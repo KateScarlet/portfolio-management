@@ -1,0 +1,77 @@
+package handlers
+
+import (
+	"context"
+	"permanent-portfolio/models"
+	"time"
+
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+func ListRecords(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var records []models.PortfolioRecord
+		if err := db.Order("timestamp DESC").Find(&records).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		c.JSON(consts.StatusOK, records)
+	}
+}
+
+func CreateRecord(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var holdings []models.Holding
+		if err := db.Find(&holdings).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
+		var total, principal float64
+		for _, h := range holdings {
+			assets[h.AssetId] += h.Value
+			total += h.Value
+			principal += h.Cost
+		}
+
+		if total == 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "No data to record"})
+			return
+		}
+
+		record := models.PortfolioRecord{
+			ID:        uuid.New().String(),
+			Timestamp: time.Now().UnixMilli(),
+			Assets:    assets,
+			Total:     total,
+			Principal: principal,
+		}
+
+		if err := db.Create(&record).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		c.JSON(consts.StatusCreated, record)
+	}
+}
+
+func DeleteRecord(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		id := c.Param("id")
+		result := db.Delete(&models.PortfolioRecord{}, "id = ?", id)
+		if result.Error != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+			return
+		}
+		if result.RowsAffected == 0 {
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "Record not found"})
+			return
+		}
+		c.JSON(consts.StatusOK, map[string]bool{"success": true})
+	}
+}

@@ -5,10 +5,18 @@ import RebalancePanel from './components/RebalancePanel';
 import HistoryPanel from './components/HistoryPanel';
 
 export default function App() {
-  const { holdings, assets, history, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
+  const { holdings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
 
   const total = Object.values(assets).reduce((sum, val) => sum + val, 0);
   const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <p className="text-sm text-[#6C757D]">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">

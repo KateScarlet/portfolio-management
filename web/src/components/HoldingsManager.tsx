@@ -205,7 +205,10 @@ export default function HoldingsManager({ holdings, total, onAddHolding, onUpdat
     } else {
         onAddHolding({
             assetId: 'cash',
+            symbol: '',
             name: '卖出资金 (现金)',
+            shares: 0,
+            price: 0,
             value: realizedValue,
             cost: realizedValue,
             date: Date.now()
