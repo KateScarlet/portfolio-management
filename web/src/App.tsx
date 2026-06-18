@@ -1,0 +1,60 @@
+import { usePortfolio } from './usePortfolio';
+import Dashboard from './components/Dashboard';
+import HoldingsManager from './components/HoldingsManager';
+import RebalancePanel from './components/RebalancePanel';
+import HistoryPanel from './components/HistoryPanel';
+
+export default function App() {
+  const { holdings, assets, history, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
+
+  const total = Object.values(assets).reduce((sum, val) => sum + val, 0);
+  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0);
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">
+      {/* Header */}
+      <header className="h-20 bg-white border-b border-[#E9ECEF] flex items-center justify-between px-6 sm:px-10 flex-shrink-0 lg:sticky lg:top-0 lg:z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
+            <div className="w-4 h-4 border-2 border-white rounded-full"></div>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight uppercase">
+            PERMANENT<span className="font-light opacity-50 ml-1 text-sm">Portfolio</span>
+          </h1>
+        </div>
+        <div className="hidden sm:flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">持久资产配置</p>
+            <p className="text-xs font-mono text-[#6C757D]">自动跟踪器</p>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Grid */}
+      <main className="flex-grow p-4 sm:p-8 flex flex-col gap-8 max-w-[1400px] mx-auto w-full">
+        {/* Top Row: Dashboard & Rebalance */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-5 flex flex-col gap-6">
+            <Dashboard assets={assets} total={total} principal={totalCost} />
+          </div>
+          <div className="lg:col-span-7 flex flex-col gap-6">
+            <RebalancePanel assets={assets} total={total} />
+          </div>
+        </div>
+        
+        {/* Bottom Row: Holdings & History */}
+        <div className="flex flex-col gap-6">
+          <HoldingsManager 
+            holdings={holdings}
+            total={total}
+            onAddHolding={addHolding}
+            onUpdateHolding={updateHolding}
+            onRemoveHolding={removeHolding}
+            onSaveRecord={saveRecord}
+          />
+          <HistoryPanel history={history} onDeleteRecord={deleteRecord} />
+        </div>
+      </main>
+    </div>
+  );
+}

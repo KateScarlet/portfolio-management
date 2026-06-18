@@ -1,0 +1,6 @@
+{
+  "name": "永久投资组合跟踪",
+  "description": "基于哈利·布朗模型的永久投资组合(股票、长期债券、现金、黄金)资产记录与再平衡跟踪工具。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
