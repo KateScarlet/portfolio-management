@@ -70,7 +70,7 @@ export default function Dashboard({ assets, total, principal, totalFees }: Dashb
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value) => formatCurrency(Number(value))}
                 contentStyle={{ borderRadius: '0.5rem', border: '1px solid #E9ECEF', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)', backgroundColor: '#fff' }}
               />
             </PieChart>
