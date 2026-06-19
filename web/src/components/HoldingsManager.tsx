@@ -980,7 +980,7 @@ export default function HoldingsManager({
                                                                             key={
                                                                                 lot.id
                                                                             }
-                                                                            className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6]" : "text-[#495057]"} ${lot.type === "sell" ? "!text-orange-600" : ""}`}
+                                                                            className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 whitespace-nowrap ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6] flex-wrap" : "text-[#495057]"} ${lot.type === "sell" ? "!text-orange-600" : ""}`}
                                                                         >
                                                                             {isEditing ? (
                                                                                 <div className="flex flex-wrap items-center gap-2 w-full">
@@ -1132,23 +1132,23 @@ export default function HoldingsManager({
                                                                                             lot.date,
                                                                                         ).toLocaleDateString()}
                                                                                     </span>
-                                                                                    <div className="flex items-center gap-4 text-right">
+                                                                                    <div className="flex items-center gap-4 text-right flex-shrink-0">
                                                                                         {h.symbol ? (
                                                                                             <>
-                                                                                                <span className="w-24">
+                                                                                                <span className="w-28 text-right">
                                                                                                     单价:{" "}
                                                                                                     {formatCurrency(
                                                                                                         lot.costPrice ||
                                                                                                             0,
                                                                                                     )}
                                                                                                 </span>
-                                                                                                <span className="w-24">
+                                                                                                <span className="w-20 text-right">
                                                                                                     数量:{" "}
                                                                                                     {
                                                                                                         lot.shares
                                                                                                     }
                                                                                                 </span>
-                                                                                                <span className="w-24 font-medium text-[#1A1A1A]">
+                                                                                                <span className="w-28 font-medium text-[#1A1A1A] text-right">
                                                                                                     {lot.type ===
                                                                                                     "sell"
                                                                                                         ? "收入"
@@ -1161,7 +1161,7 @@ export default function HoldingsManager({
                                                                                                 </span>
                                                                                             </>
                                                                                         ) : (
-                                                                                            <span className="w-24 font-medium text-[#1A1A1A]">
+                                                                                            <span className="w-28 font-medium text-[#1A1A1A] text-right">
                                                                                                 {lot.type ===
                                                                                                 "sell"
                                                                                                     ? "收入"
@@ -1177,7 +1177,7 @@ export default function HoldingsManager({
                                                                                         {(lot.fee ||
                                                                                             0) >
                                                                                             0 && (
-                                                                                            <span className="w-20 text-[10px] text-[#ADB5BD]">
+                                                                                            <span className="w-20 text-[10px] text-[#ADB5BD] text-right">
                                                                                                 费:{" "}
                                                                                                 {formatCurrency(
                                                                                                     lot.fee ||
@@ -1187,7 +1187,7 @@ export default function HoldingsManager({
                                                                                         )}
                                                                                         {lot.type !==
                                                                                             "sell" && (
-                                                                                            <>
+                                                                                            <div className="flex gap-2 flex-shrink-0">
                                                                                                 <button
                                                                                                     onClick={() => {
                                                                                                         setEditingLotId(
@@ -1221,7 +1221,7 @@ export default function HoldingsManager({
                                                                                                             },
                                                                                                         );
                                                                                                     }}
-                                                                                                    className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors"
+                                                                                                    className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
                                                                                                 >
                                                                                                     Edit
                                                                                                 </button>
@@ -1232,11 +1232,11 @@ export default function HoldingsManager({
                                                                                                             lot.id,
                                                                                                         )
                                                                                                     }
-                                                                                                    className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
+                                                                                                    className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors whitespace-nowrap"
                                                                                                 >
                                                                                                     Del
                                                                                                 </button>
-                                                                                            </>
+                                                                                            </div>
                                                                                         )}
                                                                                     </div>
                                                                                 </>
