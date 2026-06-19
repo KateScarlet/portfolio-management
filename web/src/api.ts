@@ -1,41 +1,41 @@
-import { Holding, PortfolioRecord, SyncStatus } from './types';
+import { Holding, PortfolioRecord, SyncStatus } from "./types"
 
-const BASE = '';
+const BASE = ""
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     ...options,
-  });
+  })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || res.statusText)
   }
-  return res.json();
+  return res.json()
 }
 
 export async function fetchHoldings(): Promise<Holding[]> {
-  return request<Holding[]>('/api/holdings');
+  return request<Holding[]>("/api/holdings")
 }
 
-export async function createHolding(h: Omit<Holding, 'id'>): Promise<Holding> {
-  return request<Holding>('/api/holdings', {
-    method: 'POST',
+export async function createHolding(h: Omit<Holding, "id">): Promise<Holding> {
+  return request<Holding>("/api/holdings", {
+    method: "POST",
     body: JSON.stringify(h),
-  });
+  })
 }
 
 export async function updateHolding(id: string, updates: Partial<Holding>): Promise<Holding> {
   return request<Holding>(`/api/holdings/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(updates),
-  });
+  })
 }
 
 export async function deleteHolding(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/holdings/${id}`, {
-    method: 'DELETE',
-  });
+    method: "DELETE",
+  })
 }
 
 export async function sellHolding(
@@ -46,42 +46,45 @@ export async function sellHolding(
   value: number
 ): Promise<{ holdings: Holding[]; cashHolding: Holding }> {
   return request<{ holdings: Holding[]; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify({ shares, price, fee, value }),
-  });
+  })
 }
 
 export async function fetchRecords(): Promise<PortfolioRecord[]> {
-  return request<PortfolioRecord[]>('/api/records');
+  return request<PortfolioRecord[]>("/api/records")
 }
 
 export async function createRecord(): Promise<PortfolioRecord> {
-  return request<PortfolioRecord>('/api/records', {
-    method: 'POST',
-  });
+  return request<PortfolioRecord>("/api/records", {
+    method: "POST",
+  })
 }
 
 export async function deleteRecord(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/records/${id}`, {
-    method: 'DELETE',
-  });
+    method: "DELETE",
+  })
 }
 
 export async function fetchSettings(): Promise<Record<string, string>> {
-  return request<Record<string, string>>('/api/settings');
+  return request<Record<string, string>>("/api/settings")
 }
 
-export async function updateSetting(key: string, value: string): Promise<{ key: string; value: string }> {
+export async function updateSetting(
+  key: string,
+  value: string
+): Promise<{ key: string; value: string }> {
   return request<{ key: string; value: string }>(`/api/settings/${key}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify({ value }),
-  });
+  })
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatus> {
-  return request<SyncStatus>('/api/sync/status');
+  return request<SyncStatus>("/api/sync/status")
 }
 
 export async function triggerSync(): Promise<SyncStatus> {
-  return request<SyncStatus>('/api/sync/trigger', { method: 'POST' });
+  return request<SyncStatus>("/api/sync/trigger", { method: "POST" })
 }

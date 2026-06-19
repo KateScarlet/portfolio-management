@@ -1,30 +1,30 @@
-import React, { useState } from 'react';
-import { Settings } from '../types';
-import { Settings as SettingsIcon } from 'lucide-react';
+import React, { useState } from "react"
+import { Settings } from "../types"
+import { Settings as SettingsIcon } from "lucide-react"
 
 interface SettingsPanelProps {
-  settings: Settings;
-  onSave: (settings: Settings) => void;
+  settings: Settings
+  onSave: (settings: Settings) => void
 }
 
 const SYNC_PRESETS = [
-  { value: 0, label: '关闭' },
-  { value: 30, label: '30分钟' },
-  { value: 60, label: '1小时' },
-  { value: 120, label: '2小时' },
-  { value: 240, label: '4小时' },
-];
+  { value: 0, label: "关闭" },
+  { value: 30, label: "30分钟" },
+  { value: 60, label: "1小时" },
+  { value: 120, label: "2小时" },
+  { value: 240, label: "4小时" },
+]
 
 export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [draft, setDraft] = useState(settings);
+  const [isOpen, setIsOpen] = useState(false)
+  const [draft, setDraft] = useState(settings)
 
   const handleSave = () => {
-    onSave(draft);
-    setIsOpen(false);
-  };
+    onSave(draft)
+    setIsOpen(false)
+  }
 
-  const presets = [3, 5, 7, 10, 15, 20];
+  const presets = [3, 5, 7, 10, 15, 20]
 
   return (
     <>
@@ -37,11 +37,22 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => setIsOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-medium text-[#1A1A1A]">设置</h3>
-              <button onClick={() => setIsOpen(false)} className="text-[#ADB5BD] hover:text-[#1A1A1A] text-xl leading-none">&times;</button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-[#ADB5BD] hover:text-[#1A1A1A] text-xl leading-none"
+              >
+                &times;
+              </button>
             </div>
 
             <div className="space-y-6">
@@ -69,7 +80,12 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       min="1"
                       max="30"
                       value={draft.driftThreshold}
-                      onChange={(e) => setDraft({ ...draft, driftThreshold: Math.max(1, Math.min(30, Number(e.target.value) || 1)) })}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          driftThreshold: Math.max(1, Math.min(30, Number(e.target.value) || 1)),
+                        })
+                      }
                       className="w-14 px-2 py-1.5 text-sm text-center border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
                     />
                     <span className="text-xs text-[#6C757D]">%</span>
@@ -82,8 +98,8 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       onClick={() => setDraft({ ...draft, driftThreshold: p })}
                       className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                         draft.driftThreshold === p
-                          ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
-                          : 'bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]'
+                          ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                          : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
                       }`}
                     >
                       {p}%
@@ -97,9 +113,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                 <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
                   自动同步价格
                 </label>
-                <p className="text-xs text-[#6C757D] mb-3">
-                  定时从 Yahoo Finance 获取最新价格。
-                </p>
+                <p className="text-xs text-[#6C757D] mb-3">定时从 Yahoo Finance 获取最新价格。</p>
                 <div className="flex flex-wrap gap-2">
                   {SYNC_PRESETS.map((p) => (
                     <button
@@ -107,8 +121,8 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       onClick={() => setDraft({ ...draft, syncInterval: p.value })}
                       className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                         draft.syncInterval === p.value
-                          ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
-                          : 'bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]'
+                          ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                          : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
                       }`}
                     >
                       {p.label}
@@ -136,5 +150,5 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
         </div>
       )}
     </>
-  );
+  )
 }

@@ -30,6 +30,18 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot be negative"})
 			return
 		}
+		if input.Shares < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares cannot be negative"})
+			return
+		}
+		if input.Value < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value cannot be negative"})
+			return
+		}
+		if input.Shares == 0 && input.Value == 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
+			return
+		}
 
 		tx := db.Begin()
 		if tx.Error != nil {

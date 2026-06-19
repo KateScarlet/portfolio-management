@@ -51,12 +51,19 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 
 		// Update scheduler if syncInterval changed
 		if key == "syncInterval" && s != nil {
-			if mins, err := strconv.Atoi(body.Value); err == nil {
-				if mins == 0 {
-					s.UpdateInterval(0)
-				} else {
-					s.UpdateInterval(time.Duration(mins) * time.Minute)
-				}
+			mins, err := strconv.Atoi(body.Value)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be a valid integer"})
+				return
+			}
+			if mins < 0 || mins > 10080 {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be between 0 and 10080 minutes (7 days)"})
+				return
+			}
+			if mins == 0 {
+				s.UpdateInterval(0)
+			} else {
+				s.UpdateInterval(time.Duration(mins) * time.Minute)
 			}
 		}
 

@@ -31,6 +31,33 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// Input validation
+		if input.AssetId == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId is required"})
+			return
+		}
+		validAssets := map[string]bool{"stocks": true, "bonds": true, "cash": true, "gold": true}
+		if !validAssets[input.AssetId] {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid assetId"})
+			return
+		}
+		if input.Shares < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "shares cannot be negative"})
+			return
+		}
+		if input.Cost < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "cost cannot be negative"})
+			return
+		}
+		if input.CostPrice < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "costPrice cannot be negative"})
+			return
+		}
+		if input.Fee < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fee cannot be negative"})
+			return
+		}
+
 		var newLot models.HoldingLot
 		newLot.ID = uuid.New().String()
 		newLot.Date = input.Date
@@ -119,7 +146,20 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if lotsRaw, ok := updates["lots"]; ok {
+		// Whitelist of allowed fields to prevent mass assignment
+		allowedFields := map[string]bool{
+			"name": true, "symbol": true, "shares": true,
+			"price": true, "costPrice": true, "value": true,
+			"cost": true, "date": true, "lots": true,
+		}
+		safeUpdates := make(map[string]interface{})
+		for k, v := range updates {
+			if allowedFields[k] {
+				safeUpdates[k] = v
+			}
+		}
+
+		if lotsRaw, ok := safeUpdates["lots"]; ok {
 			if lotsBytes, err := json.Marshal(lotsRaw); err == nil {
 				var lots []models.HoldingLot
 				if json.Unmarshal(lotsBytes, &lots) == nil {
@@ -128,17 +168,25 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 							lots[i].ID = uuid.New().String()
 						}
 					}
-					updates["lots"] = models.JSONColumn(lots)
+					safeUpdates["lots"] = models.JSONColumn(lots)
 				}
 			}
 		}
 
-		if err := db.Model(&holding).Updates(updates).Error; err != nil {
+		if len(safeUpdates) == 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no valid fields to update"})
+			return
+		}
+
+		if err := db.Model(&holding).Updates(safeUpdates).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 
-		db.First(&holding, "id = ?", id)
+		if err := db.First(&holding, "id = ?", id).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 		c.JSON(consts.StatusOK, holding)
 	}
 }

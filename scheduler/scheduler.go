@@ -48,9 +48,10 @@ func (s *PriceScheduler) Start() {
 	}
 	slog.Info("scheduler starting price sync", "interval", s.interval)
 	s.ticker = time.NewTicker(s.interval)
+	stopCh := s.stopCh
 	s.mu.Unlock()
 
-	go s.run()
+	go s.run(stopCh)
 }
 
 func (s *PriceScheduler) Stop() {
@@ -81,20 +82,23 @@ func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 	}
 	if s.ticker != nil {
 		s.ticker.Stop()
+		close(s.stopCh)
 	}
 	s.ticker = time.NewTicker(interval)
+	s.stopCh = make(chan struct{})
+	stopCh := s.stopCh
 	s.mu.Unlock()
 
-	go s.run()
+	go s.run(stopCh)
 	slog.Info("scheduler interval updated", "interval", interval)
 }
 
-func (s *PriceScheduler) run() {
+func (s *PriceScheduler) run(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-s.ticker.C:
 			s.SyncNow()
-		case <-s.stopCh:
+		case <-stopCh:
 			return
 		}
 	}

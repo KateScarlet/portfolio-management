@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -21,7 +22,8 @@ var (
 func Init() {
 	client = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
-		SetHeader("Accept", "application/json")
+		SetHeader("Accept", "application/json").
+		SetTimeout(30 * time.Second)
 }
 
 type YahooChartResponse struct {
@@ -120,7 +122,11 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 				price *= rate
 			}
 		} else {
-			slog.Warn("fx conversion failed", "from", currency, "to", "CNY", "error", err, "status", fxResp.StatusCode())
+			statusCode := 0
+			if fxResp != nil {
+				statusCode = fxResp.StatusCode()
+			}
+			slog.Warn("fx conversion failed", "from", currency, "to", "CNY", "error", err, "status", statusCode)
 		}
 	}
 

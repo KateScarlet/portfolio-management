@@ -1,65 +1,82 @@
-import { useState, useEffect, useCallback } from 'react';
-import { usePortfolio } from './usePortfolio';
-import { Settings, SyncStatus, DEFAULT_SETTINGS } from './types';
-import * as api from './api';
-import Dashboard from './components/Dashboard';
-import HoldingsManager from './components/HoldingsManager';
-import RebalancePanel from './components/RebalancePanel';
-import HistoryPanel from './components/HistoryPanel';
-import SettingsPanel from './components/SettingsPanel';
+import { useState, useEffect, useCallback } from "react"
+import { usePortfolio } from "./usePortfolio"
+import { Settings, SyncStatus, DEFAULT_SETTINGS } from "./types"
+import * as api from "./api"
+import Dashboard from "./components/Dashboard"
+import HoldingsManager from "./components/HoldingsManager"
+import RebalancePanel from "./components/RebalancePanel"
+import HistoryPanel from "./components/HistoryPanel"
+import SettingsPanel from "./components/SettingsPanel"
 
 export default function App() {
-  const { holdings, setHoldings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const {
+    holdings,
+    setHoldings,
+    assets,
+    history,
+    loading,
+    addHolding,
+    updateHolding,
+    removeHolding,
+    saveRecord,
+    deleteRecord,
+  } = usePortfolio()
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
 
   useEffect(() => {
-    api.fetchSettings().then((s) => {
-      setSettings({
-        driftThreshold: Number(s.driftThreshold) || DEFAULT_SETTINGS.driftThreshold,
-        syncInterval: Number(s.syncInterval) || DEFAULT_SETTINGS.syncInterval,
-      });
-    }).catch(console.error);
-    api.fetchSyncStatus().then(setSyncStatus).catch(console.error);
-  }, []);
+    api
+      .fetchSettings()
+      .then((s) => {
+        setSettings({
+          driftThreshold: Number(s.driftThreshold) || DEFAULT_SETTINGS.driftThreshold,
+          syncInterval: Number(s.syncInterval) || DEFAULT_SETTINGS.syncInterval,
+        })
+      })
+      .catch(console.error)
+    api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
+  }, [])
 
   // Poll sync status every 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      api.fetchSyncStatus().then(setSyncStatus).catch(console.error);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+      api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {
-      await api.updateSetting('driftThreshold', String(newSettings.driftThreshold));
-      await api.updateSetting('syncInterval', String(newSettings.syncInterval));
-      setSettings(newSettings);
+      await api.updateSetting("driftThreshold", String(newSettings.driftThreshold))
+      await api.updateSetting("syncInterval", String(newSettings.syncInterval))
+      setSettings(newSettings)
     } catch (e) {
-      console.error('Failed to save settings', e);
+      console.error("Failed to save settings", e)
     }
-  }, []);
+  }, [])
 
   const handleTriggerSync = useCallback(async () => {
     try {
-      const status = await api.triggerSync();
-      setSyncStatus(status);
+      const status = await api.triggerSync()
+      setSyncStatus(status)
     } catch (e) {
-      console.error('Failed to trigger sync', e);
+      console.error("Failed to trigger sync", e)
     }
-  }, []);
+  }, [])
 
-  const total = Object.values(assets).reduce((sum, val) => sum + val, 0);
-  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0);
-  const totalFees = holdings.reduce((sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0), 0);
+  const total = Object.values(assets).reduce((sum, val) => sum + val, 0)
+  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0)
+  const totalFees = holdings.reduce(
+    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
+    0
+  )
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
         <p className="text-sm text-[#6C757D]">Loading...</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -70,9 +87,7 @@ export default function App() {
           <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            投资组合
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">投资组合</h1>
         </div>
         <div className="hidden sm:flex items-center gap-4">
           {syncStatus && syncStatus.lastSyncAt && (
@@ -82,7 +97,9 @@ export default function App() {
               className="text-[10px] text-[#6C757D] hover:text-[#1A1A1A] transition-colors disabled:opacity-50"
               title="手动同步价格"
             >
-              {syncStatus.syncing ? '同步中...' : `上次同步: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`}
+              {syncStatus.syncing
+                ? "同步中..."
+                : `上次同步: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`}
             </button>
           )}
           <SettingsPanel settings={settings} onSave={handleSaveSettings} />
@@ -97,13 +114,17 @@ export default function App() {
             <Dashboard assets={assets} total={total} principal={totalCost} totalFees={totalFees} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
-            <RebalancePanel assets={assets} total={total} driftThreshold={settings.driftThreshold} />
+            <RebalancePanel
+              assets={assets}
+              total={total}
+              driftThreshold={settings.driftThreshold}
+            />
           </div>
         </div>
-        
+
         {/* Bottom Row: Holdings & History */}
         <div className="flex flex-col gap-6">
-          <HoldingsManager 
+          <HoldingsManager
             holdings={holdings}
             setHoldings={setHoldings}
             total={total}
@@ -116,5 +137,5 @@ export default function App() {
         </div>
       </main>
     </div>
-  );
+  )
 }
