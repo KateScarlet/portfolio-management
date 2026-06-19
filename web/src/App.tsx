@@ -52,6 +52,7 @@ export default function App() {
 
   const total = Object.values(assets).reduce((sum, val) => sum + val, 0);
   const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0);
+  const totalFees = holdings.reduce((sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0), 0);
 
   if (loading) {
     return (
@@ -96,10 +97,10 @@ export default function App() {
       <main className="flex-grow p-4 sm:p-8 flex flex-col gap-8 max-w-[1400px] mx-auto w-full">
         {/* Top Row: Dashboard & Rebalance */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <Dashboard assets={assets} total={total} principal={totalCost} />
+          <div className="lg:col-span-5 flex flex-col gap-6 h-full">
+            <Dashboard assets={assets} total={total} principal={totalCost} totalFees={totalFees} />
           </div>
-          <div className="lg:col-span-7 flex flex-col gap-6">
+          <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel assets={assets} total={total} driftThreshold={settings.driftThreshold} />
           </div>
         </div>

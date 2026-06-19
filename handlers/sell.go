@@ -13,6 +13,7 @@ import (
 type SellRequest struct {
 	Shares float64 `json:"shares"`
 	Price  float64 `json:"price"`
+	Fee    float64 `json:"fee"`
 }
 
 func SellHolding(db *gorm.DB) app.HandlerFunc {
@@ -28,6 +29,10 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Invalid shares or price"})
 			return
 		}
+		if input.Fee < 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot be negative"})
+			return
+		}
 
 		var holding models.Holding
 		if err := db.First(&holding, "id = ?", id).Error; err != nil {
@@ -40,7 +45,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		realizedValue := input.Shares * input.Price
+		realizedValue := input.Shares*input.Price - input.Fee
 		remainingShares := holding.Shares - input.Shares
 
 		tx := db.Begin()

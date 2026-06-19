@@ -41,6 +41,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		newLot.CostPrice = input.CostPrice
 		newLot.Cost = input.Cost
 		newLot.ValueAdded = input.Value
+		newLot.Fee = input.Fee
 
 		var existing models.Holding
 		var result *gorm.DB
@@ -59,6 +60,10 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				existing.Cost = input.Cost
 			} else if existing.Cost == 0 && input.Symbol == "" {
 				existing.Cost = input.Cost + input.Value
+			}
+
+			if input.Fee > 0 {
+				existing.Cost += input.Fee
 			}
 
 			if existing.Shares > 0 && existing.Cost > 0 {
@@ -81,6 +86,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusOK, existing)
 		} else {
 			input.ID = uuid.New().String()
+			if input.Fee > 0 {
+				input.Cost += input.Fee
+			}
 			if input.Lots == nil {
 				input.Lots = models.JSONColumn{newLot}
 			} else {

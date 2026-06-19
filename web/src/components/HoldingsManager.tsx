@@ -36,6 +36,7 @@ export default function HoldingsManager({
     const [costCurrency, setCostCurrency] = useState("CNY");
     const [newValue, setNewValue] = useState("");
     const [newCost, setNewCost] = useState("");
+    const [newFee, setNewFee] = useState("");
     const [newDate, setNewDate] = useState(
         new Date().toISOString().split("T")[0],
     );
@@ -46,21 +47,23 @@ export default function HoldingsManager({
     const [editingValueId, setEditingValueId] = useState<string | null>(null);
     const [tempEditValue, setTempEditValue] = useState("");
     const [editingLotId, setEditingLotId] = useState<string | null>(null);
-    const [tempEditLot, setTempEditLot] = useState<{ date: string; shares: string; costPrice: string; cost: string }>({ date: "", shares: "", costPrice: "", cost: "" });
+    const [tempEditLot, setTempEditLot] = useState<{ date: string; shares: string; costPrice: string; cost: string; fee: string }>({ date: "", shares: "", costPrice: "", cost: "", fee: "" });
 
     const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [sellShares, setSellShares] = useState("");
     const [sellPrice, setSellPrice] = useState("");
+    const [sellFee, setSellFee] = useState("");
     const [deductFromCash, setDeductFromCash] = useState(false);
 
     const handleAdd = async () => {
         let addedCost = 0;
+        const feeNum = parseFloat(newFee) || 0;
 
         if (isManual) {
             const val = parseFloat(newValue);
             const c = parseFloat(newCost);
             if (isNaN(val) || val <= 0) return;
-            addedCost = isNaN(c) || c <= 0 ? val : c;
+            addedCost = (isNaN(c) || c <= 0 ? val : c) + feeNum;
             onAddHolding({
                 assetId: newAssetId,
                 symbol: "",
@@ -68,7 +71,8 @@ export default function HoldingsManager({
                 shares: 0,
                 price: 0,
                 value: val,
-                cost: addedCost,
+                cost: addedCost - feeNum,
+                fee: feeNum,
                 date: new Date(newDate).getTime(),
             });
         } else {
@@ -106,7 +110,7 @@ export default function HoldingsManager({
                         }
                     }
 
-                    addedCost = sharesNum * finalCostPrice;
+                    addedCost = sharesNum * finalCostPrice + feeNum;
                     onAddHolding({
                         assetId: newAssetId,
                         symbol: authoritativeSymbol,
@@ -116,7 +120,8 @@ export default function HoldingsManager({
                         price: data.price,
                         costPrice: finalCostPrice,
                         value: sharesNum * data.price,
-                        cost: addedCost,
+                        cost: sharesNum * finalCostPrice,
+                        fee: feeNum,
                         date: new Date(newDate).getTime(),
                     });
                 } else {
@@ -158,6 +163,7 @@ export default function HoldingsManager({
         setNewCostPrice("");
         setNewValue("");
         setNewCost("");
+        setNewFee("");
         setDeductFromCash(false);
     };
 
@@ -195,12 +201,12 @@ export default function HoldingsManager({
         const isSymbol = !!h.symbol;
         if (isSymbol) {
             const totalShares = buyLots.reduce((s, l) => s + l.shares, 0);
-            const totalCost = buyLots.reduce((s, l) => s + (l.cost || 0), 0);
+            const totalCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0);
             const costPrice = totalShares > 0 ? totalCost / totalShares : 0;
             return { lots, shares: totalShares, cost: totalCost, costPrice };
         } else {
             const totalValue = buyLots.reduce((s, l) => s + (l.valueAdded || l.cost || 0), 0);
-            const totalCost = buyLots.reduce((s, l) => s + (l.cost || l.valueAdded || 0), 0);
+            const totalCost = buyLots.reduce((s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0), 0);
             return { lots, value: totalValue, cost: totalCost, shares: 0 };
         }
     };
@@ -212,15 +218,16 @@ export default function HoldingsManager({
         const updatedLots = h.lots.map((l) => {
             if (l.id !== editingLotId) return l;
             const dateVal = new Date(tempEditLot.date).getTime() || l.date;
+            const fee = parseFloat(tempEditLot.fee) || 0;
             if (h.symbol) {
                 const shares = parseFloat(tempEditLot.shares) || l.shares;
                 const costPrice = parseFloat(tempEditLot.costPrice) || l.costPrice || 0;
                 const cost = parseFloat(tempEditLot.cost) || shares * costPrice;
-                return { ...l, date: dateVal, shares, costPrice, cost };
+                return { ...l, date: dateVal, shares, costPrice, cost, fee };
             } else {
                 const valueAdded = parseFloat(tempEditLot.cost) || l.valueAdded || 0;
                 const cost = valueAdded;
-                return { ...l, date: dateVal, valueAdded, cost };
+                return { ...l, date: dateVal, valueAdded, cost, fee };
             }
         });
         onUpdateHolding(h.id, recalcHolding(h, updatedLots));
@@ -248,6 +255,7 @@ export default function HoldingsManager({
     const confirmSell = () => {
         if (!sellingHolding) return;
         const h = sellingHolding;
+        const feeNum = parseFloat(sellFee) || 0;
 
         let realizedValue = 0;
         let sellSharesNum = 0;
@@ -262,7 +270,7 @@ export default function HoldingsManager({
             if (isNaN(sPrice) || sPrice < 0) {
                 return;
             }
-            realizedValue = sShares * sPrice;
+            realizedValue = sShares * sPrice - feeNum;
             sellSharesNum = sShares;
             sellPriceNum = sPrice;
 
@@ -270,12 +278,13 @@ export default function HoldingsManager({
             if (remainingShares === 0) {
                 onRemoveHolding(h.id);
                 setSellingHolding(null);
+                setSellFee("");
                 return;
             } else {
                 const remainingCost = h.cost
                     ? (h.cost / h.shares) * remainingShares
                     : 0;
-                const sellLot = { type: "sell", date: Date.now(), shares: sellSharesNum, costPrice: sellPriceNum, cost: realizedValue };
+                const sellLot = { type: "sell", date: Date.now(), shares: sellSharesNum, costPrice: sellPriceNum, cost: realizedValue, fee: feeNum };
                 const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
                 onUpdateHolding(h.id, {
                     shares: remainingShares,
@@ -289,18 +298,19 @@ export default function HoldingsManager({
             if (isNaN(sValue) || sValue <= 0 || sValue > h.value) {
                 return;
             }
-            realizedValue = sValue;
+            realizedValue = sValue - feeNum;
 
             const remainingValue = h.value - sValue;
             if (remainingValue === 0) {
                 onRemoveHolding(h.id);
                 setSellingHolding(null);
+                setSellFee("");
                 return;
             } else {
                 const remainingCost = h.cost
                     ? (h.cost / h.value) * remainingValue
                     : 0;
-                const sellLot = { type: "sell", date: Date.now(), shares: 0, costPrice: 0, cost: realizedValue, valueAdded: realizedValue };
+                const sellLot = { type: "sell", date: Date.now(), shares: 0, costPrice: 0, cost: realizedValue, valueAdded: realizedValue, fee: feeNum };
                 const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
                 onUpdateHolding(h.id, {
                     value: remainingValue,
@@ -330,6 +340,7 @@ export default function HoldingsManager({
         }
 
         setSellingHolding(null);
+        setSellFee("");
     };
 
     return (
@@ -601,6 +612,21 @@ export default function HoldingsManager({
                                 </div>
                             </>
                         )}
+
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                                手续费 (选填)
+                            </label>
+                            <input
+                                type="number"
+                                placeholder="0"
+                                value={newFee}
+                                onChange={(e) =>
+                                    setNewFee(e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                            />
+                        </div>
 
                         <div className="flex flex-col justify-end gap-2">
                             <label className="flex items-center gap-2 cursor-pointer pb-1 h-[21px]">
@@ -955,6 +981,13 @@ export default function HoldingsManager({
                                                                                         onChange={(e) => setTempEditLot({ ...tempEditLot, cost: e.target.value })}
                                                                                         className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                                                                     />
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        placeholder="手续费"
+                                                                                        value={tempEditLot.fee}
+                                                                                        onChange={(e) => setTempEditLot({ ...tempEditLot, fee: e.target.value })}
+                                                                                        className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                                                                    />
                                                                                     <div className="flex gap-1 ml-auto">
                                                                                         <button onClick={() => saveEditLot(h)} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">保存</button>
                                                                                         <button onClick={() => setEditingLotId(null)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1">取消</button>
@@ -988,6 +1021,11 @@ export default function HoldingsManager({
                                                                                                 {lot.type === "sell" ? "收入" : "价值"}: {formatCurrency(lot.valueAdded || lot.cost || 0)}
                                                                                             </span>
                                                                                         )}
+                                                                                        {(lot.fee || 0) > 0 && (
+                                                                                            <span className="w-20 text-[10px] text-[#ADB5BD]">
+                                                                                                费: {formatCurrency(lot.fee || 0)}
+                                                                                            </span>
+                                                                                        )}
                                                                                         {lot.type !== "sell" && (
                                                                                             <>
                                                                                                 <button
@@ -998,6 +1036,7 @@ export default function HoldingsManager({
                                                                                                             shares: lot.shares.toString(),
                                                                                                             costPrice: (lot.costPrice || 0).toString(),
                                                                                                             cost: (h.symbol ? lot.cost : lot.valueAdded || lot.cost || 0).toString(),
+                                                                                                            fee: (lot.fee || 0).toString(),
                                                                                                         });
                                                                                                     }}
                                                                                                     className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors"
@@ -1094,9 +1133,24 @@ export default function HoldingsManager({
                             )}
                         </div>
 
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                                手续费 (选填)
+                            </label>
+                            <input
+                                type="number"
+                                value={sellFee}
+                                onChange={(e) =>
+                                    setSellFee(e.target.value)
+                                }
+                                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+                                placeholder="0"
+                            />
+                        </div>
+
                         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">
                             <button
-                                onClick={() => setSellingHolding(null)}
+                                onClick={() => { setSellingHolding(null); setSellFee(""); }}
                                 className="px-4 py-2 text-sm font-medium text-[#6C757D] hover:bg-[#F8F9FA] rounded-xl transition-colors"
                             >
                                 取消

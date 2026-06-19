@@ -36,7 +36,7 @@ export default function RebalancePanel({ assets, total, driftThreshold }: Rebala
   const allBalanced = items.every((i) => i.isBalanced);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col overflow-hidden">
+    <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col overflow-hidden h-full">
       <div className="p-6 border-b border-[#F1F3F5] flex justify-between items-center bg-white">
         <h3 className="text-lg font-medium text-[#1A1A1A]">再平衡建议</h3>
           <span className="text-[10px] uppercase tracking-widest text-[#ADB5BD] border border-[#E9ECEF] px-2 py-1 rounded-sm bg-[#F8F9FA]">

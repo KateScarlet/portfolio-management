@@ -7,9 +7,10 @@ interface DashboardProps {
   assets: Record<AssetId, number>;
   total: number;
   principal: number;
+  totalFees: number;
 }
 
-export default function Dashboard({ assets, total, principal }: DashboardProps) {
+export default function Dashboard({ assets, total, principal, totalFees }: DashboardProps) {
   const chartData = Object.keys(assets).map((key) => {
     const id = key as AssetId;
     const value = assets[id];
@@ -25,12 +26,13 @@ export default function Dashboard({ assets, total, principal }: DashboardProps) 
   const isPositive = profit >= 0;
 
   return (
-    <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col">
+    <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col h-full">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs uppercase tracking-[0.2em] text-[#6C757D] font-semibold">总资产净值</p>
         
         <div className="flex items-center gap-2 text-xs text-[#ADB5BD]">
            <span>累计投入成本: <span className="font-mono">{formatCurrency(principal)}</span></span>
+           {totalFees > 0 && <span className="ml-2">累计手续费: <span className="font-mono">{formatCurrency(totalFees)}</span></span>}
         </div>
       </div>
       

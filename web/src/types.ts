@@ -16,6 +16,7 @@ export interface HoldingLot {
   costPrice?: number;
   cost?: number;
   valueAdded?: number;
+  fee?: number;         // 手续费
 }
 
 export interface Holding {
@@ -29,6 +30,7 @@ export interface Holding {
   value: number;       // Current total value
   cost?: number;       // Total cost basis
   date?: number;       // Original purchase date for the lot being added
+  fee?: number;        // 手续费（仅用于创建时传递）
   lots?: HoldingLot[];
 }
 

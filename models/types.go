@@ -14,6 +14,7 @@ type HoldingLot struct {
 	CostPrice  float64 `json:"costPrice,omitempty"`
 	Cost       float64 `json:"cost,omitempty"`
 	ValueAdded float64 `json:"valueAdded,omitempty"`
+	Fee        float64 `json:"fee,omitempty"`
 }
 
 type JSONColumn []HoldingLot
@@ -69,6 +70,7 @@ type Holding struct {
 	Value     float64     `gorm:"default:0" json:"value"`
 	Cost      float64     `gorm:"default:0" json:"cost,omitempty"`
 	Date      int64       `gorm:"default:0" json:"date,omitempty"`
+	Fee       float64     `gorm:"-" json:"fee,omitempty"`
 	Lots      JSONColumn  `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
 }
 
