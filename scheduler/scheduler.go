@@ -42,12 +42,14 @@ func New(db *gorm.DB, interval time.Duration) *PriceScheduler {
 
 func (s *PriceScheduler) Start() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.ticker != nil {
+		s.mu.Unlock()
 		return
 	}
 	slog.Info("scheduler starting price sync", "interval", s.interval)
 	s.ticker = time.NewTicker(s.interval)
+	s.mu.Unlock()
+
 	go s.run()
 }
 
@@ -65,7 +67,6 @@ func (s *PriceScheduler) Stop() {
 
 func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.interval = interval
 	if interval <= 0 {
 		if s.ticker != nil {
@@ -75,12 +76,15 @@ func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 			s.stopCh = make(chan struct{})
 			slog.Info("scheduler disabled", "interval", 0)
 		}
+		s.mu.Unlock()
 		return
 	}
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
 	s.ticker = time.NewTicker(interval)
+	s.mu.Unlock()
+
 	go s.run()
 	slog.Info("scheduler interval updated", "interval", interval)
 }

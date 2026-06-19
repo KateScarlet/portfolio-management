@@ -31,8 +31,15 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		tx := db.Begin()
+		if tx.Error != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": tx.Error.Error()})
+			return
+		}
+
 		var holding models.Holding
-		if err := db.First(&holding, "id = ?", id).Error; err != nil {
+		if err := tx.First(&holding, "id = ?", id).Error; err != nil {
+			tx.Rollback()
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
 			return
 		}
@@ -44,10 +51,12 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		if input.Shares > 0 {
 			// Standard sell: shares-based
 			if input.Shares > holding.Shares {
+				tx.Rollback()
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares exceed holding"})
 				return
 			}
 			if input.Price < 0 {
+				tx.Rollback()
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Invalid price"})
 				return
 			}
@@ -57,6 +66,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		} else if input.Value > 0 {
 			// Manual holding sell: value-based (shares=0)
 			if input.Value > holding.Value {
+				tx.Rollback()
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value exceed holding"})
 				return
 			}
@@ -64,11 +74,10 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			remainingShares = 0
 			remainingValue = holding.Value - input.Value
 		} else {
+			tx.Rollback()
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
 			return
 		}
-
-		tx := db.Begin()
 
 		if remainingShares == 0 && remainingValue == 0 {
 			if err := tx.Delete(&holding).Error; err != nil {
@@ -143,8 +152,14 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var holdings []models.Holding
-		db.Order("asset_id").Find(&holdings)
-		db.Where("asset_id = ?", "cash").First(&cashHolding)
+		if err := db.Order("asset_id").Find(&holdings).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if err := db.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 
 		c.JSON(consts.StatusOK, map[string]interface{}{
 			"holdings":    holdings,
