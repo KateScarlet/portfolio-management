@@ -6,9 +6,10 @@ import { ArrowRight, ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-r
 interface RebalancePanelProps {
   assets: Record<AssetId, number>;
   total: number;
+  driftThreshold: number;
 }
 
-export default function RebalancePanel({ assets, total }: RebalancePanelProps) {
+export default function RebalancePanel({ assets, total, driftThreshold }: RebalancePanelProps) {
   if (total === 0) {
     return null;
   }
@@ -19,7 +20,7 @@ export default function RebalancePanel({ assets, total }: RebalancePanelProps) {
     const targetValue = total * (def.targetPct / 100);
     const currentValue = assets[id] || 0;
     const difference = targetValue - currentValue;
-    const isBalanced = Math.abs(difference / total) < 0.05; // Within 5% tolerance
+    const isBalanced = Math.abs(difference / total) < (driftThreshold / 100); // Within drift tolerance
 
     return {
       id,
@@ -38,9 +39,9 @@ export default function RebalancePanel({ assets, total }: RebalancePanelProps) {
     <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col overflow-hidden">
       <div className="p-6 border-b border-[#F1F3F5] flex justify-between items-center bg-white">
         <h3 className="text-lg font-medium text-[#1A1A1A]">再平衡建议</h3>
-        <span className="text-[10px] uppercase tracking-widest text-[#ADB5BD] border border-[#E9ECEF] px-2 py-1 rounded-sm bg-[#F8F9FA]">
-          ±5% 漂移
-        </span>
+          <span className="text-[10px] uppercase tracking-widest text-[#ADB5BD] border border-[#E9ECEF] px-2 py-1 rounded-sm bg-[#F8F9FA]">
+            ±{driftThreshold}% 漂移
+          </span>
       </div>
 
       <div className="p-6 bg-white space-y-4">

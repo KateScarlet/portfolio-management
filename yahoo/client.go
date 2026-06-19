@@ -2,6 +2,7 @@ package yahoo
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -44,6 +45,7 @@ type PriceResult struct {
 	OriginalPrice    float64 `json:"originalPrice"`
 	Currency         string  `json:"currency"`
 	OriginalCurrency string  `json:"originalCurrency"`
+	Unit             string  `json:"unit"`
 }
 
 func ConvertSymbol(symbol string) string {
@@ -101,6 +103,8 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	currency := meta.Currency
 	price := meta.RegularMarketPrice
 	originalPrice := meta.RegularMarketPrice
+	unit := ""
+	isCommodity := strings.HasSuffix(strings.ToUpper(meta.Symbol), "=F")
 
 	if currency != "" && currency != "CNY" {
 		fxSymbol := fmt.Sprintf("%sCNY=X", currency)
@@ -115,7 +119,14 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 			if rate > 0 {
 				price = price * rate
 			}
+		} else {
+			log.Printf("[yahoo] fx conversion failed for %s->CNY: err=%v status=%d", currency, err, fxResp.StatusCode())
 		}
+	}
+
+	if isCommodity {
+		price = price / 31.1035
+		unit = "克"
 	}
 
 	return &PriceResult{
@@ -125,6 +136,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		OriginalPrice:    originalPrice,
 		Currency:         "CNY",
 		OriginalCurrency: currency,
+		Unit:             unit,
 	}, nil
 }
 

@@ -64,3 +64,14 @@ export async function deleteRecord(id: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+export async function fetchSettings(): Promise<Record<string, string>> {
+  return request<Record<string, string>>('/api/settings');
+}
+
+export async function updateSetting(key: string, value: string): Promise<{ key: string; value: string }> {
+  return request<{ key: string; value: string }>(`/api/settings/${key}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value }),
+  });
+}

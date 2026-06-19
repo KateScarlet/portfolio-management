@@ -10,6 +10,7 @@ export interface AssetInfo {
 
 export interface HoldingLot {
   id: string;
+  type?: string;        // 'sell' for sell records, empty/undefined for buy
   date: number;
   shares: number;
   costPrice?: number;
@@ -39,6 +40,14 @@ export interface PortfolioRecord {
   principal?: number;
   // We don't necessarily need to store holdings in history if we only want aggregate history, but it's okay.
 }
+
+export interface Settings {
+  driftThreshold: number; // 漂移阈值百分比，如 5 表示 5%
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  driftThreshold: 5,
+};
 
 export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
   stocks: {
@@ -70,3 +79,11 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     targetPct: 25,
   },
 };
+
+export const COMMODITY_SYMBOLS = [
+  { symbol: 'GC=F', name: '黄金' },
+  { symbol: 'SI=F', name: '白银' },
+  { symbol: 'CL=F', name: '原油 (WTI)' },
+  { symbol: 'NG=F', name: '天然气' },
+  { symbol: 'HG=F', name: '铜' },
+] as const;

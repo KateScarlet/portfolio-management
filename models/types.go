@@ -8,6 +8,7 @@ import (
 
 type HoldingLot struct {
 	ID         string  `json:"id"`
+	Type       string  `gorm:"size:10;default:''" json:"type,omitempty"`
 	Date       int64   `json:"date"`
 	Shares     float64 `json:"shares"`
 	CostPrice  float64 `json:"costPrice,omitempty"`
@@ -77,4 +78,9 @@ type PortfolioRecord struct {
 	Assets    AssetMapColumn  `gorm:"type:text;not null;default:'{}'" json:"assets"`
 	Total     float64         `gorm:"default:0" json:"total"`
 	Principal float64         `gorm:"default:0" json:"principal,omitempty"`
+}
+
+type Setting struct {
+	Key   string `gorm:"primaryKey" json:"key"`
+	Value string `gorm:"not null" json:"value"`
 }

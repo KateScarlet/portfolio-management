@@ -47,6 +47,9 @@ func main() {
 		api.GET("/records", handlers.ListRecords(database))
 		api.POST("/records", handlers.CreateRecord(database))
 		api.DELETE("/records/:id", handlers.DeleteRecord(database))
+
+		api.GET("/settings", handlers.ListSettings(database))
+		api.PUT("/settings/:key", handlers.UpdateSetting(database))
 	}
 
 	distPath := filepath.Join(".", "web", "dist")

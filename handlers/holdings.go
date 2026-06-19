@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"permanent-portfolio/models"
 	"time"
 
@@ -107,6 +108,20 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		if err := c.BindJSON(&updates); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
+		}
+
+		if lotsRaw, ok := updates["lots"]; ok {
+			if lotsBytes, err := json.Marshal(lotsRaw); err == nil {
+				var lots []models.HoldingLot
+				if json.Unmarshal(lotsBytes, &lots) == nil {
+					for i := range lots {
+						if lots[i].ID == "" {
+							lots[i].ID = uuid.New().String()
+						}
+					}
+					updates["lots"] = models.JSONColumn(lots)
+				}
+			}
 		}
 
 		if err := db.Model(&holding).Updates(updates).Error; err != nil {

@@ -28,7 +28,7 @@ dev:
 
 # 仅启动 Go 后端
 dev-go:
-    go run .
+    air
 
 # 仅启动 Vite 前端
 dev-frontend:

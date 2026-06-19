@@ -1,11 +1,33 @@
+import { useState, useEffect, useCallback } from 'react';
 import { usePortfolio } from './usePortfolio';
+import { Settings, DEFAULT_SETTINGS } from './types';
+import * as api from './api';
 import Dashboard from './components/Dashboard';
 import HoldingsManager from './components/HoldingsManager';
 import RebalancePanel from './components/RebalancePanel';
 import HistoryPanel from './components/HistoryPanel';
+import SettingsPanel from './components/SettingsPanel';
 
 export default function App() {
   const { holdings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    api.fetchSettings().then((s) => {
+      setSettings({
+        driftThreshold: Number(s.driftThreshold) || DEFAULT_SETTINGS.driftThreshold,
+      });
+    }).catch(console.error);
+  }, []);
+
+  const handleSaveSettings = useCallback(async (newSettings: Settings) => {
+    try {
+      await api.updateSetting('driftThreshold', String(newSettings.driftThreshold));
+      setSettings(newSettings);
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  }, []);
 
   const total = Object.values(assets).reduce((sum, val) => sum + val, 0);
   const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0);
@@ -35,6 +57,7 @@ export default function App() {
             <p className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">持久资产配置</p>
             <p className="text-xs font-mono text-[#6C757D]">自动跟踪器</p>
           </div>
+          <SettingsPanel settings={settings} onSave={handleSaveSettings} />
         </div>
       </header>
 
@@ -46,7 +69,7 @@ export default function App() {
             <Dashboard assets={assets} total={total} principal={totalCost} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6">
-            <RebalancePanel assets={assets} total={total} />
+            <RebalancePanel assets={assets} total={total} driftThreshold={settings.driftThreshold} />
           </div>
         </div>
         

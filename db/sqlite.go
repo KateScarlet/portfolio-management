@@ -21,7 +21,7 @@ func Init(dbPath string) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}); err != nil {
+	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}); err != nil {
 		return nil, err
 	}
 
