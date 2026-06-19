@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePortfolio } from './usePortfolio';
-import { Settings, DEFAULT_SETTINGS } from './types';
+import { Settings, SyncStatus, DEFAULT_SETTINGS } from './types';
 import * as api from './api';
 import Dashboard from './components/Dashboard';
 import HoldingsManager from './components/HoldingsManager';
@@ -11,21 +11,42 @@ import SettingsPanel from './components/SettingsPanel';
 export default function App() {
   const { holdings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
 
   useEffect(() => {
     api.fetchSettings().then((s) => {
       setSettings({
         driftThreshold: Number(s.driftThreshold) || DEFAULT_SETTINGS.driftThreshold,
+        syncInterval: Number(s.syncInterval) ?? DEFAULT_SETTINGS.syncInterval,
       });
     }).catch(console.error);
+    api.fetchSyncStatus().then(setSyncStatus).catch(console.error);
+  }, []);
+
+  // Poll sync status every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.fetchSyncStatus().then(setSyncStatus).catch(console.error);
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {
       await api.updateSetting('driftThreshold', String(newSettings.driftThreshold));
+      await api.updateSetting('syncInterval', String(newSettings.syncInterval));
       setSettings(newSettings);
     } catch (e) {
       console.error('Failed to save settings', e);
+    }
+  }, []);
+
+  const handleTriggerSync = useCallback(async () => {
+    try {
+      const status = await api.triggerSync();
+      setSyncStatus(status);
+    } catch (e) {
+      console.error('Failed to trigger sync', e);
     }
   }, []);
 
@@ -57,6 +78,16 @@ export default function App() {
             <p className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">持久资产配置</p>
             <p className="text-xs font-mono text-[#6C757D]">自动跟踪器</p>
           </div>
+          {syncStatus && syncStatus.lastSyncAt && (
+            <button
+              onClick={handleTriggerSync}
+              disabled={syncStatus.syncing}
+              className="text-[10px] text-[#6C757D] hover:text-[#1A1A1A] transition-colors disabled:opacity-50"
+              title="手动同步价格"
+            >
+              {syncStatus.syncing ? '同步中...' : `上次同步: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`}
+            </button>
+          )}
           <SettingsPanel settings={settings} onSave={handleSaveSettings} />
         </div>
       </header>

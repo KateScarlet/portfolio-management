@@ -7,8 +7,12 @@ import (
 	"path/filepath"
 	"permanent-portfolio/db"
 	"permanent-portfolio/handlers"
+	"permanent-portfolio/models"
+	"permanent-portfolio/scheduler"
 	"permanent-portfolio/yahoo"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -25,6 +29,18 @@ func main() {
 
 	yahoo.Init()
 
+	// Read sync interval from settings, default 60 minutes
+	var syncInterval time.Duration = 60 * time.Minute
+	var setting models.Setting
+	if database.Find(&setting, "key = ?", "syncInterval").Error == nil {
+		if mins, err := strconv.Atoi(setting.Value); err == nil && mins > 0 {
+			syncInterval = time.Duration(mins) * time.Minute
+		} else if mins == 0 {
+			syncInterval = 0 // disabled
+		}
+	}
+	priceScheduler := scheduler.New(database, syncInterval)
+
 	h := server.Default(server.WithHostPorts(":3000"))
 
 	h.Use(cors.New(cors.Config{
@@ -35,6 +51,8 @@ func main() {
 
 	h.GET("/api/price/:symbol", handlers.GetPrice())
 	h.GET("/api/exchange/:pair", handlers.GetExchange())
+	h.GET("/api/sync/status", handlers.GetSyncStatus(priceScheduler))
+	h.POST("/api/sync/trigger", handlers.TriggerSync(priceScheduler))
 
 	api := h.Group("/api")
 	{
@@ -49,7 +67,7 @@ func main() {
 		api.DELETE("/records/:id", handlers.DeleteRecord(database))
 
 		api.GET("/settings", handlers.ListSettings(database))
-		api.PUT("/settings/:key", handlers.UpdateSetting(database))
+		api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
 	}
 
 	distPath := filepath.Join(".", "web", "dist")

@@ -3,6 +3,9 @@ package handlers
 import (
 	"context"
 	"permanent-portfolio/models"
+	"permanent-portfolio/scheduler"
+	"strconv"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -24,7 +27,7 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func UpdateSetting(db *gorm.DB) app.HandlerFunc {
+func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		key := c.Param("key")
 		var body struct {
@@ -44,6 +47,17 @@ func UpdateSetting(db *gorm.DB) app.HandlerFunc {
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return
+		}
+
+		// Update scheduler if syncInterval changed
+		if key == "syncInterval" && s != nil {
+			if mins, err := strconv.Atoi(body.Value); err == nil {
+				if mins == 0 {
+					s.UpdateInterval(0)
+				} else {
+					s.UpdateInterval(time.Duration(mins) * time.Minute)
+				}
+			}
 		}
 
 		c.JSON(consts.StatusOK, map[string]string{"key": key, "value": body.Value})

@@ -1,4 +1,4 @@
-import { Holding, PortfolioRecord } from './types';
+import { Holding, PortfolioRecord, SyncStatus } from './types';
 
 const BASE = '';
 
@@ -74,4 +74,12 @@ export async function updateSetting(key: string, value: string): Promise<{ key: 
     method: 'PUT',
     body: JSON.stringify({ value }),
   });
+}
+
+export async function fetchSyncStatus(): Promise<SyncStatus> {
+  return request<SyncStatus>('/api/sync/status');
+}
+
+export async function triggerSync(): Promise<SyncStatus> {
+  return request<SyncStatus>('/api/sync/trigger', { method: 'POST' });
 }

@@ -43,11 +43,19 @@ export interface PortfolioRecord {
 
 export interface Settings {
   driftThreshold: number; // 漂移阈值百分比，如 5 表示 5%
+  syncInterval: number;   // 同步间隔（分钟），0 = 关闭
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
+  syncInterval: 60,
 };
+
+export interface SyncStatus {
+  lastSyncAt: string;     // ISO timestamp
+  lastSyncErr?: string;
+  syncing: boolean;
+}
 
 export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
   stocks: {

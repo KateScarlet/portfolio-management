@@ -963,8 +963,10 @@ export default function HoldingsManager({
                                                                             ) : (
                                                                                 <>
                                                                                     <span className="flex items-center gap-2">
-                                                                                        {lot.type === "sell" && (
+                                                                                        {lot.type === "sell" ? (
                                                                                             <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold">卖出</span>
+                                                                                        ) : (
+                                                                                            <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">买入</span>
                                                                                         )}
                                                                                         {new Date(lot.date).toLocaleDateString()}
                                                                                     </span>
@@ -977,12 +979,12 @@ export default function HoldingsManager({
                                                                                                 <span className="w-24">
                                                                                                     数量: {lot.shares}
                                                                                                 </span>
-                                                                                                <span className={`w-24 font-medium ${lot.type === "sell" ? "text-orange-600" : "text-[#1A1A1A]"}`}>
+                                                                                                <span className="w-24 font-medium text-[#1A1A1A]">
                                                                                                     {lot.type === "sell" ? "收入" : "成本"}: {formatCurrency(lot.cost || 0)}
                                                                                                 </span>
                                                                                             </>
                                                                                         ) : (
-                                                                                            <span className={`w-24 font-medium ${lot.type === "sell" ? "text-orange-600" : "text-[#1A1A1A]"}`}>
+                                                                                            <span className="w-24 font-medium text-[#1A1A1A]">
                                                                                                 {lot.type === "sell" ? "收入" : "价值"}: {formatCurrency(lot.valueAdded || lot.cost || 0)}
                                                                                             </span>
                                                                                         )}

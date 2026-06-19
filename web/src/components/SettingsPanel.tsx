@@ -7,6 +7,14 @@ interface SettingsPanelProps {
   onSave: (settings: Settings) => void;
 }
 
+const SYNC_PRESETS = [
+  { value: 0, label: '关闭' },
+  { value: 30, label: '30分钟' },
+  { value: 60, label: '1小时' },
+  { value: 120, label: '2小时' },
+  { value: 240, label: '4小时' },
+];
+
 export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState(settings);
@@ -37,6 +45,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
             </div>
 
             <div className="space-y-6">
+              {/* Drift Threshold */}
               <div>
                 <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
                   再平衡漂移阈值
@@ -78,6 +87,31 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       }`}
                     >
                       {p}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sync Interval */}
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                  自动同步价格
+                </label>
+                <p className="text-xs text-[#6C757D] mb-3">
+                  定时从 Yahoo Finance 获取最新价格。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SYNC_PRESETS.map((p) => (
+                    <button
+                      key={p.value}
+                      onClick={() => setDraft({ ...draft, syncInterval: p.value })}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        draft.syncInterval === p.value
+                          ? 'bg-[#1A1A1A] text-white border-[#1A1A1A]'
+                          : 'bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]'
+                      }`}
+                    >
+                      {p.label}
                     </button>
                   ))}
                 </div>
