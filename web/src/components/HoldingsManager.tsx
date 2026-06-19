@@ -47,7 +47,13 @@ export default function HoldingsManager({
     const [editingValueId, setEditingValueId] = useState<string | null>(null);
     const [tempEditValue, setTempEditValue] = useState("");
     const [editingLotId, setEditingLotId] = useState<string | null>(null);
-    const [tempEditLot, setTempEditLot] = useState<{ date: string; shares: string; costPrice: string; cost: string; fee: string }>({ date: "", shares: "", costPrice: "", cost: "", fee: "" });
+    const [tempEditLot, setTempEditLot] = useState<{
+        date: string;
+        shares: string;
+        costPrice: string;
+        cost: string;
+        fee: string;
+    }>({ date: "", shares: "", costPrice: "", cost: "", fee: "" });
 
     const [sellingHolding, setSellingHolding] = useState<Holding | null>(null);
     const [sellShares, setSellShares] = useState("");
@@ -201,12 +207,21 @@ export default function HoldingsManager({
         const isSymbol = !!h.symbol;
         if (isSymbol) {
             const totalShares = buyLots.reduce((s, l) => s + l.shares, 0);
-            const totalCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0);
+            const totalCost = buyLots.reduce(
+                (s, l) => s + (l.cost || 0) + (l.fee || 0),
+                0,
+            );
             const costPrice = totalShares > 0 ? totalCost / totalShares : 0;
             return { lots, shares: totalShares, cost: totalCost, costPrice };
         } else {
-            const totalValue = buyLots.reduce((s, l) => s + (l.valueAdded || l.cost || 0), 0);
-            const totalCost = buyLots.reduce((s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0), 0);
+            const totalValue = buyLots.reduce(
+                (s, l) => s + (l.valueAdded || l.cost || 0),
+                0,
+            );
+            const totalCost = buyLots.reduce(
+                (s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0),
+                0,
+            );
             return { lots, value: totalValue, cost: totalCost, shares: 0 };
         }
     };
@@ -221,11 +236,13 @@ export default function HoldingsManager({
             const fee = parseFloat(tempEditLot.fee) || 0;
             if (h.symbol) {
                 const shares = parseFloat(tempEditLot.shares) || l.shares;
-                const costPrice = parseFloat(tempEditLot.costPrice) || l.costPrice || 0;
+                const costPrice =
+                    parseFloat(tempEditLot.costPrice) || l.costPrice || 0;
                 const cost = parseFloat(tempEditLot.cost) || shares * costPrice;
                 return { ...l, date: dateVal, shares, costPrice, cost, fee };
             } else {
-                const valueAdded = parseFloat(tempEditLot.cost) || l.valueAdded || 0;
+                const valueAdded =
+                    parseFloat(tempEditLot.cost) || l.valueAdded || 0;
                 const cost = valueAdded;
                 return { ...l, date: dateVal, valueAdded, cost, fee };
             }
@@ -284,7 +301,14 @@ export default function HoldingsManager({
                 const remainingCost = h.cost
                     ? (h.cost / h.shares) * remainingShares
                     : 0;
-                const sellLot = { type: "sell", date: Date.now(), shares: sellSharesNum, costPrice: sellPriceNum, cost: realizedValue, fee: feeNum };
+                const sellLot = {
+                    type: "sell",
+                    date: Date.now(),
+                    shares: sellSharesNum,
+                    costPrice: sellPriceNum,
+                    cost: realizedValue,
+                    fee: feeNum,
+                };
                 const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
                 onUpdateHolding(h.id, {
                     shares: remainingShares,
@@ -310,7 +334,15 @@ export default function HoldingsManager({
                 const remainingCost = h.cost
                     ? (h.cost / h.value) * remainingValue
                     : 0;
-                const sellLot = { type: "sell", date: Date.now(), shares: 0, costPrice: 0, cost: realizedValue, valueAdded: realizedValue, fee: feeNum };
+                const sellLot = {
+                    type: "sell",
+                    date: Date.now(),
+                    shares: 0,
+                    costPrice: 0,
+                    cost: realizedValue,
+                    valueAdded: realizedValue,
+                    fee: feeNum,
+                };
                 const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
                 onUpdateHolding(h.id, {
                     value: remainingValue,
@@ -330,7 +362,7 @@ export default function HoldingsManager({
             onAddHolding({
                 assetId: "cash",
                 symbol: "",
-                name: "卖出资金 (现金)",
+                name: "可用现金",
                 shares: 0,
                 price: 0,
                 value: realizedValue,
@@ -621,9 +653,7 @@ export default function HoldingsManager({
                                 type="number"
                                 placeholder="0"
                                 value={newFee}
-                                onChange={(e) =>
-                                    setNewFee(e.target.value)
-                                }
+                                onChange={(e) => setNewFee(e.target.value)}
                                 className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
                             />
                         </div>
@@ -942,18 +972,35 @@ export default function HoldingsManager({
                                                             </h5>
                                                             {h.lots.map(
                                                                 (lot) => {
-                                                                    const isEditing = editingLotId === lot.id;
-                                                                     return (
+                                                                    const isEditing =
+                                                                        editingLotId ===
+                                                                        lot.id;
+                                                                    return (
                                                                         <div
-                                                                            key={lot.id}
+                                                                            key={
+                                                                                lot.id
+                                                                            }
                                                                             className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6]" : "text-[#495057]"} ${lot.type === "sell" ? "!text-orange-600" : ""}`}
                                                                         >
                                                                             {isEditing ? (
                                                                                 <div className="flex flex-wrap items-center gap-2 w-full">
                                                                                     <input
                                                                                         type="date"
-                                                                                        value={tempEditLot.date}
-                                                                                        onChange={(e) => setTempEditLot({ ...tempEditLot, date: e.target.value })}
+                                                                                        value={
+                                                                                            tempEditLot.date
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            setTempEditLot(
+                                                                                                {
+                                                                                                    ...tempEditLot,
+                                                                                                    date: e
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                },
+                                                                                            )
+                                                                                        }
                                                                                         className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
                                                                                     />
                                                                                     {h.symbol ? (
@@ -961,90 +1008,230 @@ export default function HoldingsManager({
                                                                                             <input
                                                                                                 type="number"
                                                                                                 placeholder="单价"
-                                                                                                value={tempEditLot.costPrice}
-                                                                                                onChange={(e) => setTempEditLot({ ...tempEditLot, costPrice: e.target.value })}
+                                                                                                value={
+                                                                                                    tempEditLot.costPrice
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    setTempEditLot(
+                                                                                                        {
+                                                                                                            ...tempEditLot,
+                                                                                                            costPrice:
+                                                                                                                e
+                                                                                                                    .target
+                                                                                                                    .value,
+                                                                                                        },
+                                                                                                    )
+                                                                                                }
                                                                                                 className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                                                                             />
                                                                                             <input
                                                                                                 type="number"
                                                                                                 placeholder="数量"
-                                                                                                value={tempEditLot.shares}
-                                                                                                onChange={(e) => setTempEditLot({ ...tempEditLot, shares: e.target.value })}
+                                                                                                value={
+                                                                                                    tempEditLot.shares
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    setTempEditLot(
+                                                                                                        {
+                                                                                                            ...tempEditLot,
+                                                                                                            shares: e
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                        },
+                                                                                                    )
+                                                                                                }
                                                                                                 className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                                                                             />
                                                                                         </>
                                                                                     ) : null}
                                                                                     <input
                                                                                         type="number"
-                                                                                        placeholder={h.symbol ? "成本" : "价值"}
-                                                                                        value={tempEditLot.cost}
-                                                                                        onChange={(e) => setTempEditLot({ ...tempEditLot, cost: e.target.value })}
+                                                                                        placeholder={
+                                                                                            h.symbol
+                                                                                                ? "成本"
+                                                                                                : "价值"
+                                                                                        }
+                                                                                        value={
+                                                                                            tempEditLot.cost
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            setTempEditLot(
+                                                                                                {
+                                                                                                    ...tempEditLot,
+                                                                                                    cost: e
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                },
+                                                                                            )
+                                                                                        }
                                                                                         className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                                                                     />
                                                                                     <input
                                                                                         type="number"
                                                                                         placeholder="手续费"
-                                                                                        value={tempEditLot.fee}
-                                                                                        onChange={(e) => setTempEditLot({ ...tempEditLot, fee: e.target.value })}
+                                                                                        value={
+                                                                                            tempEditLot.fee
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            setTempEditLot(
+                                                                                                {
+                                                                                                    ...tempEditLot,
+                                                                                                    fee: e
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                },
+                                                                                            )
+                                                                                        }
                                                                                         className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                                                                     />
                                                                                     <div className="flex gap-1 ml-auto">
-                                                                                        <button onClick={() => saveEditLot(h)} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">保存</button>
-                                                                                        <button onClick={() => setEditingLotId(null)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1">取消</button>
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                saveEditLot(
+                                                                                                    h,
+                                                                                                )
+                                                                                            }
+                                                                                            className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90"
+                                                                                        >
+                                                                                            保存
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={() =>
+                                                                                                setEditingLotId(
+                                                                                                    null,
+                                                                                                )
+                                                                                            }
+                                                                                            className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1"
+                                                                                        >
+                                                                                            取消
+                                                                                        </button>
                                                                                     </div>
                                                                                 </div>
                                                                             ) : (
                                                                                 <>
                                                                                     <span className="flex items-center gap-2">
-                                                                                        {lot.type === "sell" ? (
-                                                                                            <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold">卖出</span>
+                                                                                        {lot.type ===
+                                                                                        "sell" ? (
+                                                                                            <span className="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold">
+                                                                                                卖出
+                                                                                            </span>
                                                                                         ) : (
-                                                                                            <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">买入</span>
+                                                                                            <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">
+                                                                                                买入
+                                                                                            </span>
                                                                                         )}
-                                                                                        {new Date(lot.date).toLocaleDateString()}
+                                                                                        {new Date(
+                                                                                            lot.date,
+                                                                                        ).toLocaleDateString()}
                                                                                     </span>
                                                                                     <div className="flex items-center gap-4 text-right">
                                                                                         {h.symbol ? (
                                                                                             <>
                                                                                                 <span className="w-24">
-                                                                                                    单价: {formatCurrency(lot.costPrice || 0)}
+                                                                                                    单价:{" "}
+                                                                                                    {formatCurrency(
+                                                                                                        lot.costPrice ||
+                                                                                                            0,
+                                                                                                    )}
                                                                                                 </span>
                                                                                                 <span className="w-24">
-                                                                                                    数量: {lot.shares}
+                                                                                                    数量:{" "}
+                                                                                                    {
+                                                                                                        lot.shares
+                                                                                                    }
                                                                                                 </span>
                                                                                                 <span className="w-24 font-medium text-[#1A1A1A]">
-                                                                                                    {lot.type === "sell" ? "收入" : "成本"}: {formatCurrency(lot.cost || 0)}
+                                                                                                    {lot.type ===
+                                                                                                    "sell"
+                                                                                                        ? "收入"
+                                                                                                        : "成本"}
+                                                                                                    :{" "}
+                                                                                                    {formatCurrency(
+                                                                                                        lot.cost ||
+                                                                                                            0,
+                                                                                                    )}
                                                                                                 </span>
                                                                                             </>
                                                                                         ) : (
                                                                                             <span className="w-24 font-medium text-[#1A1A1A]">
-                                                                                                {lot.type === "sell" ? "收入" : "价值"}: {formatCurrency(lot.valueAdded || lot.cost || 0)}
+                                                                                                {lot.type ===
+                                                                                                "sell"
+                                                                                                    ? "收入"
+                                                                                                    : "价值"}
+                                                                                                :{" "}
+                                                                                                {formatCurrency(
+                                                                                                    lot.valueAdded ||
+                                                                                                        lot.cost ||
+                                                                                                        0,
+                                                                                                )}
                                                                                             </span>
                                                                                         )}
-                                                                                        {(lot.fee || 0) > 0 && (
+                                                                                        {(lot.fee ||
+                                                                                            0) >
+                                                                                            0 && (
                                                                                             <span className="w-20 text-[10px] text-[#ADB5BD]">
-                                                                                                费: {formatCurrency(lot.fee || 0)}
+                                                                                                费:{" "}
+                                                                                                {formatCurrency(
+                                                                                                    lot.fee ||
+                                                                                                        0,
+                                                                                                )}
                                                                                             </span>
                                                                                         )}
-                                                                                        {lot.type !== "sell" && (
+                                                                                        {lot.type !==
+                                                                                            "sell" && (
                                                                                             <>
                                                                                                 <button
                                                                                                     onClick={() => {
-                                                                                                        setEditingLotId(lot.id);
-                                                                                                        setTempEditLot({
-                                                                                                            date: new Date(lot.date).toISOString().split("T")[0],
-                                                                                                            shares: lot.shares.toString(),
-                                                                                                            costPrice: (lot.costPrice || 0).toString(),
-                                                                                                            cost: (h.symbol ? lot.cost : lot.valueAdded || lot.cost || 0).toString(),
-                                                                                                            fee: (lot.fee || 0).toString(),
-                                                                                                        });
+                                                                                                        setEditingLotId(
+                                                                                                            lot.id,
+                                                                                                        );
+                                                                                                        setTempEditLot(
+                                                                                                            {
+                                                                                                                date: new Date(
+                                                                                                                    lot.date,
+                                                                                                                )
+                                                                                                                    .toISOString()
+                                                                                                                    .split(
+                                                                                                                        "T",
+                                                                                                                    )[0],
+                                                                                                                shares: lot.shares.toString(),
+                                                                                                                costPrice:
+                                                                                                                    (
+                                                                                                                        lot.costPrice ||
+                                                                                                                        0
+                                                                                                                    ).toString(),
+                                                                                                                cost: (h.symbol
+                                                                                                                    ? lot.cost
+                                                                                                                    : lot.valueAdded ||
+                                                                                                                      lot.cost ||
+                                                                                                                      0
+                                                                                                                ).toString(),
+                                                                                                                fee: (
+                                                                                                                    lot.fee ||
+                                                                                                                    0
+                                                                                                                ).toString(),
+                                                                                                            },
+                                                                                                        );
                                                                                                     }}
                                                                                                     className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors"
                                                                                                 >
                                                                                                     Edit
                                                                                                 </button>
                                                                                                 <button
-                                                                                                    onClick={() => deleteEditLot(h, lot.id)}
+                                                                                                    onClick={() =>
+                                                                                                        deleteEditLot(
+                                                                                                            h,
+                                                                                                            lot.id,
+                                                                                                        )
+                                                                                                    }
                                                                                                     className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
                                                                                                 >
                                                                                                     Del
@@ -1140,9 +1327,7 @@ export default function HoldingsManager({
                             <input
                                 type="number"
                                 value={sellFee}
-                                onChange={(e) =>
-                                    setSellFee(e.target.value)
-                                }
+                                onChange={(e) => setSellFee(e.target.value)}
                                 className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                                 placeholder="0"
                             />
@@ -1150,7 +1335,10 @@ export default function HoldingsManager({
 
                         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">
                             <button
-                                onClick={() => { setSellingHolding(null); setSellFee(""); }}
+                                onClick={() => {
+                                    setSellingHolding(null);
+                                    setSellFee("");
+                                }}
                                 className="px-4 py-2 text-sm font-medium text-[#6C757D] hover:bg-[#F8F9FA] rounded-xl transition-colors"
                             >
                                 取消

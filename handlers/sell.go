@@ -86,7 +86,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			cashHolding = models.Holding{
 				ID:      uuid.New().String(),
 				AssetId: "cash",
-				Name:    "卖出资金 (现金)",
+				Name:    "可用现金",
 				Value:   realizedValue,
 				Cost:    realizedValue,
 				Lots: models.JSONColumn{{
