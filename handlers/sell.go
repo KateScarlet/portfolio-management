@@ -137,7 +137,10 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			}
 		}
 
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 
 		var holdings []models.Holding
 		db.Order("asset_id").Find(&holdings)
