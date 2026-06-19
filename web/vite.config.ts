@@ -11,6 +11,11 @@ export default defineConfig(() => {
         "@": path.resolve(__dirname, "."),
       },
     },
+    test: {
+      environment: "jsdom",
+      globals: true,
+      setupFiles: ["./src/test-setup.ts"],
+    },
     server: {
       hmr: process.env.DISABLE_HMR !== "true",
       watch: process.env.DISABLE_HMR === "true" ? null : {},

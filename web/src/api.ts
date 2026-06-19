@@ -85,6 +85,22 @@ export async function fetchSyncStatus(): Promise<SyncStatus> {
   return request<SyncStatus>("/api/sync/status")
 }
 
+export async function fetchPrice(symbol: string): Promise<{
+  symbol: string
+  name: string
+  price: number
+  originalPrice: number
+  currency: string
+  originalCurrency: string
+  unit: string
+}> {
+  return request(`/api/price/${encodeURIComponent(symbol)}`)
+}
+
+export async function fetchExchangeRate(pair: string): Promise<{ rate: number }> {
+  return request(`/api/exchange/${encodeURIComponent(pair)}`)
+}
+
 export async function triggerSync(): Promise<SyncStatus> {
   return request<SyncStatus>("/api/sync/trigger", { method: "POST" })
 }
