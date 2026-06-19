@@ -49,9 +49,10 @@ func (s *PriceScheduler) Start() {
 	slog.Info("scheduler starting price sync", "interval", s.interval)
 	s.ticker = time.NewTicker(s.interval)
 	stopCh := s.stopCh
+	ticker := s.ticker
 	s.mu.Unlock()
 
-	go s.run(stopCh)
+	go s.run(ticker, stopCh)
 }
 
 func (s *PriceScheduler) Stop() {
@@ -86,22 +87,36 @@ func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 	}
 	s.ticker = time.NewTicker(interval)
 	s.stopCh = make(chan struct{})
+	ticker := s.ticker
 	stopCh := s.stopCh
 	s.mu.Unlock()
 
-	go s.run(stopCh)
+	go s.run(ticker, stopCh)
 	slog.Info("scheduler interval updated", "interval", interval)
 }
 
-func (s *PriceScheduler) run(stopCh <-chan struct{}) {
+func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
 	for {
 		select {
-		case <-s.ticker.C:
+		case <-ticker.C:
 			s.SyncNow()
 		case <-stopCh:
 			return
 		}
 	}
+}
+
+// TryStartSync atomically attempts to start a sync.
+// Returns true if sync was started, false if already syncing.
+func (s *PriceScheduler) TryStartSync() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.syncing {
+		return false
+	}
+	s.syncing = true
+	go s.doSync()
+	return true
 }
 
 func (s *PriceScheduler) SyncNow() {
@@ -120,6 +135,10 @@ func (s *PriceScheduler) SyncNow() {
 		s.mu.Unlock()
 	}()
 
+	s.doSync()
+}
+
+func (s *PriceScheduler) doSync() {
 	slog.Info("starting price sync")
 
 	var holdings []models.Holding

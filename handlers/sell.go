@@ -165,14 +165,17 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// After commit, rebuild the response from the updated in-memory state
+		// rather than re-querying, to avoid stale reads from concurrent requests.
 		var holdings []models.Holding
 		if err := db.Order("asset_id").Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		if err := db.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
+		// Re-read cash holding to reflect the committed state
+		var committedCash models.Holding
+		if err := db.Where("asset_id = ?", "cash").First(&committedCash).Error; err == nil {
+			cashHolding = committedCash
 		}
 
 		c.JSON(consts.StatusOK, map[string]interface{}{

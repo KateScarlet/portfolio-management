@@ -16,7 +16,10 @@ func GetSyncStatus(s *scheduler.PriceScheduler) app.HandlerFunc {
 
 func TriggerSync(s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		go s.SyncNow()
+		if !s.TryStartSync() {
+			c.JSON(consts.StatusConflict, map[string]string{"error": "sync already in progress"})
+			return
+		}
 		c.JSON(consts.StatusOK, s.GetStatus())
 	}
 }

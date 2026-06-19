@@ -49,6 +49,10 @@ export default function HoldingsManager({
   const [editingValueId, setEditingValueId] = useState<string | null>(null)
   const [tempEditValue, setTempEditValue] = useState("")
   const [editingLotId, setEditingLotId] = useState<string | null>(null)
+  const [editingLotCost, setEditingLotCost] = useState("")
+  const [editingLotFee, setEditingLotFee] = useState("")
+  const [editingLotShares, setEditingLotShares] = useState("")
+  const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
 
   const syncAllPrices = useCallback(async () => {
@@ -324,11 +328,7 @@ export default function HoldingsManager({
                                         value={new Date(lot.date).toISOString().split("T")[0]}
                                         onChange={(e) => {
                                           const dateVal = new Date(e.target.value).getTime() || lot.date
-                                          if (h.symbol) {
-                                            saveEditLot(h, lot.id, { date: dateVal })
-                                          } else {
-                                            saveEditLot(h, lot.id, { date: dateVal })
-                                          }
+                                          saveEditLot(h, lot.id, { date: dateVal })
                                         }}
                                         className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
                                       />
@@ -337,17 +337,12 @@ export default function HoldingsManager({
                                           <input
                                             type="number"
                                             placeholder="单价"
-                                            defaultValue={lot.costPrice || 0}
-                                            onBlur={(e) => {
-                                              const costPrice = parseFloat(e.target.value) || 0
-                                              const sharesEl = (e.target.parentElement as HTMLElement)
-                                                ?.querySelector<HTMLInputElement>('[placeholder="数量"]')
-                                              const shares = sharesEl ? parseFloat(sharesEl.value) || lot.shares : lot.shares
-                                              const cost = parseFloat(
-                                                (e.target.parentElement as HTMLElement)
-                                                  ?.querySelector<HTMLInputElement>('[placeholder="成本"]')
-                                                  ?.value || ""
-                                              ) || shares * costPrice
+                                            value={editingLotCostPrice}
+                                            onChange={(e) => setEditingLotCostPrice(e.target.value)}
+                                            onBlur={() => {
+                                              const costPrice = parseFloat(editingLotCostPrice) || 0
+                                              const shares = parseFloat(editingLotShares) || lot.shares
+                                              const cost = parseFloat(editingLotCost) || shares * costPrice
                                               saveEditLot(h, lot.id, { costPrice, shares, cost })
                                             }}
                                             className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
@@ -355,7 +350,8 @@ export default function HoldingsManager({
                                           <input
                                             type="number"
                                             placeholder="数量"
-                                            defaultValue={lot.shares}
+                                            value={editingLotShares}
+                                            onChange={(e) => setEditingLotShares(e.target.value)}
                                             className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                           />
                                         </>
@@ -363,16 +359,34 @@ export default function HoldingsManager({
                                       <input
                                         type="number"
                                         placeholder={h.symbol ? "成本" : "价值"}
-                                        defaultValue={h.symbol ? (lot.cost ?? 0) : (lot.valueAdded || lot.cost || 0)}
+                                        value={editingLotCost}
+                                        onChange={(e) => setEditingLotCost(e.target.value)}
                                         className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                       />
                                       <input
                                         type="number"
                                         placeholder="手续费"
-                                        defaultValue={lot.fee || 0}
+                                        value={editingLotFee}
+                                        onChange={(e) => setEditingLotFee(e.target.value)}
                                         className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                       />
                                       <div className="flex gap-1 ml-auto">
+                                        <button
+                                          onClick={() => {
+                                            if (h.symbol) {
+                                              const costPrice = parseFloat(editingLotCostPrice) || 0
+                                              const shares = parseFloat(editingLotShares) || lot.shares
+                                              const cost = parseFloat(editingLotCost) || shares * costPrice
+                                              saveEditLot(h, lot.id, { costPrice, shares, cost, fee: parseFloat(editingLotFee) || 0 })
+                                            } else {
+                                              const valueAdded = parseFloat(editingLotCost) || 0
+                                              saveEditLot(h, lot.id, { valueAdded, cost: valueAdded, fee: parseFloat(editingLotFee) || 0 })
+                                            }
+                                          }}
+                                          className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90"
+                                        >
+                                          保存
+                                        </button>
                                         <button
                                           onClick={() => setEditingLotId(null)}
                                           className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1"
@@ -423,7 +437,13 @@ export default function HoldingsManager({
                                         {lot.type !== "sell" && (
                                           <div className="flex gap-2 flex-shrink-0">
                                             <button
-                                              onClick={() => setEditingLotId(lot.id)}
+                                              onClick={() => {
+                                                setEditingLotId(lot.id)
+                                                setEditingLotCost(h.symbol ? String(lot.cost ?? 0) : String(lot.valueAdded || lot.cost || 0))
+                                                setEditingLotFee(String(lot.fee || 0))
+                                                setEditingLotShares(String(lot.shares))
+                                                setEditingLotCostPrice(String(lot.costPrice || 0))
+                                              }}
                                               className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
                                             >
                                               Edit
