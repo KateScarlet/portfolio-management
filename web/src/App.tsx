@@ -9,7 +9,7 @@ import HistoryPanel from './components/HistoryPanel';
 import SettingsPanel from './components/SettingsPanel';
 
 export default function App() {
-  const { holdings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
+  const { holdings, setHoldings, assets, history, loading, addHolding, updateHolding, removeHolding, saveRecord, deleteRecord } = usePortfolio();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
 
@@ -105,6 +105,7 @@ export default function App() {
         <div className="flex flex-col gap-6">
           <HoldingsManager 
             holdings={holdings}
+            setHoldings={setHoldings}
             total={total}
             onAddHolding={addHolding}
             onUpdateHolding={updateHolding}

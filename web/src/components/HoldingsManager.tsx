@@ -11,6 +11,7 @@ import * as api from "../api";
 
 interface HoldingsManagerProps {
     holdings: Holding[];
+    setHoldings: React.Dispatch<React.SetStateAction<Holding[]>>;
     total: number;
     onAddHolding: (holding: Omit<Holding, "id">) => void;
     onUpdateHolding: (id: string, updates: Partial<Holding>) => void;
@@ -20,6 +21,7 @@ interface HoldingsManagerProps {
 
 export default function HoldingsManager({
     holdings,
+    setHoldings,
     total,
     onAddHolding,
     onUpdateHolding,
@@ -252,106 +254,37 @@ export default function HoldingsManager({
         }
     };
 
-    const confirmSell = () => {
+    const confirmSell = async () => {
         if (!sellingHolding) return;
         const h = sellingHolding;
         const feeNum = parseFloat(sellFee) || 0;
 
-        let realizedValue = 0;
-        let sellSharesNum = 0;
-        let sellPriceNum = 0;
-
         if (h.shares && h.shares > 0 && h.price) {
             const sShares = parseFloat(sellShares);
             const sPrice = parseFloat(sellPrice);
-            if (isNaN(sShares) || sShares <= 0 || sShares > h.shares) {
-                return;
-            }
-            if (isNaN(sPrice) || sPrice < 0) {
-                return;
-            }
-            realizedValue = sShares * sPrice - feeNum;
-            sellSharesNum = sShares;
-            sellPriceNum = sPrice;
+            if (isNaN(sShares) || sShares <= 0 || sShares > h.shares) return;
+            if (isNaN(sPrice) || sPrice < 0) return;
 
-            const remainingShares = h.shares - sShares;
-            if (remainingShares === 0) {
-                onRemoveHolding(h.id);
-                setSellingHolding(null);
-                setSellFee("");
+            try {
+                const result = await api.sellHolding(h.id, sShares, sPrice, feeNum, 0);
+                setHoldings(result.holdings);
+            } catch (e) {
+                console.error("Failed to sell holding", e);
+                alert("卖出失败，请重试");
                 return;
-            } else {
-                const remainingCost = h.cost
-                    ? (h.cost / h.shares) * remainingShares
-                    : 0;
-                const sellLot = {
-                    type: "sell",
-                    date: Date.now(),
-                    shares: sellSharesNum,
-                    costPrice: sellPriceNum,
-                    cost: realizedValue,
-                    fee: feeNum,
-                };
-                const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
-                onUpdateHolding(h.id, {
-                    shares: remainingShares,
-                    value: remainingShares * (h.price || 0),
-                    cost: remainingCost,
-                    lots: updatedLots,
-                });
             }
         } else {
             const sValue = parseFloat(sellPrice);
-            if (isNaN(sValue) || sValue <= 0 || sValue > h.value) {
+            if (isNaN(sValue) || sValue <= 0 || sValue > h.value) return;
+
+            try {
+                const result = await api.sellHolding(h.id, 0, 0, feeNum, sValue);
+                setHoldings(result.holdings);
+            } catch (e) {
+                console.error("Failed to sell holding", e);
+                alert("卖出失败，请重试");
                 return;
             }
-            realizedValue = sValue - feeNum;
-
-            const remainingValue = h.value - sValue;
-            if (remainingValue === 0) {
-                onRemoveHolding(h.id);
-                setSellingHolding(null);
-                setSellFee("");
-                return;
-            } else {
-                const remainingCost = h.cost
-                    ? (h.cost / h.value) * remainingValue
-                    : 0;
-                const sellLot = {
-                    type: "sell",
-                    date: Date.now(),
-                    shares: 0,
-                    costPrice: 0,
-                    cost: realizedValue,
-                    valueAdded: realizedValue,
-                    fee: feeNum,
-                };
-                const updatedLots = h.lots ? [...h.lots, sellLot] : [sellLot];
-                onUpdateHolding(h.id, {
-                    value: remainingValue,
-                    cost: remainingCost,
-                    lots: updatedLots,
-                });
-            }
-        }
-
-        const cashHolding = holdings.find((hd) => hd.assetId === "cash");
-        if (cashHolding) {
-            onUpdateHolding(cashHolding.id, {
-                value: cashHolding.value + realizedValue,
-                cost: (cashHolding.cost || cashHolding.value) + realizedValue,
-            });
-        } else {
-            onAddHolding({
-                assetId: "cash",
-                symbol: "",
-                name: "可用现金",
-                shares: 0,
-                price: 0,
-                value: realizedValue,
-                cost: realizedValue,
-                date: Date.now(),
-            });
         }
 
         setSellingHolding(null);

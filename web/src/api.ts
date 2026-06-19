@@ -41,11 +41,13 @@ export async function deleteHolding(id: string): Promise<void> {
 export async function sellHolding(
   id: string,
   shares: number,
-  price: number
-): Promise<{ holding: Holding; cashHolding: Holding }> {
-  return request<{ holding: Holding; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
+  price: number,
+  fee: number,
+  value: number
+): Promise<{ holdings: Holding[]; cashHolding: Holding }> {
+  return request<{ holdings: Holding[]; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
     method: 'POST',
-    body: JSON.stringify({ shares, price }),
+    body: JSON.stringify({ shares, price, fee, value }),
   });
 }
 

@@ -13,6 +13,7 @@ import (
 type SellRequest struct {
 	Shares float64 `json:"shares"`
 	Price  float64 `json:"price"`
+	Value  float64 `json:"value"`
 	Fee    float64 `json:"fee"`
 }
 
@@ -23,10 +24,6 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		var input SellRequest
 		if err := c.BindJSON(&input); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
-		}
-		if input.Shares <= 0 || input.Price < 0 {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Invalid shares or price"})
 			return
 		}
 		if input.Fee < 0 {
@@ -40,23 +37,46 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if input.Shares > holding.Shares {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares exceed holding"})
+		var realizedValue float64
+		var remainingShares float64
+		var remainingValue float64
+
+		if input.Shares > 0 {
+			// Standard sell: shares-based
+			if input.Shares > holding.Shares {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares exceed holding"})
+				return
+			}
+			if input.Price < 0 {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Invalid price"})
+				return
+			}
+			realizedValue = input.Shares*input.Price - input.Fee
+			remainingShares = holding.Shares - input.Shares
+			remainingValue = holding.Value
+		} else if input.Value > 0 {
+			// Manual holding sell: value-based (shares=0)
+			if input.Value > holding.Value {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value exceed holding"})
+				return
+			}
+			realizedValue = input.Value - input.Fee
+			remainingShares = 0
+			remainingValue = holding.Value - input.Value
+		} else {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
 			return
 		}
 
-		realizedValue := input.Shares*input.Price - input.Fee
-		remainingShares := holding.Shares - input.Shares
-
 		tx := db.Begin()
 
-		if remainingShares == 0 {
+		if remainingShares == 0 && remainingValue == 0 {
 			if err := tx.Delete(&holding).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
-		} else {
+		} else if input.Shares > 0 {
 			remainingCost := holding.Cost
 			if holding.Shares > 0 {
 				remainingCost = (holding.Cost / holding.Shares) * remainingShares
@@ -65,6 +85,20 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				"shares": remainingShares,
 				"value":  remainingShares * holding.Price,
 				"cost":   remainingCost,
+			}
+			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
+				tx.Rollback()
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+		} else {
+			remainingCost := holding.Cost
+			if holding.Value > 0 {
+				remainingCost = (holding.Cost / holding.Value) * remainingValue
+			}
+			updates := map[string]interface{}{
+				"value": remainingValue,
+				"cost":  remainingCost,
 			}
 			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
 				tx.Rollback()
@@ -105,11 +139,12 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 		tx.Commit()
 
-		db.First(&holding, "id = ?", id)
+		var holdings []models.Holding
+		db.Order("asset_id").Find(&holdings)
 		db.Where("asset_id = ?", "cash").First(&cashHolding)
 
 		c.JSON(consts.StatusOK, map[string]interface{}{
-			"holding":     holding,
+			"holdings":    holdings,
 			"cashHolding": cashHolding,
 		})
 	}

@@ -77,6 +77,7 @@ export function usePortfolio() {
 
   return {
     holdings,
+    setHoldings,
     assets,
     history,
     loading,
