@@ -54,11 +54,12 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		if result.Error == nil {
 			existing.Shares += input.Shares
 
-			if existing.Cost > 0 && input.Cost > 0 {
+			switch {
+			case existing.Cost > 0 && input.Cost > 0:
 				existing.Cost += input.Cost
-			} else if input.Cost > 0 {
+			case input.Cost > 0:
 				existing.Cost = input.Cost
-			} else if existing.Cost == 0 && input.Symbol == "" {
+			case existing.Cost == 0 && input.Symbol == "":
 				existing.Cost = input.Cost + input.Value
 			}
 

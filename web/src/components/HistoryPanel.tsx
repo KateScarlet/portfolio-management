@@ -1,6 +1,5 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Trash2 } from 'lucide-react';
 import { PortfolioRecord } from '../types';
 import { formatCurrency, formatPercent } from '../utils';
 

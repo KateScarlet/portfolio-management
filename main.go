@@ -61,20 +61,18 @@ func main() {
 	h.POST("/api/sync/trigger", handlers.TriggerSync(priceScheduler))
 
 	api := h.Group("/api")
-	{
-		api.GET("/holdings", handlers.ListHoldings(database))
-		api.POST("/holdings", handlers.CreateHolding(database))
-		api.PATCH("/holdings/:id", handlers.UpdateHolding(database))
-		api.DELETE("/holdings/:id", handlers.DeleteHolding(database))
-		api.POST("/holdings/:id/sell", handlers.SellHolding(database))
+	api.GET("/holdings", handlers.ListHoldings(database))
+	api.POST("/holdings", handlers.CreateHolding(database))
+	api.PATCH("/holdings/:id", handlers.UpdateHolding(database))
+	api.DELETE("/holdings/:id", handlers.DeleteHolding(database))
+	api.POST("/holdings/:id/sell", handlers.SellHolding(database))
 
-		api.GET("/records", handlers.ListRecords(database))
-		api.POST("/records", handlers.CreateRecord(database))
-		api.DELETE("/records/:id", handlers.DeleteRecord(database))
+	api.GET("/records", handlers.ListRecords(database))
+	api.POST("/records", handlers.CreateRecord(database))
+	api.DELETE("/records/:id", handlers.DeleteRecord(database))
 
-		api.GET("/settings", handlers.ListSettings(database))
-		api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
-	}
+	api.GET("/settings", handlers.ListSettings(database))
+	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
 
 	distPath := filepath.Join(".", "web", "dist")
 	if _, err := os.Stat(distPath); err == nil {

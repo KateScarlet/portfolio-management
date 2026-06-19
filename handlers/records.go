@@ -32,10 +32,10 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 
 		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
 		var total, principal float64
-		for _, h := range holdings {
-			assets[h.AssetId] += h.Value
-			total += h.Value
-			principal += h.Cost
+		for i := range holdings {
+			assets[holdings[i].AssetId] += holdings[i].Value
+			total += holdings[i].Value
+			principal += holdings[i].Cost
 		}
 
 		if total == 0 {

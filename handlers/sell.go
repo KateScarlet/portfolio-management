@@ -48,7 +48,8 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		var remainingShares float64
 		var remainingValue float64
 
-		if input.Shares > 0 {
+		switch {
+		case input.Shares > 0:
 			// Standard sell: shares-based
 			if input.Shares > holding.Shares {
 				tx.Rollback()
@@ -63,7 +64,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			realizedValue = input.Shares*input.Price - input.Fee
 			remainingShares = holding.Shares - input.Shares
 			remainingValue = holding.Value
-		} else if input.Value > 0 {
+		case input.Value > 0:
 			// Manual holding sell: value-based (shares=0)
 			if input.Value > holding.Value {
 				tx.Rollback()
@@ -73,19 +74,20 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			realizedValue = input.Value - input.Fee
 			remainingShares = 0
 			remainingValue = holding.Value - input.Value
-		} else {
+		default:
 			tx.Rollback()
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
 			return
 		}
 
-		if remainingShares == 0 && remainingValue == 0 {
+		switch {
+		case remainingShares == 0 && remainingValue == 0:
 			if err := tx.Delete(&holding).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
-		} else if input.Shares > 0 {
+		case input.Shares > 0:
 			remainingCost := holding.Cost
 			if holding.Shares > 0 {
 				remainingCost = (holding.Cost / holding.Shares) * remainingShares
@@ -100,7 +102,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
-		} else {
+		default:
 			remainingCost := holding.Cost
 			if holding.Value > 0 {
 				remainingCost = (holding.Cost / holding.Value) * remainingValue

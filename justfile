@@ -44,6 +44,29 @@ clean:
 tidy:
     go mod tidy
 
-# TypeScript 类型检查
-lint:
-    cd {{frontend_dir}} && pnpm exec tsc --noEmit
+# 代码检查（全部）
+lint: lint-go lint-frontend
+
+# Go 代码检查
+lint-go:
+    golangci-lint run
+
+# 前端代码检查
+lint-frontend:
+    cd {{frontend_dir}} && pnpm lint
+    cd {{frontend_dir}} && pnpm typecheck
+
+# 代码格式化
+fmt: fmt-go fmt-frontend
+
+# Go 代码格式化
+fmt-go:
+    gofmt -s -w .
+
+# 前端代码格式化
+fmt-frontend:
+    cd {{frontend_dir}} && pnpm format
+
+# 前端格式检查
+fmt-check:
+    cd {{frontend_dir}} && pnpm format:check

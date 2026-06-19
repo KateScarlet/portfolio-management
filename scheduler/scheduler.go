@@ -139,11 +139,12 @@ func (s *PriceScheduler) SyncNow() {
 	synced := 0
 	failed := 0
 
-	for i, h := range holdings {
+	for i := range holdings {
 		if i > 0 {
 			time.Sleep(200 * time.Millisecond)
 		}
 
+		h := &holdings[i]
 		result, err := yahoo.FetchQuote(h.Symbol)
 		if err != nil {
 			slog.Error("failed to fetch price", "name", h.Name, "symbol", h.Symbol, "error", err)

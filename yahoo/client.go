@@ -117,7 +117,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		if err == nil && !fxResp.IsError() && len(fxResult.Chart.Result) > 0 {
 			rate := fxResult.Chart.Result[0].Meta.RegularMarketPrice
 			if rate > 0 {
-				price = price * rate
+				price *= rate
 			}
 		} else {
 			slog.Warn("fx conversion failed", "from", currency, "to", "CNY", "error", err, "status", fxResp.StatusCode())
@@ -125,7 +125,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	}
 
 	if isCommodity {
-		price = price / 31.1035
+		price /= 31.1035
 		unit = "克"
 	}
 

@@ -1,7 +1,6 @@
 import React from 'react';
 import { AssetId, ASSET_DEFINITIONS } from '../types';
-import { formatCurrency, formatPercent } from '../utils';
-import { ArrowRight, ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-react';
+import { formatCurrency } from '../utils';
 
 interface RebalancePanelProps {
   assets: Record<AssetId, number>;

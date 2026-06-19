@@ -22,7 +22,7 @@ interface HoldingsManagerProps {
 export default function HoldingsManager({
     holdings,
     setHoldings,
-    total,
+    total: _total,
     onAddHolding,
     onUpdateHolding,
     onRemoveHolding,
@@ -66,8 +66,8 @@ export default function HoldingsManager({
     const [deductFromCash, setDeductFromCash] = useState(false);
 
     const handleAdd = async () => {
-        let addedCost = 0;
         const feeNum = parseFloat(newFee) || 0;
+        let addedCost: number | undefined;
 
         if (isManual) {
             const val = parseFloat(newValue);
@@ -115,7 +115,7 @@ export default function HoldingsManager({
                             if (fxData && fxData.rate) {
                                 finalCostPrice = cPrice * fxData.rate;
                             }
-                        } catch (e) {
+                        } catch {
                             console.error("Failed to fetch exchange rate");
                         }
                     }
@@ -139,7 +139,7 @@ export default function HoldingsManager({
                     setIsFetching(false);
                     return;
                 }
-            } catch (e) {
+            } catch {
                 alert("Failed to fetch price. Try manual entry.");
                 setIsFetching(false);
                 return;
@@ -148,7 +148,7 @@ export default function HoldingsManager({
             }
         }
 
-        if (deductFromCash && addedCost > 0) {
+        if (deductFromCash && addedCost && addedCost > 0) {
             const cashHolding = holdings.find((hd) => hd.assetId === "cash");
             if (cashHolding) {
                 const remainingValue = Math.max(
