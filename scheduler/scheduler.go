@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"permanent-portfolio/models"
 	"permanent-portfolio/yahoo"
 	"sync"
@@ -46,7 +46,7 @@ func (s *PriceScheduler) Start() {
 	if s.ticker != nil {
 		return
 	}
-	log.Printf("[scheduler] starting price sync every %v", s.interval)
+	slog.Info("scheduler starting price sync", "interval", s.interval)
 	s.ticker = time.NewTicker(s.interval)
 	go s.run()
 }
@@ -59,7 +59,7 @@ func (s *PriceScheduler) Stop() {
 		s.ticker = nil
 		close(s.stopCh)
 		s.stopCh = make(chan struct{})
-		log.Printf("[scheduler] stopped")
+		slog.Info("scheduler stopped")
 	}
 }
 
@@ -73,7 +73,7 @@ func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 			s.ticker = nil
 			close(s.stopCh)
 			s.stopCh = make(chan struct{})
-			log.Printf("[scheduler] disabled (interval=0)")
+			slog.Info("scheduler disabled", "interval", 0)
 		}
 		return
 	}
@@ -82,7 +82,7 @@ func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 	}
 	s.ticker = time.NewTicker(interval)
 	go s.run()
-	log.Printf("[scheduler] interval updated to %v", interval)
+	slog.Info("scheduler interval updated", "interval", interval)
 }
 
 func (s *PriceScheduler) run() {
@@ -100,7 +100,7 @@ func (s *PriceScheduler) SyncNow() {
 	s.mu.Lock()
 	if s.syncing {
 		s.mu.Unlock()
-		log.Printf("[scheduler] sync already in progress, skipping")
+		slog.Info("sync already in progress, skipping")
 		return
 	}
 	s.syncing = true
@@ -112,19 +112,19 @@ func (s *PriceScheduler) SyncNow() {
 		s.mu.Unlock()
 	}()
 
-	log.Printf("[scheduler] starting price sync...")
+	slog.Info("starting price sync")
 
 	var holdings []models.Holding
 	if err := s.db.Where("symbol != ''").Find(&holdings).Error; err != nil {
 		s.mu.Lock()
 		s.lastSyncErr = err.Error()
 		s.mu.Unlock()
-		log.Printf("[scheduler] failed to query holdings: %v", err)
+		slog.Error("failed to query holdings", "error", err)
 		return
 	}
 
 	if len(holdings) == 0 {
-		log.Printf("[scheduler] no holdings with symbols to sync")
+		slog.Info("no holdings with symbols to sync")
 		s.mu.Lock()
 		s.lastSyncAt = time.Now()
 		s.lastSyncErr = ""
@@ -142,7 +142,7 @@ func (s *PriceScheduler) SyncNow() {
 
 		result, err := yahoo.FetchQuote(h.Symbol)
 		if err != nil {
-			log.Printf("[scheduler] failed to fetch price for %s (%s): %v", h.Name, h.Symbol, err)
+			slog.Error("failed to fetch price", "name", h.Name, "symbol", h.Symbol, "error", err)
 			failed++
 			continue
 		}
@@ -152,13 +152,13 @@ func (s *PriceScheduler) SyncNow() {
 			"value": h.Shares * result.Price,
 		}
 		if err := s.db.Model(&models.Holding{}).Where("id = ?", h.ID).Updates(updates).Error; err != nil {
-			log.Printf("[scheduler] failed to update holding %s: %v", h.ID, err)
+			slog.Error("failed to update holding", "id", h.ID, "error", err)
 			failed++
 			continue
 		}
 
 		synced++
-		log.Printf("[scheduler] synced %s (%s): price=%.2f", h.Name, h.Symbol, result.Price)
+		slog.Info("synced holding", "name", h.Name, "symbol", h.Symbol, "price", result.Price)
 	}
 
 	s.mu.Lock()
@@ -170,7 +170,7 @@ func (s *PriceScheduler) SyncNow() {
 	}
 	s.mu.Unlock()
 
-	log.Printf("[scheduler] sync completed: %d synced, %d failed", synced, failed)
+	slog.Info("sync completed", "synced", synced, "failed", failed)
 }
 
 func (s *PriceScheduler) GetStatus() SyncStatus {

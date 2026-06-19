@@ -1,0 +1,38 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+server.exe
+tmp/
+
+# Go test binary
+*.test
+
+# Go coverage
+*.out
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+web/node_modules/
+web/dist/

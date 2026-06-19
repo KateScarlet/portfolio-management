@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"permanent-portfolio/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -19,7 +19,7 @@ func GetPrice() app.HandlerFunc {
 
 		result, err := yahoo.FetchQuote(symbol)
 		if err != nil {
-			log.Printf("[price] failed to fetch quote for %s: %v", symbol, err)
+			slog.Error("failed to fetch quote", "symbol", symbol, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}

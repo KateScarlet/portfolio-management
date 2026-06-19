@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,8 +23,13 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+
 	database, err := db.Init("portfolio.db")
 	if err != nil {
+		slog.Error("failed to init database", "error", err)
 		panic("Failed to init database: " + err.Error())
 	}
 

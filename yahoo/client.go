@@ -2,7 +2,7 @@ package yahoo
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	client    *resty.Client
-	aShareRe  = regexp.MustCompile(`^\d{6}$`)
+	client     *resty.Client
+	aShareRe   = regexp.MustCompile(`^\d{6}$`)
 	shPrefixRe = regexp.MustCompile(`^[56]\d{5}$`)
 	szPrefixRe = regexp.MustCompile(`^[0123]\d{5}$`)
-	shTagRe   = regexp.MustCompile(`^SH\d{6}$`)
-	szTagRe   = regexp.MustCompile(`^SZ\d{6}$`)
+	shTagRe    = regexp.MustCompile(`^SH\d{6}$`)
+	szTagRe    = regexp.MustCompile(`^SZ\d{6}$`)
 )
 
 func Init() {
@@ -28,11 +28,11 @@ type YahooChartResponse struct {
 	Chart struct {
 		Result []struct {
 			Meta struct {
-				Symbol              string  `json:"symbol"`
-				Currency            string  `json:"currency"`
-				RegularMarketPrice  float64 `json:"regularMarketPrice"`
-				ShortName           string  `json:"shortName"`
-				LongName            string  `json:"longName"`
+				Symbol             string  `json:"symbol"`
+				Currency           string  `json:"currency"`
+				RegularMarketPrice float64 `json:"regularMarketPrice"`
+				ShortName          string  `json:"shortName"`
+				LongName           string  `json:"longName"`
 			} `json:"meta"`
 		} `json:"result"`
 	} `json:"chart"`
@@ -120,7 +120,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 				price = price * rate
 			}
 		} else {
-			log.Printf("[yahoo] fx conversion failed for %s->CNY: err=%v status=%d", currency, err, fxResp.StatusCode())
+			slog.Warn("fx conversion failed", "from", currency, "to", "CNY", "error", err, "status", fxResp.StatusCode())
 		}
 	}
 

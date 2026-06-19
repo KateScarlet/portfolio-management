@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"permanent-portfolio/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -19,7 +19,7 @@ func GetExchange() app.HandlerFunc {
 
 		rate, err := yahoo.FetchExchangeRate(pair)
 		if err != nil {
-			log.Printf("[exchange] failed to fetch rate for %s: %v", pair, err)
+			slog.Error("failed to fetch exchange rate", "pair", pair, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
