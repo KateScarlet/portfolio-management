@@ -97,3 +97,16 @@ export const COMMODITY_SYMBOLS = [
   { symbol: 'NG=F', name: '天然气' },
   { symbol: 'HG=F', name: '铜' },
 ] as const;
+
+export const CRYPTO_SYMBOLS = [
+  { symbol: 'BTC-USD', name: 'Bitcoin' },
+  { symbol: 'ETH-USD', name: 'Ethereum' },
+  { symbol: 'BNB-USD', name: 'BNB' },
+  { symbol: 'SOL-USD', name: 'Solana' },
+  { symbol: 'XRP-USD', name: 'XRP' },
+  { symbol: 'DOGE-USD', name: 'Dogecoin' },
+  { symbol: 'ADA-USD', name: 'Cardano' },
+  { symbol: 'DOT-USD', name: 'Polkadot' },
+  { symbol: 'AVAX-USD', name: 'Avalanche' },
+  { symbol: 'LINK-USD', name: 'Chainlink' },
+] as const;

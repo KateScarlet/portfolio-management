@@ -70,15 +70,11 @@ export default function App() {
           <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
           </div>
-          <h1 className="text-xl font-semibold tracking-tight uppercase">
-            PERMANENT<span className="font-light opacity-50 ml-1 text-sm">Portfolio</span>
+          <h1 className="text-xl font-semibold tracking-tight">
+            投资组合
           </h1>
         </div>
         <div className="hidden sm:flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">持久资产配置</p>
-            <p className="text-xs font-mono text-[#6C757D]">自动跟踪器</p>
-          </div>
           {syncStatus && syncStatus.lastSyncAt && (
             <button
               onClick={handleTriggerSync}

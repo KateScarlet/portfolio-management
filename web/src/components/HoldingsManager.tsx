@@ -4,8 +4,10 @@ import {
     ASSET_DEFINITIONS,
     Holding,
     COMMODITY_SYMBOLS,
+    CRYPTO_SYMBOLS,
 } from "../types";
 import { formatCurrency, formatPercent } from "../utils";
+import * as api from "../api";
 
 interface HoldingsManagerProps {
     holdings: Holding[];
@@ -27,7 +29,7 @@ export default function HoldingsManager({
     const [isAdding, setIsAdding] = useState(false);
     const [newAssetId, setNewAssetId] = useState<AssetId>("stocks");
     const [newMarket, setNewMarket] = useState<
-        "US" | "CN" | "HK" | "COMMODITY"
+        "US" | "CN" | "HK" | "COMMODITY" | "CRYPTO"
     >("US");
     const [newSymbol, setNewSymbol] = useState("");
     const [newName, setNewName] = useState("");
@@ -173,29 +175,10 @@ export default function HoldingsManager({
         setDeductFromCash(false);
     };
 
-    const syncPrice = async (h: Holding) => {
-        if (!h.symbol) return;
-        try {
-            const res = await fetch(
-                `/api/price/${h.symbol}?targetCurrency=CNY`,
-            );
-            const data = await res.json();
-            if (data && data.price) {
-                onUpdateHolding(h.id, {
-                    price: data.price,
-                });
-            }
-        } catch (e) {
-            console.error("Failed to sync price for " + h.symbol);
-        }
-    };
-
     const syncAllPrices = async () => {
-        const withSymbol = holdings.filter((h) => h.symbol);
-        if (withSymbol.length === 0) return;
         setSyncing(true);
         try {
-            await Promise.all(withSymbol.map((h) => syncPrice(h)));
+            await api.triggerSync();
         } finally {
             setSyncing(false);
         }
@@ -472,7 +455,8 @@ export default function HoldingsManager({
                                                     | "US"
                                                     | "CN"
                                                     | "HK"
-                                                    | "COMMODITY",
+                                                    | "COMMODITY"
+                                                    | "CRYPTO",
                                             );
                                             setNewSymbol("");
                                         }}
@@ -482,13 +466,16 @@ export default function HoldingsManager({
                                         <option value="CN">A股</option>
                                         <option value="HK">港股</option>
                                         <option value="COMMODITY">期货</option>
+                                        <option value="CRYPTO">加密货币</option>
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                                         {newMarket === "COMMODITY"
                                             ? "商品"
-                                            : "代码"}
+                                            : newMarket === "CRYPTO"
+                                              ? "币种"
+                                              : "代码"}
                                     </label>
                                     {newMarket === "COMMODITY" ? (
                                         <select
@@ -502,6 +489,26 @@ export default function HoldingsManager({
                                                 选择商品...
                                             </option>
                                             {COMMODITY_SYMBOLS.map((c) => (
+                                                <option
+                                                    key={c.symbol}
+                                                    value={c.symbol}
+                                                >
+                                                    {c.name} ({c.symbol})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : newMarket === "CRYPTO" ? (
+                                        <select
+                                            value={newSymbol}
+                                            onChange={(e) =>
+                                                setNewSymbol(e.target.value)
+                                            }
+                                            className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                        >
+                                            <option value="">
+                                                选择币种...
+                                            </option>
+                                            {CRYPTO_SYMBOLS.map((c) => (
                                                 <option
                                                     key={c.symbol}
                                                     value={c.symbol}
@@ -575,14 +582,18 @@ export default function HoldingsManager({
                                     <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                                         {newMarket === "COMMODITY"
                                             ? "数量 (克)"
-                                            : "份额 (股份)"}
+                                            : newMarket === "CRYPTO"
+                                              ? "数量"
+                                              : "份额 (股份)"}
                                     </label>
                                     <input
                                         type="number"
                                         placeholder={
                                             newMarket === "COMMODITY"
                                                 ? "如: 50"
-                                                : "0"
+                                                : newMarket === "CRYPTO"
+                                                  ? "如: 0.5"
+                                                  : "0"
                                         }
                                         value={newShares}
                                         onChange={(e) =>
