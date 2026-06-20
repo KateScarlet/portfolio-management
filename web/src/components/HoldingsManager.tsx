@@ -18,19 +18,24 @@ interface HoldingsManagerProps {
 function recalcHolding(h: Holding, lots: HoldingLot[] | undefined) {
   if (!lots) return {}
   const buyLots = lots.filter((l) => l.type !== "sell")
+  const sellLots = lots.filter((l) => l.type === "sell")
   const isSymbol = !!h.symbol
   if (isSymbol) {
     const totalShares = buyLots.reduce((s, l) => s + l.shares, 0)
+    const soldShares = sellLots.reduce((s, l) => s + l.shares, 0)
+    const netShares = totalShares - soldShares
     const totalCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0)
-    const costPrice = totalShares > 0 ? totalCost / totalShares : 0
-    return { lots, shares: totalShares, cost: totalCost, costPrice }
+    const costPrice = netShares > 0 ? totalCost / netShares : 0
+    return { lots, shares: netShares, cost: totalCost, costPrice }
   } else {
     const totalValue = buyLots.reduce((s, l) => s + (l.valueAdded || l.cost || 0), 0)
+    const soldValue = sellLots.reduce((s, l) => s + (l.valueAdded || 0), 0)
+    const netValue = totalValue - soldValue
     const totalCost = buyLots.reduce(
       (s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0),
       0
     )
-    return { lots, value: totalValue, cost: totalCost, shares: 0 }
+    return { lots, value: netValue, cost: totalCost, shares: 0 }
   }
 }
 
