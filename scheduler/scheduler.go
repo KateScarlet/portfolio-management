@@ -199,7 +199,7 @@ func (s *PriceScheduler) doSync() {
 			continue
 		}
 
-		updates := map[string]interface{}{
+		updates := map[string]any{
 			"price": result.Price,
 			"value": h.Shares * result.Price,
 		}

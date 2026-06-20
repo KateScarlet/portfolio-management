@@ -27,7 +27,8 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	database, err := db.Init("portfolio.db")
+	cfg := db.LoadConfig()
+	database, err := db.Init(cfg)
 	if err != nil {
 		slog.Error("failed to init database", "error", err)
 		panic("Failed to init database: " + err.Error())

@@ -1,0 +1,10 @@
+# Database configuration
+# Default: SQLite with file "portfolio.db"
+#
+# PostgreSQL:
+#   database.type = postgres
+#   database.dsn  = postgres://user:pass@localhost:5432/portfolio?sslmode=disable
+
+database:
+  type: sqlite          # sqlite | postgres
+  dsn: portfolio.db     # SQLite: file path; Postgres: DSN string

@@ -156,7 +156,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var updates map[string]interface{}
+		var updates map[string]any
 		if err := c.BindJSON(&updates); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -168,7 +168,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			"price": true, "costPrice": true, "value": true,
 			"cost": true, "date": true, "lots": true,
 		}
-		safeUpdates := make(map[string]interface{})
+		safeUpdates := make(map[string]any)
 		for k, v := range updates {
 			if allowedFields[k] {
 				safeUpdates[k] = v

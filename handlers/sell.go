@@ -107,7 +107,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 		switch {
 		case remainingShares == 0 && remainingValue == 0:
-			updates := map[string]interface{}{
+			updates := map[string]any{
 				"shares": 0,
 				"value":  0,
 				"cost":   0,
@@ -123,7 +123,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			if holding.Shares > 0 {
 				remainingCost = (holding.Cost / holding.Shares) * remainingShares
 			}
-			updates := map[string]interface{}{
+			updates := map[string]any{
 				"shares": remainingShares,
 				"value":  remainingShares * holding.Price,
 				"cost":   remainingCost,
@@ -139,7 +139,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			if holding.Value > 0 {
 				remainingCost = (holding.Cost / holding.Value) * remainingValue
 			}
-			updates := map[string]interface{}{
+			updates := map[string]any{
 				"value": remainingValue,
 				"cost":  remainingCost,
 				"lots":  holding.Lots,
@@ -198,7 +198,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		c.JSON(consts.StatusOK, map[string]interface{}{
+		c.JSON(consts.StatusOK, map[string]any{
 			"holdings":    holdings,
 			"cashHolding": committedCash,
 		})

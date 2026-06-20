@@ -19,14 +19,19 @@ type HoldingLot struct {
 
 type JSONColumn []HoldingLot
 
-func (j *JSONColumn) Scan(value interface{}) error {
+func (j *JSONColumn) Scan(value any) error {
 	if value == nil {
 		*j = JSONColumn{}
 		return nil
 	}
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("JSONColumn.Scan: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("JSONColumn.Scan: expected []byte or string, got %T", value)
 	}
 	return json.Unmarshal(bytes, j)
 }
@@ -40,14 +45,19 @@ func (j JSONColumn) Value() (driver.Value, error) {
 
 type AssetMapColumn map[string]float64
 
-func (a *AssetMapColumn) Scan(value interface{}) error {
+func (a *AssetMapColumn) Scan(value any) error {
 	if value == nil {
 		*a = AssetMapColumn{}
 		return nil
 	}
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("AssetMapColumn.Scan: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("AssetMapColumn.Scan: expected []byte or string, got %T", value)
 	}
 	return json.Unmarshal(bytes, a)
 }
