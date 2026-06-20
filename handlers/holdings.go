@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"permanent-portfolio/models"
 	"time"
 
@@ -70,6 +71,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		newLot.ValueAdded = input.Value
 		newLot.Fee = input.Fee
 
+		// Try to find an existing holding to merge into
 		var existing models.Holding
 		var result *gorm.DB
 		if input.Symbol != "" {
@@ -78,41 +80,52 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			result = db.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
 		}
 
-		if result.Error == nil {
-			existing.Shares += input.Shares
+		switch {
+		case result.Error == nil:
+			// Found existing holding - use transaction for atomic read-modify-write
+			err := db.Transaction(func(tx *gorm.DB) error {
+				// Re-read within transaction to get latest version
+				if err := tx.First(&existing, "id = ?", existing.ID).Error; err != nil {
+					return err
+				}
 
-			switch {
-			case existing.Cost > 0 && input.Cost > 0:
-				existing.Cost += input.Cost
-			case input.Cost > 0:
-				existing.Cost = input.Cost
-			case existing.Cost == 0 && input.Symbol == "":
-				existing.Cost = input.Cost + input.Value
-			}
+				existing.Shares += input.Shares
 
-			if input.Fee > 0 {
-				existing.Cost += input.Fee
-			}
+				switch {
+				case existing.Cost > 0 && input.Cost > 0:
+					existing.Cost += input.Cost
+				case input.Cost > 0:
+					existing.Cost = input.Cost
+				case existing.Cost == 0 && input.Symbol == "":
+					existing.Cost = input.Cost + input.Value
+				}
 
-			if existing.Shares > 0 && existing.Cost > 0 {
-				existing.CostPrice = existing.Cost / existing.Shares
-			}
+				if input.Fee > 0 {
+					existing.Cost += input.Fee
+				}
 
-			if existing.Symbol != "" && input.Price > 0 {
-				existing.Price = input.Price
-				existing.Value = existing.Shares * existing.Price
-			} else {
-				existing.Value += input.Value
-			}
+				if existing.Shares > 0 && existing.Cost > 0 {
+					existing.CostPrice = existing.Cost / existing.Shares
+				}
 
-			existing.Lots = append(existing.Lots, newLot)
+				if existing.Symbol != "" && input.Price > 0 {
+					existing.Price = input.Price
+					existing.Value = existing.Shares * existing.Price
+				} else {
+					existing.Value += input.Value
+				}
 
-			if err := db.Save(&existing).Error; err != nil {
+				existing.Lots = append(existing.Lots, newLot)
+
+				return tx.Save(&existing).Error
+			})
+			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
 			c.JSON(consts.StatusOK, existing)
-		} else {
+		case errors.Is(result.Error, gorm.ErrRecordNotFound):
+			// No existing holding - create new
 			input.ID = uuid.New().String()
 			if input.Fee > 0 {
 				input.Cost += input.Fee
@@ -127,6 +140,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				return
 			}
 			c.JSON(consts.StatusCreated, input)
+		default:
+			// Database error (not "not found")
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 		}
 	}
 }

@@ -22,6 +22,7 @@ type PriceScheduler struct {
 	interval    time.Duration
 	ticker      *time.Ticker
 	stopCh      chan struct{}
+	doneCh      chan struct{} // closed when the run goroutine exits
 	mu          sync.RWMutex
 	lastSyncAt  time.Time
 	lastSyncErr string
@@ -33,6 +34,7 @@ func New(db *gorm.DB, interval time.Duration) *PriceScheduler {
 		db:       db,
 		interval: interval,
 		stopCh:   make(chan struct{}),
+		doneCh:   make(chan struct{}),
 	}
 	if interval > 0 {
 		s.Start()
@@ -50,52 +52,71 @@ func (s *PriceScheduler) Start() {
 	s.ticker = time.NewTicker(s.interval)
 	stopCh := s.stopCh
 	ticker := s.ticker
+	s.doneCh = make(chan struct{})
+	doneCh := s.doneCh
 	s.mu.Unlock()
 
-	go s.run(ticker, stopCh)
+	go s.run(ticker, stopCh, doneCh)
 }
 
 func (s *PriceScheduler) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.ticker != nil {
-		s.ticker.Stop()
-		s.ticker = nil
-		close(s.stopCh)
-		s.stopCh = make(chan struct{})
-		slog.Info("scheduler stopped")
+	if s.ticker == nil {
+		s.mu.Unlock()
+		return
 	}
+	s.ticker.Stop()
+	s.ticker = nil
+	if s.stopCh != nil {
+		close(s.stopCh)
+	}
+	s.stopCh = make(chan struct{})
+	oldDoneCh := s.doneCh
+	s.doneCh = make(chan struct{})
+	s.mu.Unlock()
+
+	if oldDoneCh != nil {
+		<-oldDoneCh
+	}
+	slog.Info("scheduler stopped")
 }
 
 func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
 	s.mu.Lock()
 	s.interval = interval
 	if interval <= 0 {
-		if s.ticker != nil {
-			s.ticker.Stop()
-			s.ticker = nil
-			close(s.stopCh)
-			s.stopCh = make(chan struct{})
-			slog.Info("scheduler disabled", "interval", 0)
-		}
 		s.mu.Unlock()
+		s.Stop()
+		slog.Info("scheduler disabled", "interval", 0)
 		return
 	}
+
+	var oldDoneCh chan struct{}
 	if s.ticker != nil {
 		s.ticker.Stop()
-		close(s.stopCh)
+		if s.stopCh != nil {
+			close(s.stopCh)
+		}
+		oldDoneCh = s.doneCh
 	}
 	s.ticker = time.NewTicker(interval)
 	s.stopCh = make(chan struct{})
+	s.doneCh = make(chan struct{})
 	ticker := s.ticker
 	stopCh := s.stopCh
+	doneCh := s.doneCh
 	s.mu.Unlock()
 
-	go s.run(ticker, stopCh)
+	if oldDoneCh != nil {
+		<-oldDoneCh
+	}
+
+	go s.run(ticker, stopCh, doneCh)
 	slog.Info("scheduler interval updated", "interval", interval)
 }
 
-func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
+func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}, doneCh chan struct{}) {
+	defer close(doneCh)
 	for {
 		select {
 		case <-ticker.C:
@@ -110,11 +131,13 @@ func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
 // Returns true if sync was started, false if already syncing.
 func (s *PriceScheduler) TryStartSync() bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.syncing {
+		s.mu.Unlock()
 		return false
 	}
 	s.syncing = true
+	s.mu.Unlock()
+
 	go s.doSync()
 	return true
 }
@@ -129,16 +152,17 @@ func (s *PriceScheduler) SyncNow() {
 	s.syncing = true
 	s.mu.Unlock()
 
+	s.doSync()
+}
+
+// doSync performs the actual sync and resets the syncing flag when done.
+func (s *PriceScheduler) doSync() {
 	defer func() {
 		s.mu.Lock()
 		s.syncing = false
 		s.mu.Unlock()
 	}()
 
-	s.doSync()
-}
-
-func (s *PriceScheduler) doSync() {
 	slog.Info("starting price sync")
 
 	var holdings []models.Holding

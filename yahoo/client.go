@@ -70,6 +70,9 @@ func ConvertSymbol(symbol string) string {
 }
 
 func FetchQuote(symbol string) (*PriceResult, error) {
+	if client == nil {
+		return nil, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
+	}
 	querySymbol := ConvertSymbol(symbol)
 
 	var result YahooChartResponse
@@ -147,6 +150,9 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 }
 
 func FetchExchangeRate(pair string) (float64, error) {
+	if client == nil {
+		return 0, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
+	}
 	fxSymbol := pair + "=X"
 	var result YahooChartResponse
 	resp, err := client.R().

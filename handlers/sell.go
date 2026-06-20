@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"permanent-portfolio/models"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -92,9 +94,26 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		sellLot := models.HoldingLot{
+			ID:         uuid.New().String(),
+			Type:       "sell",
+			Date:       time.Now().UnixMilli(),
+			Shares:     input.Shares,
+			CostPrice:  holding.CostPrice,
+			ValueAdded: realizedValue + input.Fee,
+			Fee:        input.Fee,
+		}
+		holding.Lots = append(holding.Lots, sellLot)
+
 		switch {
 		case remainingShares == 0 && remainingValue == 0:
-			if err := tx.Delete(&holding).Error; err != nil {
+			updates := map[string]interface{}{
+				"shares": 0,
+				"value":  0,
+				"cost":   0,
+				"lots":   holding.Lots,
+			}
+			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
@@ -108,6 +127,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				"shares": remainingShares,
 				"value":  remainingShares * holding.Price,
 				"cost":   remainingCost,
+				"lots":   holding.Lots,
 			}
 			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
 				tx.Rollback()
@@ -122,6 +142,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			updates := map[string]interface{}{
 				"value": remainingValue,
 				"cost":  remainingCost,
+				"lots":  holding.Lots,
 			}
 			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
 				tx.Rollback()
@@ -148,7 +169,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				Cost:    realizedValue,
 				Lots: models.JSONColumn{{
 					ID:         uuid.New().String(),
-					Date:       holding.Date,
+					Date:       time.Now().UnixMilli(),
 					Shares:     0,
 					ValueAdded: realizedValue,
 				}},
@@ -165,22 +186,21 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// After commit, rebuild the response from the updated in-memory state
-		// rather than re-querying, to avoid stale reads from concurrent requests.
+		// Re-read both from DB after commit to ensure consistency.
 		var holdings []models.Holding
 		if err := db.Order("asset_id").Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		// Re-read cash holding to reflect the committed state
 		var committedCash models.Holding
-		if err := db.Where("asset_id = ?", "cash").First(&committedCash).Error; err == nil {
-			cashHolding = committedCash
+		if err := db.Where("asset_id = ?", "cash").First(&committedCash).Error; err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to read cash: %v", err)})
+			return
 		}
 
 		c.JSON(consts.StatusOK, map[string]interface{}{
 			"holdings":    holdings,
-			"cashHolding": cashHolding,
+			"cashHolding": committedCash,
 		})
 	}
 }

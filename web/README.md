@@ -1,20 +1,49 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# 永久投资组合跟踪 - 前端
 
-# Run and deploy your AI Studio app
+基于 Harry Browne 永久投资组合模型的投资跟踪工具前端。
 
-This contains everything you need to run your app locally.
+## 技术栈
 
-View your app in AI Studio: https://ai.studio/apps/5a9486fa-9c7b-4e3b-96a5-ad8e6af360db
+- React 19 + TypeScript
+- Vite
+- Tailwind CSS 4
+- Recharts（图表）
+- Vitest（测试）
 
-## Run Locally
+## 开发
 
-**Prerequisites:**  Node.js
+### 安装依赖
+```bash
+pnpm install
+```
 
+### 启动开发服务器
+```bash
+pnpm dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 构建生产版本
+```bash
+pnpm build
+```
+
+### 运行测试
+```bash
+pnpm test
+```
+
+### 代码检查
+```bash
+pnpm lint
+pnpm format
+pnpm typecheck
+```
+
+## 项目结构
+
+- `src/` - 源代码
+  - `components/` - React 组件
+  - `api.ts` - API 客户端
+  - `types.ts` - TypeScript 类型定义
+  - `utils.ts` - 工具函数
+  - `usePortfolio.ts` - 组合数据管理 Hook
