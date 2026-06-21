@@ -73,6 +73,7 @@ func main() {
 	api.DELETE("/records/:id", handlers.DeleteRecord(database))
 
 	api.GET("/settings", handlers.ListSettings(database))
+	api.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
 	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
 
 	distPath := filepath.Join(".", "web", "dist")

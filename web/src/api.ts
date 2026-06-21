@@ -81,6 +81,15 @@ export async function updateSetting(
   })
 }
 
+export async function updateSettings(
+  settings: Record<string, string>
+): Promise<Record<string, string>> {
+  return request<Record<string, string>>("/api/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  })
+}
+
 export async function fetchSyncStatus(): Promise<SyncStatus> {
   return request<SyncStatus>("/api/sync/status")
 }

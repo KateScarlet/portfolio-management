@@ -70,3 +70,59 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 		c.JSON(consts.StatusOK, map[string]string{"key": key, "value": body.Value})
 	}
 }
+
+func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var body map[string]string
+		if err := c.BindAndValidate(&body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		if len(body) == 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no settings provided"})
+			return
+		}
+
+		for key, value := range body {
+			if value == "" {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "value is required for key: " + key})
+				return
+			}
+		}
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			for key, value := range body {
+				setting := models.Setting{Key: key, Value: value}
+				if err := tx.Where(models.Setting{Key: key}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if s != nil {
+			if syncVal, ok := body["syncInterval"]; ok {
+				mins, err := strconv.Atoi(syncVal)
+				if err != nil {
+					c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be a valid integer"})
+					return
+				}
+				if mins < 0 || mins > 10080 {
+					c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be between 0 and 10080 minutes (7 days)"})
+					return
+				}
+				if mins == 0 {
+					s.UpdateInterval(0)
+				} else {
+					s.UpdateInterval(time.Duration(mins) * time.Minute)
+				}
+			}
+		}
+
+		c.JSON(consts.StatusOK, body)
+	}
+}

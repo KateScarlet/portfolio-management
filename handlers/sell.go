@@ -71,9 +71,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares exceed holding"})
 				return
 			}
-			if input.Price < 0 {
+			if input.Price <= 0 {
 				tx.Rollback()
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Invalid price"})
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Price must be greater than 0"})
 				return
 			}
 			realizedValue = input.Shares*input.Price - input.Fee

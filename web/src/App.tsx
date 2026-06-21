@@ -47,8 +47,10 @@ export default function App() {
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {
-      await api.updateSetting("driftThreshold", String(newSettings.driftThreshold))
-      await api.updateSetting("syncInterval", String(newSettings.syncInterval))
+      await api.updateSettings({
+        driftThreshold: String(newSettings.driftThreshold),
+        syncInterval: String(newSettings.syncInterval),
+      })
       setSettings(newSettings)
     } catch (e) {
       console.error("Failed to save settings", e)

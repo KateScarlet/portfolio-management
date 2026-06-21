@@ -114,8 +114,10 @@ export default function Dashboard({ assets, total, principal, totalFees }: Dashb
         )}
         {total > 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <p className="text-2xl font-light text-[#1A1A1A]">100%</p>
-            <p className="text-[10px] text-[#ADB5BD] uppercase tracking-wider mt-1">Balanced</p>
+            <p className={`text-2xl font-light ${isPositive ? "text-emerald-600" : "text-orange-600"}`}>
+              {isPositive ? "+" : ""}{formatPercent(returnRate)}
+            </p>
+            <p className="text-[10px] text-[#ADB5BD] uppercase tracking-wider mt-1">累计收益</p>
           </div>
         )}
       </div>

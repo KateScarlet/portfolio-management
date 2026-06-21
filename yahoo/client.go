@@ -2,7 +2,6 @@ package yahoo
 
 import (
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -120,18 +119,20 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 			SetQueryParam("interval", "1d").
 			SetResult(&fxResult).
 			Get(fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", fxSymbol))
-		if err == nil && !fxResp.IsError() && len(fxResult.Chart.Result) > 0 {
-			rate := fxResult.Chart.Result[0].Meta.RegularMarketPrice
-			if rate > 0 {
-				price *= rate
-			}
-		} else {
-			statusCode := 0
-			if fxResp != nil {
-				statusCode = fxResp.StatusCode()
-			}
-			slog.Warn("fx conversion failed", "from", currency, "to", "CNY", "error", err, "status", statusCode)
+		if err != nil {
+			return nil, fmt.Errorf("fx conversion request failed for %s->CNY: %w", currency, err)
 		}
+		if fxResp.IsError() {
+			return nil, fmt.Errorf("fx conversion returned status %d for %s->CNY", fxResp.StatusCode(), currency)
+		}
+		if len(fxResult.Chart.Result) == 0 {
+			return nil, fmt.Errorf("no fx result for %s->CNY", currency)
+		}
+		rate := fxResult.Chart.Result[0].Meta.RegularMarketPrice
+		if rate <= 0 {
+			return nil, fmt.Errorf("invalid fx rate for %s->CNY: %f", currency, rate)
+		}
+		price *= rate
 	}
 
 	if isPreciousMetal {
