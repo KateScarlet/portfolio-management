@@ -70,8 +70,19 @@ export default function HoldingsManager({
   )
 
   const handleSellConfirm = useCallback(
-    (newHoldings: Holding[]) => {
-      setHoldings(newHoldings)
+    (soldHolding: Holding, cashHolding: Holding) => {
+      setHoldings((prev) =>
+        prev
+          .map((h) => {
+            if (h.id === soldHolding.id) return soldHolding
+            if (h.id === cashHolding.id) return cashHolding
+            return h
+          })
+          .concat(
+            // Append cash holding if it's newly created (not in prev)
+            prev.every((h) => h.id !== cashHolding.id) ? [cashHolding] : []
+          )
+      )
     },
     [setHoldings]
   )

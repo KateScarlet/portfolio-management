@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"permanent-portfolio/models"
 	"time"
 
@@ -136,29 +137,37 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			// Handle deduct from cash in the same transaction
-			// Use newLot.Cost which holds the original cost (before fee was added to input.Cost)
+			// Handle deduct from cash in the same transaction.
+			// Creates a sell lot on the cash holding so that RecalcFromLots keeps
+			// cash value/cost consistent and the deduction is auditable.
 			if input.DeductFromCash {
 				addedCost := newLot.Cost + input.Fee
 				if addedCost > 0 {
 					var cashHolding models.Holding
 					if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
 						if errors.Is(err, gorm.ErrRecordNotFound) {
-							// No cash holding found, skip deduction
-							return nil
+							return fmt.Errorf("no cash holding found to deduct from; create a cash holding first")
 						}
 						return err
 					}
 
-					cashHolding.Value -= addedCost
-					if cashHolding.Value < 0 {
-						cashHolding.Value = 0
+					// Proportional cost reduction based on cost/value ratio
+					var costReduction float64
+					if cashHolding.Value > 0 {
+						costReduction = (cashHolding.Cost / cashHolding.Value) * addedCost
 					}
 
-					cashHolding.Cost -= addedCost
-					if cashHolding.Cost < 0 {
-						cashHolding.Cost = 0
+					cashSellLot := models.HoldingLot{
+						ID:         uuid.New().String(),
+						Type:       "sell",
+						Date:       time.Now().UnixMilli(),
+						Shares:     0,
+						Cost:       costReduction,
+						ValueAdded: addedCost,
+						Fee:        0, // fee already accounted for in the buying lot
 					}
+					cashHolding.Lots = append(cashHolding.Lots, cashSellLot)
+					cashHolding.RecalcFromLots()
 
 					if err := tx.Save(&cashHolding).Error; err != nil {
 						return err

@@ -11,12 +11,10 @@ import (
 )
 
 var (
-	client     *resty.Client
-	aShareRe   = regexp.MustCompile(`^\d{6}$`)
-	shPrefixRe = regexp.MustCompile(`^[56]\d{5}$`)
-	szPrefixRe = regexp.MustCompile(`^[0123]\d{5}$`)
-	shTagRe    = regexp.MustCompile(`^SH\d{6}$`)
-	szTagRe    = regexp.MustCompile(`^SZ\d{6}$`)
+	client   *resty.Client
+	aShareRe = regexp.MustCompile(`^\d{6}$`)
+	shTagRe  = regexp.MustCompile(`^SH\d{6}$`)
+	szTagRe  = regexp.MustCompile(`^SZ\d{6}$`)
 
 	rateCache   sync.Map
 	cacheExpiry = 5 * time.Minute
@@ -80,12 +78,21 @@ type PriceResult struct {
 func ConvertSymbol(symbol string) string {
 	s := strings.ToUpper(symbol)
 	if aShareRe.MatchString(s) {
-		if shPrefixRe.MatchString(s) {
+		// Shanghai: 5xxxxx (funds/ETFs), 6xxxxx (stocks)
+		if s[0] == '5' || s[0] == '6' {
 			return s + ".SS"
 		}
-		if szPrefixRe.MatchString(s) {
+		// Shenzhen: 0xxxxx (stocks), 2xxxxx (B-shares), 3xxxxx (ChiNext)
+		if s[0] == '0' || s[0] == '2' || s[0] == '3' {
 			return s + ".SZ"
 		}
+		// Shenzhen ETFs: 159xxx
+		if strings.HasPrefix(s, "159") {
+			return s + ".SZ"
+		}
+		// All other 6-digit codes (1xxxxx, 4xxxxx, 7xxxxx, 8xxxxx, 9xxxxx)
+		// default to Shanghai, which has more bond/convertible listings
+		return s + ".SS"
 	}
 	if shTagRe.MatchString(s) {
 		return s[2:] + ".SS"

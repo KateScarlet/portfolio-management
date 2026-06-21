@@ -44,8 +44,8 @@ export async function sellHolding(
   price: number,
   fee: number,
   value: number
-): Promise<{ holdings: Holding[]; cashHolding: Holding }> {
-  return request<{ holdings: Holding[]; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
+): Promise<{ soldHolding: Holding; cashHolding: Holding }> {
+  return request<{ soldHolding: Holding; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
     method: "POST",
     body: JSON.stringify({ shares, price, fee, value }),
   })

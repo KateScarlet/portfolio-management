@@ -6,7 +6,7 @@ import { useToast } from "./toast-context"
 
 interface SellModalProps {
   holding: Holding
-  onConfirm: (holdings: Holding[]) => void
+  onConfirm: (soldHolding: Holding, cashHolding: Holding) => void
   onClose: () => void
 }
 
@@ -34,7 +34,7 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
 
       try {
         const result = await api.sellHolding(holding.id, sShares, sPrice, feeNum, 0)
-        onConfirm(result.holdings)
+        onConfirm(result.soldHolding, result.cashHolding)
       } catch (e) {
         console.error("Failed to sell holding", e)
         showToast("卖出失败，请重试", "error")
@@ -46,7 +46,7 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
 
       try {
         const result = await api.sellHolding(holding.id, 0, 0, feeNum, sValue)
-        onConfirm(result.holdings)
+        onConfirm(result.soldHolding, result.cashHolding)
       } catch (e) {
         console.error("Failed to sell holding", e)
         showToast("卖出失败，请重试", "error")

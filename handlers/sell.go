@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"permanent-portfolio/models"
 	"time"
 
@@ -166,21 +165,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// Re-read both from DB after commit to ensure consistency.
-		var holdings []models.Holding
-		if err := db.Order("asset_id").Find(&holdings).Error; err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-		var committedCash models.Holding
-		if err := db.Where("asset_id = ?", "cash").First(&committedCash).Error; err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to read cash: %v", err)})
-			return
-		}
-
 		c.JSON(consts.StatusOK, map[string]any{
-			"holdings":    holdings,
-			"cashHolding": committedCash,
+			"soldHolding": holding,
+			"cashHolding": cashHolding,
 		})
 	}
 }
