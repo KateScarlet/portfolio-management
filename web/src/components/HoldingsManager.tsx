@@ -24,18 +24,22 @@ function recalcHolding(h: Holding, lots: HoldingLot[] | undefined) {
     const totalShares = buyLots.reduce((s, l) => s + l.shares, 0)
     const soldShares = sellLots.reduce((s, l) => s + l.shares, 0)
     const netShares = totalShares - soldShares
-    const totalCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0)
-    const costPrice = netShares > 0 ? totalCost / netShares : 0
-    return { lots, shares: netShares, cost: totalCost, costPrice }
+    const totalBuyCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0)
+    const totalSellCost = sellLots.reduce((s, l) => s + (l.cost || 0), 0)
+    const remainingCost = totalBuyCost - totalSellCost
+    const costPrice = netShares > 0 ? remainingCost / netShares : 0
+    return { lots, shares: netShares, cost: remainingCost, costPrice }
   } else {
     const totalValue = buyLots.reduce((s, l) => s + (l.valueAdded || l.cost || 0), 0)
     const soldValue = sellLots.reduce((s, l) => s + (l.valueAdded || 0), 0)
     const netValue = totalValue - soldValue
-    const totalCost = buyLots.reduce(
+    const totalBuyCost = buyLots.reduce(
       (s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0),
       0
     )
-    return { lots, value: netValue, cost: totalCost, shares: 0 }
+    const totalSellCost = sellLots.reduce((s, l) => s + (l.cost || 0), 0)
+    const remainingCost = totalBuyCost - totalSellCost
+    return { lots, value: netValue, cost: remainingCost, shares: 0 }
   }
 }
 

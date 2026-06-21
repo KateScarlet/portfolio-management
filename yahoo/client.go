@@ -109,7 +109,8 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	price := meta.RegularMarketPrice
 	originalPrice := meta.RegularMarketPrice
 	unit := ""
-	isCommodity := strings.HasSuffix(strings.ToUpper(meta.Symbol), "=F")
+	upperSymbol := strings.ToUpper(meta.Symbol)
+	isPreciousMetal := upperSymbol == "GC=F" || upperSymbol == "SI=F" || upperSymbol == "PL=F" || upperSymbol == "PA=F"
 
 	if currency != "" && currency != "CNY" {
 		fxSymbol := fmt.Sprintf("%sCNY=X", currency)
@@ -133,7 +134,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		}
 	}
 
-	if isCommodity {
+	if isPreciousMetal {
 		price /= 31.1035
 		unit = "克"
 	}

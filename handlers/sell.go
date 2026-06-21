@@ -61,6 +61,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		var realizedValue float64
 		var remainingShares float64
 		var remainingValue float64
+		var costReduction float64
 
 		switch {
 		case input.Shares > 0:
@@ -78,6 +79,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			realizedValue = input.Shares*input.Price - input.Fee
 			remainingShares = holding.Shares - input.Shares
 			remainingValue = holding.Value
+			if holding.Shares > 0 {
+				costReduction = (holding.Cost / holding.Shares) * input.Shares
+			}
 		case input.Value > 0:
 			// Manual holding sell: value-based (shares=0)
 			if input.Value > holding.Value {
@@ -88,6 +92,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			realizedValue = input.Value - input.Fee
 			remainingShares = 0
 			remainingValue = holding.Value - input.Value
+			if holding.Value > 0 {
+				costReduction = (holding.Cost / holding.Value) * input.Value
+			}
 		default:
 			tx.Rollback()
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
@@ -100,6 +107,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			Date:       time.Now().UnixMilli(),
 			Shares:     input.Shares,
 			CostPrice:  holding.CostPrice,
+			Cost:       costReduction,
 			ValueAdded: realizedValue + input.Fee,
 			Fee:        input.Fee,
 		}

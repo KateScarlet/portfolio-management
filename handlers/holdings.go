@@ -96,8 +96,6 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					existing.Cost += input.Cost
 				case input.Cost > 0:
 					existing.Cost = input.Cost
-				case existing.Cost == 0 && input.Symbol == "":
-					existing.Cost = input.Cost + input.Value
 				}
 
 				if input.Fee > 0 {
