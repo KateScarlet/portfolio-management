@@ -3,7 +3,6 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
-	"permanent-portfolio/charts"
 	"permanent-portfolio/models"
 	"permanent-portfolio/telegram"
 	"strings"
@@ -239,21 +238,15 @@ func (n *Notifier) checkSummary(client *telegram.Client, holdings []models.Holdi
 	}
 	lines = append(lines, "")
 
-	var chartAssets []charts.AssetData
 	for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
 		pct := 0.0
 		if total > 0 {
 			pct = assets[id] / total * 100
 		}
 		lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
-		chartAssets = append(chartAssets, charts.AssetData{Name: assetNames[id], Value: assets[id]})
 	}
 
 	_ = client.SendMessage(strings.Join(lines, "\n"))
-
-	if chartImg, err := charts.RenderAllocationBar(chartAssets); err == nil {
-		_ = client.SendPhoto(chartImg, "资产配比图")
-	}
 
 	n.lastSummaryTime = now
 	slog.Info("sent portfolio summary")

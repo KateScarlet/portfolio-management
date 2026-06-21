@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"permanent-portfolio/charts"
 	"permanent-portfolio/models"
 	"permanent-portfolio/telegram"
 	"strings"
@@ -106,25 +105,19 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			}
 			lines = append(lines, "")
 
-			var chartAssets []charts.AssetData
-			for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
-				pct := 0.0
-				if total > 0 {
-					pct = assets[id] / total * 100
-				}
-				lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
-				chartAssets = append(chartAssets, charts.AssetData{Name: assetNames[id], Value: assets[id]})
+		for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
+			pct := 0.0
+			if total > 0 {
+				pct = assets[id] / total * 100
 			}
-			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
+			lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
+		}
+		lines = append(lines, "", "<i>— 这是一条测试消息</i>")
 
-			if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
-				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
-				return
-			}
-
-			if chartImg, err := charts.RenderAllocationBar(chartAssets); err == nil {
-				_ = client.SendPhoto(chartImg, "资产配比图（测试）")
-			}
+		if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
+			c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
 
 		default:
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid test type: " + body.Type})
