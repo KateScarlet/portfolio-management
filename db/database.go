@@ -1,6 +1,7 @@
 package db
 
 import (
+	"os"
 	"permanent-portfolio/models"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+const ConfigDir = "config"
+const ConfigFile = "config/config.yaml"
 
 type Config struct {
 	Database struct {
@@ -20,15 +24,18 @@ type Config struct {
 func LoadConfig() *Config {
 	v := viper.GetViper()
 
-	v.SetConfigName("config")
+	v.SetConfigFile(ConfigFile)
 	v.SetConfigType("yaml")
-	v.AddConfigPath(".")
 
 	v.SetDefault("database.type", "sqlite")
 	v.SetDefault("database.dsn", "portfolio.db")
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// Config file doesn't exist yet - return defaults (setup mode)
+			if os.IsNotExist(err) {
+				return &Config{}
+			}
 			panic("failed to read config: " + err.Error())
 		}
 	}
@@ -106,4 +113,25 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+// IsSetupMode checks if config file exists
+func IsSetupMode() bool {
+	_, err := os.Stat(ConfigFile)
+	return os.IsNotExist(err)
+}
+
+// SaveConfig writes the configuration to config file
+func SaveConfig(cfg *Config) error {
+	// Ensure config directory exists
+	if err := os.MkdirAll(ConfigDir, 0755); err != nil {
+		return err
+	}
+
+	v := viper.New()
+	v.Set("database.type", cfg.Database.Type)
+	v.Set("database.dsn", cfg.Database.DSN)
+	v.SetConfigFile(ConfigFile)
+	v.SetConfigType("yaml")
+	return v.WriteConfig()
 }

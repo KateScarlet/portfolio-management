@@ -140,3 +140,17 @@ export async function testTelegramMessage(
     }
   )
 }
+
+export async function fetchSetupStatus(): Promise<{ configured: boolean }> {
+  return request<{ configured: boolean }>("/api/setup/status")
+}
+
+export async function submitSetup(config: {
+  databaseType: string
+  databaseDsn: string
+}): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>("/api/setup/complete", {
+    method: "POST",
+    body: JSON.stringify(config),
+  })
+}

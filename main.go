@@ -58,6 +58,9 @@ func main() {
 		AllowHeaders:    []string{"Origin", "Content-Type", "Accept"},
 	}))
 
+	h.GET("/api/setup/status", handlers.SetupStatus())
+	h.POST("/api/setup/complete", handlers.SetupComplete())
+
 	h.GET("/api/price/:symbol", handlers.GetPrice())
 	h.GET("/api/exchange/:pair", handlers.GetExchange())
 	h.GET("/api/sync/status", handlers.GetSyncStatus(priceScheduler))

@@ -19,8 +19,8 @@ tmp/
 *.db-shm
 *.db-wal
 
-# Config file (may contain credentials)
-config.yaml
+# Config directory (may contain credentials)
+config/
 
 # Dependency directories
 vendor/

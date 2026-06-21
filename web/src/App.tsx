@@ -7,8 +7,10 @@ import HoldingsManager from "./components/HoldingsManager"
 import RebalancePanel from "./components/RebalancePanel"
 import HistoryPanel from "./components/HistoryPanel"
 import SettingsPanel from "./components/SettingsPanel"
+import SetupWizard from "./components/SetupWizard"
 
 export default function App() {
+  const [setupMode, setSetupMode] = useState<boolean | null>(null)
   const {
     holdings,
     setHoldings,
@@ -23,6 +25,12 @@ export default function App() {
   } = usePortfolio()
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+
+  useEffect(() => {
+    api.fetchSetupStatus()
+      .then((s) => setSetupMode(!s.configured))
+      .catch(() => setSetupMode(false))
+  }, [])
 
   useEffect(() => {
     api
@@ -98,6 +106,18 @@ export default function App() {
   )
   // principal = cost of current holdings + buy fees only
   const principal = totalCost + totalBuyFees
+
+  if (setupMode === null) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <p className="text-sm text-[#6C757D]">Loading...</p>
+      </div>
+    )
+  }
+
+  if (setupMode) {
+    return <SetupWizard onComplete={() => window.location.reload()} />
+  }
 
   if (loading) {
     return (

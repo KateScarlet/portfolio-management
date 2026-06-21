@@ -4,8 +4,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
+      - app-config:/app/config
+      - app-data:/app/data
     environment:
       - TZ=Asia/Shanghai
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
   # postgres:
   #   image: postgres:18.4
   #   volumes:
-  #     - ./pg-data:/var/lib/postgresql/data
+  #     - pg-data:/var/lib/postgresql/data
   #   environment:
   #     POSTGRES_DB: portfolio
   #     POSTGRES_USER: portfolio
@@ -27,3 +27,8 @@ services:
   #     timeout: 3s
   #     retries: 5
   #   restart: unless-stopped
+
+volumes:
+  app-config:
+  app-data:
+  # pg-data:

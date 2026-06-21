@@ -1,6 +1,10 @@
 # Database configuration
 # Default: SQLite with file "portfolio.db"
 #
+# Config file location: config/config.yaml
+# If config file does not exist, the web setup wizard will guide you through
+# initial configuration on first launch.
+#
 # PostgreSQL:
 #   database.type = postgres
 #   database.dsn  = postgres://user:pass@localhost:5432/portfolio?sslmode=disable
