@@ -68,11 +68,14 @@ export default function HoldingsManager({
     (h: Holding, lotId: string) => {
       if (!h.lots) return
       const updatedLots = h.lots.filter((l) => l.id !== lotId)
-      // Send only lots to backend; backend recalculates all derived fields
-      onUpdateHolding(h.id, { lots: updatedLots })
+      if (updatedLots.length === 0) {
+        onRemoveHolding(h.id)
+      } else {
+        onUpdateHolding(h.id, { lots: updatedLots })
+      }
       setEditingLotId(null)
     },
-    [onUpdateHolding]
+    [onUpdateHolding, onRemoveHolding]
   )
 
   const handleSellConfirm = useCallback(

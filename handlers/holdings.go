@@ -213,20 +213,14 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					holding.Lots = lots
 					holding.RecalcFromLots()
 
-					// Remove lots from safeUpdates; add recalculated fields
-					delete(safeUpdates, "lots")
-					safeUpdates["shares"] = holding.Shares
-					safeUpdates["cost"] = holding.Cost
-					safeUpdates["costPrice"] = holding.CostPrice
-
-					// If price is also being updated, recompute value with the new price
-					if newPrice, ok := safeUpdates["price"]; ok {
-						if price, ok := newPrice.(float64); ok && holding.Symbol != "" {
-							holding.Price = price
-							holding.Value = holding.Shares * price
-						}
+					// Save the full holding since lots is a JSON column
+					if err := db.Save(&holding).Error; err != nil {
+						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+						return
 					}
-					safeUpdates["value"] = holding.Value
+
+					c.JSON(consts.StatusOK, holding)
+					return
 				}
 			}
 		}
