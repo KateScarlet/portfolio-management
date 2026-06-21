@@ -96,3 +96,58 @@ type Setting struct {
 	Key   string `gorm:"primaryKey" json:"key"`
 	Value string `gorm:"not null" json:"value"`
 }
+
+// RecalcFromLots recalculates holding fields from its lots.
+// This is the single source of truth for financial calculations.
+//
+// Convention:
+//   - Buy lot: Cost = raw cost (shares * costPrice, NO fee); ValueAdded = market value at purchase; Fee = transaction fee
+//   - Sell lot: Cost = proportional cost reduction; ValueAdded = value removed from holding; Fee = transaction fee
+//   - Holding: Cost = total buy costs - total sell costs (NO fees); Value = current market value
+//   - Total investment (principal) = Cost + TotalFees()
+func (h *Holding) RecalcFromLots() {
+	if len(h.Lots) == 0 {
+		return
+	}
+
+	var totalBuyShares, totalSellShares float64
+	var totalBuyCost, totalSellCost float64
+	var totalBuyValue, totalSellValue float64
+
+	for _, lot := range h.Lots {
+		if lot.Type == "sell" {
+			totalSellShares += lot.Shares
+			totalSellCost += lot.Cost
+			totalSellValue += lot.ValueAdded
+		} else {
+			totalBuyShares += lot.Shares
+			totalBuyCost += lot.Cost
+			totalBuyValue += lot.ValueAdded
+		}
+	}
+
+	if h.Symbol != "" {
+		h.Shares = totalBuyShares - totalSellShares
+		h.Cost = totalBuyCost - totalSellCost
+		if h.Shares > 0 {
+			h.CostPrice = h.Cost / h.Shares
+		} else {
+			h.CostPrice = 0
+		}
+		h.Value = h.Shares * h.Price
+	} else {
+		h.Shares = 0
+		h.Value = totalBuyValue - totalSellValue
+		h.Cost = totalBuyCost - totalSellCost
+		h.CostPrice = 0
+	}
+}
+
+// TotalFees returns the sum of all lot fees for this holding.
+func (h *Holding) TotalFees() float64 {
+	var total float64
+	for _, lot := range h.Lots {
+		total += lot.Fee
+	}
+	return total
+}

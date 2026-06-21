@@ -100,10 +100,6 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					existing.Cost = input.Cost
 				}
 
-				if input.Fee > 0 {
-					existing.Cost += input.Fee
-				}
-
 				if existing.Shares > 0 && existing.Cost > 0 {
 					existing.CostPrice = existing.Cost / existing.Shares
 				}
@@ -128,9 +124,6 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 				// No existing holding - create new
 				input.ID = uuid.New().String()
-				if input.Fee > 0 {
-					input.Cost += input.Fee
-				}
 				if input.Lots == nil {
 					input.Lots = models.JSONColumn{newLot}
 				} else {
@@ -224,7 +217,16 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 							lots[i].ID = uuid.New().String()
 						}
 					}
-					safeUpdates["lots"] = models.JSONColumn(lots)
+					// Set lots and recalculate all derived fields
+					holding.Lots = lots
+					holding.RecalcFromLots()
+
+					// Remove lots from safeUpdates; add recalculated fields
+					delete(safeUpdates, "lots")
+					safeUpdates["shares"] = holding.Shares
+					safeUpdates["cost"] = holding.Cost
+					safeUpdates["costPrice"] = holding.CostPrice
+					safeUpdates["value"] = holding.Value
 				}
 			}
 		}

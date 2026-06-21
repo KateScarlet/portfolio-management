@@ -120,3 +120,76 @@ func TestAssetMapColumn_ValueWithData(t *testing.T) {
 		t.Fatalf("unexpected data: %+v", parsed)
 	}
 }
+
+func TestHolding_RecalcFromLots_SymbolBased(t *testing.T) {
+	h := &Holding{
+		Symbol: "VTI",
+		Price:  100,
+		Lots: []HoldingLot{
+			{Type: "", Shares: 10, Cost: 950, ValueAdded: 1000, Fee: 5},
+			{Type: "", Shares: 5, Cost: 490, ValueAdded: 500, Fee: 3},
+			{Type: "sell", Shares: 3, Cost: 285, ValueAdded: 300, Fee: 2},
+		},
+	}
+	h.RecalcFromLots()
+
+	if h.Shares != 12 {
+		t.Errorf("expected shares=12, got %f", h.Shares)
+	}
+	if h.Cost != 1155 {
+		t.Errorf("expected cost=1155, got %f", h.Cost)
+	}
+	if h.CostPrice != 96.25 {
+		t.Errorf("expected costPrice=96.25, got %f", h.CostPrice)
+	}
+	if h.Value != 1200 {
+		t.Errorf("expected value=1200, got %f", h.Value)
+	}
+	if h.TotalFees() != 10 {
+		t.Errorf("expected totalFees=10, got %f", h.TotalFees())
+	}
+}
+
+func TestHolding_RecalcFromLots_FullySold(t *testing.T) {
+	h := &Holding{
+		Symbol: "VTI",
+		Price:  100,
+		Lots: []HoldingLot{
+			{Type: "", Shares: 10, Cost: 1000, ValueAdded: 1000, Fee: 5},
+			{Type: "sell", Shares: 10, Cost: 1000, ValueAdded: 1100, Fee: 5},
+		},
+	}
+	h.RecalcFromLots()
+
+	if h.Shares != 0 {
+		t.Errorf("expected shares=0, got %f", h.Shares)
+	}
+	if h.Cost != 0 {
+		t.Errorf("expected cost=0, got %f", h.Cost)
+	}
+	if h.Value != 0 {
+		t.Errorf("expected value=0, got %f", h.Value)
+	}
+}
+
+func TestHolding_RecalcFromLots_ManualHolding(t *testing.T) {
+	h := &Holding{
+		Symbol: "",
+		Lots: []HoldingLot{
+			{Type: "", Shares: 0, Cost: 5000, ValueAdded: 5000, Fee: 0},
+			{Type: "", Shares: 0, Cost: 3000, ValueAdded: 3000, Fee: 0},
+			{Type: "sell", Shares: 0, Cost: 2000, ValueAdded: 2500, Fee: 0},
+		},
+	}
+	h.RecalcFromLots()
+
+	if h.Shares != 0 {
+		t.Errorf("expected shares=0, got %f", h.Shares)
+	}
+	if h.Value != 5500 {
+		t.Errorf("expected value=5500, got %f", h.Value)
+	}
+	if h.Cost != 6000 {
+		t.Errorf("expected cost=6000, got %f", h.Cost)
+	}
+}

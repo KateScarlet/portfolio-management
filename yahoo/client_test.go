@@ -22,16 +22,16 @@ func TestConvertSymbol(t *testing.T) {
 		{"159915", "159915.SZ"},
 		{"204001", "204001.SZ"},
 		{"300750", "300750.SZ"},
-		// SH tag format (SHxxxxxx -> xxxxxx.SS)
+		// SH tag format (SHxxxxxx -> xxxxxx.SS, case-insensitive)
 		{"SH600519", "600519.SS"},
 		{"SH510300", "510300.SS"},
-		// SZ tag format (SZxxxxxx -> xxxxxx.SZ)
+		{"sh600519", "600519.SS"},
+		{"Sh600519", "600519.SS"},
+		// SZ tag format (SZxxxxxx -> xxxxxx.SZ, case-insensitive)
 		{"SZ000001", "000001.SZ"},
 		{"SZ300750", "300750.SZ"},
-		// Lowercase input with 6 digits still works via aShareRe
-		{"600519", "600519.SS"},
-		// Note: shTagRe/szTagRe only match uppercase SH/SZ prefix
-		{"SH600519", "600519.SS"},
+		{"sz000001", "000001.SZ"},
+		{"Sz300750", "300750.SZ"},
 		// HK stocks - pass through unchanged
 		{"2800", "2800"},
 		{"9988", "9988"},

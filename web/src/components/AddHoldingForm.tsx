@@ -4,16 +4,12 @@ import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface AddHoldingFormProps {
-  holdings: Array<{ assetId: string; value: number; cost?: number; id: string }>
   onAddHolding: (holding: Parameters<typeof api.createHolding>[0]) => void
-  onUpdateHolding: (id: string, updates: Record<string, unknown>) => void
   onClose: () => void
 }
 
 export default function AddHoldingForm({
-  holdings,
   onAddHolding,
-  onUpdateHolding,
   onClose,
 }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")

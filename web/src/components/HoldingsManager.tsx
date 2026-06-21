@@ -15,34 +15,6 @@ interface HoldingsManagerProps {
   onSaveRecord: () => void
 }
 
-function recalcHolding(h: Holding, lots: HoldingLot[] | undefined) {
-  if (!lots) return {}
-  const buyLots = lots.filter((l) => l.type !== "sell")
-  const sellLots = lots.filter((l) => l.type === "sell")
-  const isSymbol = !!h.symbol
-  if (isSymbol) {
-    const totalShares = buyLots.reduce((s, l) => s + l.shares, 0)
-    const soldShares = sellLots.reduce((s, l) => s + l.shares, 0)
-    const netShares = totalShares - soldShares
-    const totalBuyCost = buyLots.reduce((s, l) => s + (l.cost || 0) + (l.fee || 0), 0)
-    const totalSellCost = sellLots.reduce((s, l) => s + (l.cost || 0), 0)
-    const remainingCost = totalBuyCost - totalSellCost
-    const costPrice = netShares > 0 ? remainingCost / netShares : 0
-    return { lots, shares: netShares, cost: remainingCost, costPrice, value: netShares * h.price }
-  } else {
-    const totalValue = buyLots.reduce((s, l) => s + (l.valueAdded || l.cost || 0), 0)
-    const soldValue = sellLots.reduce((s, l) => s + (l.valueAdded || 0), 0)
-    const netValue = totalValue - soldValue
-    const totalBuyCost = buyLots.reduce(
-      (s, l) => s + (l.cost || l.valueAdded || 0) + (l.fee || 0),
-      0
-    )
-    const totalSellCost = sellLots.reduce((s, l) => s + (l.cost || 0), 0)
-    const remainingCost = totalBuyCost - totalSellCost
-    return { lots, value: netValue, cost: remainingCost, shares: 0 }
-  }
-}
-
 export default function HoldingsManager({
   holdings,
   setHoldings,
@@ -79,7 +51,8 @@ export default function HoldingsManager({
       const updatedLots = h.lots.map((l) =>
         l.id === lotId ? { ...l, ...updatedFields } : l
       )
-      onUpdateHolding(h.id, recalcHolding(h, updatedLots))
+      // Send only lots to backend; backend recalculates all derived fields
+      onUpdateHolding(h.id, { lots: updatedLots })
       setEditingLotId(null)
     },
     [onUpdateHolding]
@@ -89,7 +62,8 @@ export default function HoldingsManager({
     (h: Holding, lotId: string) => {
       if (!h.lots) return
       const updatedLots = h.lots.filter((l) => l.id !== lotId)
-      onUpdateHolding(h.id, recalcHolding(h, updatedLots))
+      // Send only lots to backend; backend recalculates all derived fields
+      onUpdateHolding(h.id, { lots: updatedLots })
       setEditingLotId(null)
     },
     [onUpdateHolding]
@@ -131,9 +105,7 @@ export default function HoldingsManager({
 
       {isAdding && (
         <AddHoldingForm
-          holdings={holdings}
           onAddHolding={onAddHolding}
-          onUpdateHolding={onUpdateHolding}
           onClose={() => setIsAdding(false)}
         />
       )}

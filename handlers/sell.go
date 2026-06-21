@@ -59,8 +59,6 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var realizedValue float64
-		var remainingShares float64
-		var remainingValue float64
 		var costReduction float64
 
 		switch {
@@ -77,8 +75,6 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return
 			}
 			realizedValue = input.Shares*input.Price - input.Fee
-			remainingShares = holding.Shares - input.Shares
-			remainingValue = holding.Value
 			if holding.Shares > 0 {
 				costReduction = (holding.Cost / holding.Shares) * input.Shares
 			}
@@ -90,8 +86,6 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return
 			}
 			realizedValue = input.Value - input.Fee
-			remainingShares = 0
-			remainingValue = holding.Value - input.Value
 			if holding.Value > 0 {
 				costReduction = (holding.Cost / holding.Value) * input.Value
 			}
@@ -101,62 +95,40 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// Create sell lot
+		// ValueAdded = value removed from the holding (NOT the proceeds)
+		// For share-based: shares * currentPrice (market value removed)
+		// For value-based: input.Value (value removed)
 		sellLot := models.HoldingLot{
-			ID:         uuid.New().String(),
-			Type:       "sell",
-			Date:       time.Now().UnixMilli(),
-			Shares:     input.Shares,
-			CostPrice:  holding.CostPrice,
-			Cost:       costReduction,
-			ValueAdded: realizedValue + input.Fee,
-			Fee:        input.Fee,
+			ID:        uuid.New().String(),
+			Type:      "sell",
+			Date:      time.Now().UnixMilli(),
+			CostPrice: holding.CostPrice,
+			Cost:      costReduction,
+			Fee:       input.Fee,
 		}
-		holding.Lots = append(holding.Lots, sellLot)
+		if input.Shares > 0 {
+			sellLot.Shares = input.Shares
+			sellLot.ValueAdded = input.Shares * holding.Price
+		} else {
+			sellLot.ValueAdded = input.Value
+		}
 
-		switch {
-		case remainingShares == 0 && remainingValue == 0:
-			updates := map[string]any{
-				"shares": 0,
-				"value":  0,
-				"cost":   0,
-				"lots":   holding.Lots,
-			}
-			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
-				tx.Rollback()
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
-			}
-		case input.Shares > 0:
-			remainingCost := holding.Cost
-			if holding.Shares > 0 {
-				remainingCost = (holding.Cost / holding.Shares) * remainingShares
-			}
-			updates := map[string]any{
-				"shares": remainingShares,
-				"value":  remainingShares * holding.Price,
-				"cost":   remainingCost,
-				"lots":   holding.Lots,
-			}
-			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
-				tx.Rollback()
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
-			}
-		default:
-			remainingCost := holding.Cost
-			if holding.Value > 0 {
-				remainingCost = (holding.Cost / holding.Value) * remainingValue
-			}
-			updates := map[string]any{
-				"value": remainingValue,
-				"cost":  remainingCost,
-				"lots":  holding.Lots,
-			}
-			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
-				tx.Rollback()
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
-			}
+		holding.Lots = append(holding.Lots, sellLot)
+		holding.RecalcFromLots()
+
+		// Update holding with recalculated fields
+		updates := map[string]any{
+			"shares":    holding.Shares,
+			"value":     holding.Value,
+			"cost":      holding.Cost,
+			"costPrice": holding.CostPrice,
+			"lots":      holding.Lots,
+		}
+		if err := tx.Model(&holding).Updates(updates).Error; err != nil {
+			tx.Rollback()
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
 		}
 
 		var cashHolding models.Holding

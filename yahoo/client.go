@@ -87,11 +87,11 @@ func ConvertSymbol(symbol string) string {
 			return s + ".SZ"
 		}
 	}
-	if shTagRe.MatchString(symbol) {
-		return strings.ToUpper(symbol[2:]) + ".SS"
+	if shTagRe.MatchString(s) {
+		return s[2:] + ".SS"
 	}
-	if szTagRe.MatchString(symbol) {
-		return strings.ToUpper(symbol[2:]) + ".SZ"
+	if szTagRe.MatchString(s) {
+		return s[2:] + ".SZ"
 	}
 	return s
 }

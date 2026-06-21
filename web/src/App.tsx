@@ -72,6 +72,8 @@ export default function App() {
     (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
     0
   )
+  // principal = total amount invested (raw cost + fees)
+  const principal = totalCost + totalFees
 
   if (loading) {
     return (
@@ -113,7 +115,7 @@ export default function App() {
         {/* Top Row: Dashboard & Rebalance */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} principal={totalCost} totalFees={totalFees} />
+            <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
