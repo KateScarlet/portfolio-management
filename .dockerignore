@@ -1,0 +1,13 @@
+.git
+.idea
+.vscode
+*.db
+*.db-shm
+*.db-wal
+tmp/
+web/node_modules/
+web/dist/
+data/
+pg-data/
+server
+server.exe
