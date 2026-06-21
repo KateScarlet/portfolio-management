@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Settings } from "../types"
 import { Settings as SettingsIcon } from "lucide-react"
 import * as api from "../api"
@@ -25,6 +25,9 @@ const SUMMARY_INTERVALS = [
 export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [draft, setDraft] = useState(settings)
+  useEffect(() => {
+    setDraft(settings)
+  }, [settings])
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
