@@ -27,6 +27,7 @@ type PriceScheduler struct {
 	lastSyncAt  time.Time
 	lastSyncErr string
 	syncing     bool
+	notifier    *Notifier
 }
 
 func New(db *gorm.DB, interval time.Duration) *PriceScheduler {
@@ -185,6 +186,7 @@ func (s *PriceScheduler) doSync() {
 
 	synced := 0
 	failed := 0
+	syncedPrices := make(map[string]float64)
 
 	for i := range holdings {
 		if i > 0 {
@@ -210,6 +212,7 @@ func (s *PriceScheduler) doSync() {
 		}
 
 		synced++
+		syncedPrices[h.Symbol] = result.Price
 		slog.Info("synced holding", "name", h.Name, "symbol", h.Symbol, "price", result.Price)
 	}
 
@@ -223,6 +226,15 @@ func (s *PriceScheduler) doSync() {
 	s.mu.Unlock()
 
 	slog.Info("sync completed", "synced", synced, "failed", failed)
+
+	// Send notifications after sync
+	if s.notifier != nil {
+		// Reload holdings with updated prices
+		var updatedHoldings []models.Holding
+		if err := s.db.Find(&updatedHoldings).Error; err == nil {
+			s.notifier.NotifyAfterSync(updatedHoldings, syncedPrices)
+		}
+	}
 }
 
 func (s *PriceScheduler) GetStatus() SyncStatus {
@@ -236,4 +248,8 @@ func (s *PriceScheduler) GetStatus() SyncStatus {
 		status.LastSyncErr = s.lastSyncErr
 	}
 	return status
+}
+
+func (s *PriceScheduler) SetNotifier(n *Notifier) {
+	s.notifier = n
 }

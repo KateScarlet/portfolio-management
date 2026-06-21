@@ -113,3 +113,16 @@ export async function fetchExchangeRate(pair: string): Promise<{ rate: number }>
 export async function triggerSync(): Promise<SyncStatus> {
   return request<SyncStatus>("/api/sync/trigger", { method: "POST" })
 }
+
+export async function testTelegramConnection(
+  botToken: string,
+  chatID: string
+): Promise<{ success: boolean; botName?: string; error?: string }> {
+  return request<{ success: boolean; botName?: string; error?: string }>(
+    "/api/telegram/test",
+    {
+      method: "POST",
+      body: JSON.stringify({ botToken, chatID }),
+    }
+  )
+}

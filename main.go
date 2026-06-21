@@ -47,6 +47,8 @@ func main() {
 		}
 	}
 	priceScheduler := scheduler.New(database, syncInterval)
+	notifier := scheduler.NewNotifier(database)
+	priceScheduler.SetNotifier(notifier)
 
 	h := server.Default(server.WithHostPorts(":3000"))
 
@@ -75,6 +77,7 @@ func main() {
 	api.GET("/settings", handlers.ListSettings(database))
 	api.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
 	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
+	api.POST("/telegram/test", handlers.TestTelegramConnection())
 
 	distPath := filepath.Join(".", "web", "dist")
 	if _, err := os.Stat(distPath); err == nil {

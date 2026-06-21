@@ -47,11 +47,28 @@ export interface PortfolioRecord {
 export interface Settings {
   driftThreshold: number // 漂移阈值百分比，如 5 表示 5%
   syncInterval: number // 同步间隔（分钟），0 = 关闭
+  // Telegram
+  telegramBotToken: string
+  telegramChatID: string
+  telegramEnabled: boolean
+  telegramPriceAlert: boolean
+  telegramDriftAlert: boolean
+  telegramSummary: boolean
+  telegramPriceThreshold: number // 价格波动阈值百分比
+  telegramSummaryInterval: string // "daily" | "weekly" | "off"
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
   syncInterval: 60,
+  telegramBotToken: "",
+  telegramChatID: "",
+  telegramEnabled: false,
+  telegramPriceAlert: true,
+  telegramDriftAlert: true,
+  telegramSummary: true,
+  telegramPriceThreshold: 5,
+  telegramSummaryInterval: "daily",
 }
 
 export interface SyncStatus {

@@ -31,6 +31,14 @@ export default function App() {
         setSettings({
           driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
           syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
+          telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
+          telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
+          telegramEnabled: s.telegramEnabled === "true",
+          telegramPriceAlert: s.telegramPriceAlert !== "false",
+          telegramDriftAlert: s.telegramDriftAlert !== "false",
+          telegramSummary: s.telegramSummary !== "false",
+          telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
+          telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
         })
       })
       .catch(console.error)
@@ -50,6 +58,14 @@ export default function App() {
       await api.updateSettings({
         driftThreshold: String(newSettings.driftThreshold),
         syncInterval: String(newSettings.syncInterval),
+        telegramBotToken: newSettings.telegramBotToken,
+        telegramChatID: newSettings.telegramChatID,
+        telegramEnabled: String(newSettings.telegramEnabled),
+        telegramPriceAlert: String(newSettings.telegramPriceAlert),
+        telegramDriftAlert: String(newSettings.telegramDriftAlert),
+        telegramSummary: String(newSettings.telegramSummary),
+        telegramPriceThreshold: String(newSettings.telegramPriceThreshold),
+        telegramSummaryInterval: newSettings.telegramSummaryInterval,
       })
       setSettings(newSettings)
     } catch (e) {
