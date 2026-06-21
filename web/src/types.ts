@@ -1,5 +1,11 @@
 export type AssetId = "stocks" | "bonds" | "cash" | "gold"
 
+export interface UserInfo {
+  id: string
+  username: string
+  role: "admin" | "user"
+}
+
 export interface AssetInfo {
   id: AssetId
   name: string

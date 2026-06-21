@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"gorm.io/gorm"
 )
 
 func SetupStatus() app.HandlerFunc {
@@ -16,11 +17,13 @@ func SetupStatus() app.HandlerFunc {
 	}
 }
 
-func SetupComplete() app.HandlerFunc {
+func SetupComplete(database *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			DatabaseType string `json:"databaseType"`
 			DatabaseDSN  string `json:"databaseDsn"`
+			Username     string `json:"username"`
+			Password     string `json:"password"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -38,12 +41,27 @@ func SetupComplete() app.HandlerFunc {
 			}
 		}
 
+		if body.Username == "" || body.Password == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "管理员用户名和密码不能为空"})
+			return
+		}
+
+		if len(body.Password) < 6 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "密码至少6位"})
+			return
+		}
+
 		cfg := &db.Config{}
 		cfg.Database.Type = body.DatabaseType
 		cfg.Database.DSN = body.DatabaseDSN
 
 		if err := db.SaveConfig(cfg); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if err := CreateUserForSetup(database, body.Username, body.Password, "admin"); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建管理员失败: " + err.Error()})
 			return
 		}
 

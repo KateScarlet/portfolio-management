@@ -1,10 +1,11 @@
-import { Holding, PortfolioRecord, SyncStatus } from "./types"
+import { Holding, PortfolioRecord, SyncStatus, UserInfo } from "./types"
 
 const BASE = ""
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     ...options,
   })
   if (!res.ok) {
@@ -148,9 +149,41 @@ export async function fetchSetupStatus(): Promise<{ configured: boolean }> {
 export async function submitSetup(config: {
   databaseType: string
   databaseDsn: string
+  username: string
+  password: string
 }): Promise<{ success: boolean }> {
   return request<{ success: boolean }>("/api/setup/complete", {
     method: "POST",
     body: JSON.stringify(config),
   })
+}
+
+export async function login(username: string, password: string): Promise<{ user: UserInfo }> {
+  return request<{ user: UserInfo }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  })
+}
+
+export async function logout(): Promise<void> {
+  await request<{ success: boolean }>("/api/auth/logout", { method: "POST" })
+}
+
+export async function fetchMe(): Promise<UserInfo> {
+  return request<UserInfo>("/api/auth/me")
+}
+
+export async function register(username: string, password: string, role: string): Promise<UserInfo> {
+  return request<UserInfo>("/api/users", {
+    method: "POST",
+    body: JSON.stringify({ username, password, role }),
+  })
+}
+
+export async function listUsers(): Promise<UserInfo[]> {
+  return request<UserInfo[]>("/api/users")
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/users/${id}`, { method: "DELETE" })
 }

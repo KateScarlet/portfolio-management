@@ -97,6 +97,14 @@ type Setting struct {
 	Value string `gorm:"not null" json:"value"`
 }
 
+type User struct {
+	ID        string `gorm:"primaryKey" json:"id"`
+	Username  string `gorm:"uniqueIndex;size:50;not null" json:"username"`
+	Password  string `gorm:"size:200;not null" json:"-"`
+	Role      string `gorm:"size:20;default:'user'" json:"role"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
 // RecalcFromLots recalculates holding fields from its lots.
 // This is the single source of truth for financial calculations.
 //

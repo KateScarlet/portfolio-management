@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"permanent-portfolio/db"
 	"permanent-portfolio/handlers"
+	"permanent-portfolio/middleware"
 	"permanent-portfolio/models"
 	"permanent-portfolio/scheduler"
 	"permanent-portfolio/yahoo"
@@ -34,16 +35,18 @@ func main() {
 		panic("Failed to init database: " + err.Error())
 	}
 
+	jwtSecret := db.GenerateJWTSecret()
+	middleware.SetJWTSecret(jwtSecret)
+
 	yahoo.Init()
 
-	// Read sync interval from settings, default 60 minutes
 	var syncInterval time.Duration = 60 * time.Minute
 	var setting models.Setting
 	if database.Find(&setting, "key = ?", "syncInterval").Error == nil {
 		if mins, err := strconv.Atoi(setting.Value); err == nil && mins > 0 {
 			syncInterval = time.Duration(mins) * time.Minute
 		} else if mins == 0 {
-			syncInterval = 0 // disabled
+			syncInterval = 0
 		}
 	}
 	priceScheduler := scheduler.New(database, syncInterval)
@@ -53,20 +56,28 @@ func main() {
 	h := server.Default(server.WithHostPorts(":3000"))
 
 	h.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
-		AllowMethods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:    []string{"Origin", "Content-Type", "Accept"},
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
 	}))
 
 	h.GET("/api/setup/status", handlers.SetupStatus())
-	h.POST("/api/setup/complete", handlers.SetupComplete())
+	h.POST("/api/setup/complete", handlers.SetupComplete(database))
+
+	h.POST("/api/auth/login", handlers.Login(database))
+	h.POST("/api/auth/logout", handlers.Logout())
+	h.GET("/api/auth/me", middleware.AuthRequired(), handlers.Me(database))
 
 	h.GET("/api/price/:symbol", handlers.GetPrice())
 	h.GET("/api/exchange/:pair", handlers.GetExchange())
-	h.GET("/api/sync/status", handlers.GetSyncStatus(priceScheduler))
-	h.POST("/api/sync/trigger", handlers.TriggerSync(priceScheduler))
 
 	api := h.Group("/api")
+	api.Use(middleware.AuthRequired())
+
+	api.GET("/sync/status", handlers.GetSyncStatus(priceScheduler))
+	api.POST("/sync/trigger", handlers.TriggerSync(priceScheduler))
+
 	api.GET("/holdings", handlers.ListHoldings(database))
 	api.POST("/holdings", handlers.CreateHolding(database))
 	api.PATCH("/holdings/:id", handlers.UpdateHolding(database))
@@ -81,6 +92,12 @@ func main() {
 	api.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
 	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database))
+
+	admin := api.Group("")
+	admin.Use(middleware.AdminRequired())
+	admin.GET("/users", handlers.ListUsers(database))
+	admin.POST("/users", handlers.Register(database))
+	admin.DELETE("/users/:id", handlers.DeleteUser(database))
 
 	distPath := filepath.Join(".", "web", "dist")
 	if _, err := os.Stat(distPath); err == nil {

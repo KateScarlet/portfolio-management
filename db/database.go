@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"permanent-portfolio/models"
 	"time"
@@ -32,7 +34,6 @@ func LoadConfig() *Config {
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// Config file doesn't exist yet - return defaults (setup mode)
 			if os.IsNotExist(err) {
 				return &Config{}
 			}
@@ -46,6 +47,12 @@ func LoadConfig() *Config {
 	}
 
 	return &cfg
+}
+
+func GenerateJWTSecret() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func Init(cfg *Config) (*gorm.DB, error) {
@@ -87,7 +94,7 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}); err != nil {
+	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +115,7 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}); err != nil {
+	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}); err != nil {
 		return nil, err
 	}
 
@@ -123,7 +130,6 @@ func IsSetupMode() bool {
 
 // SaveConfig writes the configuration to config file
 func SaveConfig(cfg *Config) error {
-	// Ensure config directory exists
 	if err := os.MkdirAll(ConfigDir, 0755); err != nil {
 		return err
 	}

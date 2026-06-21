@@ -1,0 +1,87 @@
+import { useState } from "react"
+import * as api from "../api"
+
+interface LoginPageProps {
+  onLogin: () => void
+}
+
+export default function LoginPage({ onLogin }: LoginPageProps) {
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!username || !password) {
+      setError("请输入用户名和密码")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    try {
+      await api.login(username, password)
+      onLogin()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "登录失败")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="px-6 pt-6 pb-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
+              <div className="w-4 h-4 border-2 border-white rounded-full"></div>
+            </div>
+            <h1 className="text-lg font-semibold text-[#1A1A1A]">投资组合</h1>
+          </div>
+          <p className="text-sm text-[#6C757D]">请登录以继续</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+              用户名
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+              密码
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-500">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full px-4 py-2 text-sm bg-[#1A1A1A] text-white rounded-lg hover:bg-[#333] transition-colors disabled:opacity-50"
+          >
+            {loading ? "登录中..." : "登录"}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}

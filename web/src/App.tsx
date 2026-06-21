@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { usePortfolio } from "./usePortfolio"
-import { Settings, SyncStatus, DEFAULT_SETTINGS } from "./types"
+import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
@@ -8,9 +8,13 @@ import RebalancePanel from "./components/RebalancePanel"
 import HistoryPanel from "./components/HistoryPanel"
 import SettingsPanel from "./components/SettingsPanel"
 import SetupWizard from "./components/SetupWizard"
+import LoginPage from "./components/LoginPage"
+import UserManager from "./components/UserManager"
 
 export default function App() {
   const [setupMode, setSetupMode] = useState<boolean | null>(null)
+  const [user, setUser] = useState<UserInfo | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const {
     holdings,
     setHoldings,
@@ -33,33 +37,43 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    api
-      .fetchSettings()
-      .then((s) => {
-        setSettings({
-          driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
-          syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
-          telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
-          telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
-          telegramEnabled: s.telegramEnabled === "true",
-          telegramPriceAlert: s.telegramPriceAlert !== "false",
-          telegramDriftAlert: s.telegramDriftAlert !== "false",
-          telegramSummary: s.telegramSummary !== "false",
-          telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
-          telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
-        })
-      })
-      .catch(console.error)
-    api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
-  }, [])
+    if (setupMode === false) {
+      api.fetchMe()
+        .then((u) => setUser(u))
+        .catch(() => setUser(null))
+        .finally(() => setAuthChecked(true))
+    }
+  }, [setupMode])
 
-  // Poll sync status every 30s
   useEffect(() => {
+    if (user) {
+      api.fetchSettings()
+        .then((s) => {
+          setSettings({
+            driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
+            syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
+            telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
+            telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
+            telegramEnabled: s.telegramEnabled === "true",
+            telegramPriceAlert: s.telegramPriceAlert !== "false",
+            telegramDriftAlert: s.telegramDriftAlert !== "false",
+            telegramSummary: s.telegramSummary !== "false",
+            telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
+            telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
+          })
+        })
+        .catch(console.error)
+      api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
     const interval = setInterval(() => {
       api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
     }, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [user])
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {
@@ -90,22 +104,10 @@ export default function App() {
     }
   }, [])
 
-  const total = Object.values(assets).reduce((sum, val) => sum + val, 0)
-  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0)
-  const totalFees = holdings.reduce(
-    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
-    0
-  )
-  // Buy-only fees for principal: sell fees are already deducted from
-  // realizedValue, so including them in principal would double-count.
-  const totalBuyFees = holdings.reduce(
-    (sum, h) =>
-      sum +
-      (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? (l.fee || 0) : 0), 0),
-    0
-  )
-  // principal = cost of current holdings + buy fees only
-  const principal = totalCost + totalBuyFees
+  const handleLogout = useCallback(async () => {
+    await api.logout()
+    setUser(null)
+  }, [])
 
   if (setupMode === null) {
     return (
@@ -119,6 +121,18 @@ export default function App() {
     return <SetupWizard onComplete={() => window.location.reload()} />
   }
 
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <p className="text-sm text-[#6C757D]">Loading...</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <LoginPage onLogin={() => window.location.reload()} />
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
@@ -127,9 +141,22 @@ export default function App() {
     )
   }
 
+  const total = Object.values(assets).reduce((sum, val) => sum + val, 0)
+  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0)
+  const totalFees = holdings.reduce(
+    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
+    0
+  )
+  const totalBuyFees = holdings.reduce(
+    (sum, h) =>
+      sum +
+      (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? (l.fee || 0) : 0), 0),
+    0
+  )
+  const principal = totalCost + totalBuyFees
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">
-      {/* Header */}
       <header className="h-20 bg-white border-b border-[#E9ECEF] flex items-center justify-between px-6 sm:px-10 flex-shrink-0 lg:sticky lg:top-0 lg:z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
@@ -151,12 +178,20 @@ export default function App() {
             </button>
           )}
           <SettingsPanel settings={settings} onSave={handleSaveSettings} />
+          {user.role === "admin" && <UserManager />}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#6C757D]">{user.username}</span>
+            <button
+              onClick={handleLogout}
+              className="text-xs text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
+            >
+              退出
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Main Content Grid */}
       <main className="flex-grow p-4 sm:p-8 flex flex-col gap-8 max-w-[1400px] mx-auto w-full">
-        {/* Top Row: Dashboard & Rebalance */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
             <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} />
@@ -170,7 +205,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Row: Holdings & History */}
         <div className="flex flex-col gap-6">
           <HoldingsManager
             holdings={holdings}

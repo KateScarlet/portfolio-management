@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"permanent-portfolio/models"
 	"permanent-portfolio/telegram"
 	"strings"
@@ -112,9 +113,7 @@ func (n *Notifier) checkPriceAlert(client *telegram.Client, holdings []models.Ho
 		}
 	}
 
-	for k, v := range syncedPrices {
-		n.prevPrices[k] = v
-	}
+	maps.Copy(n.prevPrices, syncedPrices)
 
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>价格波动提醒</b>\n\n" + strings.Join(alerts, "\n\n")
