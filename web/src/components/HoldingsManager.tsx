@@ -204,6 +204,11 @@ export default function HoldingsManager({
                             <p>{formatCurrency(h.price)}</p>
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
+                        ) : (h.shares || 0) > 0 ? (
+                          <div>
+                            {(h.costPrice || 0) > 0 && <p>{formatCurrency(h.costPrice || 0)}</p>}
+                            <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
+                          </div>
                         ) : (
                           <span className="text-[#ADB5BD] text-xs">-</span>
                         )}
@@ -305,7 +310,7 @@ export default function HoldingsManager({
                         <td colSpan={6} className="px-6 py-4">
                           <div className="pl-12 border-l-2 border-[#DEE2E6] ml-4 space-y-2">
                             <h5 className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold mb-2">
-                              购买/录入记录
+                              记录
                             </h5>
                             {h.lots.map((lot) => {
                               const isEditing = editingLotId === lot.id
@@ -427,28 +432,26 @@ export default function HoldingsManager({
                                             费: {formatCurrency(lot.fee || 0)}
                                           </span>
                                         )}
-                                        {lot.type !== "sell" && (
-                                          <div className="flex gap-2 shrink-0">
-                                            <button
-                                              onClick={() => {
-                                                setEditingLotId(lot.id)
-                                                setEditingLotCost(h.symbol ? String(lot.cost ?? 0) : String(lot.valueAdded || lot.cost || 0))
-                                                setEditingLotFee(String(lot.fee || 0))
-                                                setEditingLotShares(String(lot.shares))
-                                                setEditingLotCostPrice(String(lot.costPrice || 0))
-                                              }}
-                                              className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
-                                            >
-                                              Edit
-                                            </button>
-                                            <button
-                                              onClick={() => deleteEditLot(h, lot.id)}
-                                              className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors whitespace-nowrap"
-                                            >
-                                              Del
-                                            </button>
-                                          </div>
-                                        )}
+                                        <div className="flex gap-2 shrink-0">
+                                          <button
+                                            onClick={() => {
+                                              setEditingLotId(lot.id)
+                                              setEditingLotCost(h.symbol ? String(lot.cost ?? 0) : String(lot.valueAdded || lot.cost || 0))
+                                              setEditingLotFee(String(lot.fee || 0))
+                                              setEditingLotShares(String(lot.shares))
+                                              setEditingLotCostPrice(String(lot.costPrice || 0))
+                                            }}
+                                            className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            onClick={() => deleteEditLot(h, lot.id)}
+                                            className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors whitespace-nowrap"
+                                          >
+                                            Del
+                                          </button>
+                                        </div>
                                       </div>
                                     </>
                                   )}

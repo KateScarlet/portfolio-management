@@ -1,7 +1,8 @@
-import React from "react"
+import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
 import { formatCurrency, formatPercent, getProfitColor } from "../utils"
+import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {
   history: PortfolioRecord[]
@@ -10,6 +11,8 @@ interface HistoryPanelProps {
 }
 
 export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: HistoryPanelProps) {
+  const [deletingRecord, setDeletingRecord] = useState<PortfolioRecord | null>(null)
+
   if (history.length === 0) {
     return null
   }
@@ -82,7 +85,7 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
-                      onClick={() => onDeleteRecord(record.id)}
+                      onClick={() => setDeletingRecord(record)}
                       className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
                       title="删除记录"
                     >
@@ -95,6 +98,18 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
           </tbody>
         </table>
       </div>
+
+      {deletingRecord && (
+        <ConfirmDialog
+          title="删除记录"
+          message={`确定删除 ${format(deletingRecord.timestamp, "MM/dd HH:mm")} 的快照记录？此操作不可撤销。`}
+          onConfirm={() => {
+            onDeleteRecord(deletingRecord.id)
+            setDeletingRecord(null)
+          }}
+          onCancel={() => setDeletingRecord(null)}
+        />
+      )}
     </div>
   )
 }

@@ -144,10 +144,14 @@ func (h *Holding) RecalcFromLots() {
 		}
 		h.Value = h.Shares * h.Price
 	} else {
-		h.Shares = 0
+		h.Shares = totalBuyShares - totalSellShares
 		h.Value = totalBuyValue - totalSellValue
 		h.Cost = totalBuyCost - totalSellCost
-		h.CostPrice = 0
+		if h.Shares > 0 {
+			h.CostPrice = h.Cost / h.Shares
+		} else {
+			h.CostPrice = 0
+		}
 	}
 }
 

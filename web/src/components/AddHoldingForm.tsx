@@ -24,8 +24,11 @@ export default function AddHoldingForm({
   const [fee, setFee] = useState("")
   const [date, setDate] = useState(new Date().toISOString().split("T")[0])
   const [isManual, setIsManual] = useState(false)
+  const [manualInputMode, setManualInputMode] = useState<"cost" | "priceShares">("cost")
+  const [manualPrice, setManualPrice] = useState("")
+  const [manualShares, setManualShares] = useState("")
   const [isFetching, setIsFetching] = useState(false)
-  const [deductFromCash, setDeductFromCash] = useState(false)
+  const [deductFromCash, setDeductFromCash] = useState(true)
 
   const { showToast } = useToast()
 
@@ -34,18 +37,27 @@ export default function AddHoldingForm({
 
     if (isManual) {
       const val = parseFloat(value)
-      const c = parseFloat(cost)
       if (isNaN(val) || val <= 0) return
-      const addedCost = (isNaN(c) || c <= 0 ? val : c) + feeNum
+
+      let addedCost: number
+      if (manualInputMode === "priceShares") {
+        const p = parseFloat(manualPrice)
+        const s = parseFloat(manualShares)
+        if (isNaN(p) || p <= 0 || isNaN(s) || s <= 0) return
+        addedCost = p * s
+      } else {
+        const c = parseFloat(cost)
+        addedCost = (isNaN(c) || c <= 0 ? val : c)
+      }
       try {
         await onAddHolding({
           assetId,
           symbol: "",
           name: name.trim() || "手工资产",
-          shares: 0,
-          price: 0,
+          shares: manualInputMode === "priceShares" ? (parseFloat(manualShares) || 0) : 0,
+          price: manualInputMode === "priceShares" ? (parseFloat(manualPrice) || 0) : 0,
           value: val,
-          cost: addedCost - feeNum,
+          cost: addedCost,
           fee: feeNum,
           date: new Date(date).getTime(),
           deductFromCash: deductFromCash,
@@ -122,7 +134,7 @@ export default function AddHoldingForm({
             onChange={() => setIsManual(false)}
             className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
           />
-          自动获取价格 (股票/ETF/基金)
+          自动获取价格
         </label>
         <label className="flex items-center gap-2 text-sm text-[#495057]">
           <input
@@ -131,7 +143,7 @@ export default function AddHoldingForm({
             onChange={() => setIsManual(true)}
             className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
           />
-          手动录入价值
+          手动录入
         </label>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
@@ -250,7 +262,7 @@ export default function AddHoldingForm({
                 <select
                   value={costCurrency}
                   onChange={(e) => setCostCurrency(e.target.value)}
-                  className="px-2 py-2 border border-r-0 border-[#E9ECEF] rounded-l-lg text-xs bg-gray-50 focus:outline-none focus:border-[#1A1A1A] w-[70px]"
+                  className="px-2 py-2 border border-r-0 border-[#E9ECEF] rounded-l-lg text-xs bg-gray-50 focus:outline-none focus:border-[#1A1A1A] w-17.5"
                 >
                   <option value="CNY">CNY</option>
                   <option value="USD">USD</option>
@@ -310,16 +322,70 @@ export default function AddHoldingForm({
             </div>
             <div className="flex flex-col gap-1 md:col-span-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                总成本 (选填)
+                录入方式
               </label>
-              <input
-                type="number"
-                placeholder="投入本金"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-              />
+              <div className="flex gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-[#495057]">
+                  <input
+                    type="radio"
+                    checked={manualInputMode === "cost"}
+                    onChange={() => setManualInputMode("cost")}
+                    className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
+                  />
+                  总成本
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-[#495057]">
+                  <input
+                    type="radio"
+                    checked={manualInputMode === "priceShares"}
+                    onChange={() => setManualInputMode("priceShares")}
+                    className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
+                  />
+                  单价+份额
+                </label>
+              </div>
             </div>
+            {manualInputMode === "cost" ? (
+              <div className="flex flex-col gap-1 md:col-span-1">
+                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                  总成本 (选填)
+                </label>
+                <input
+                  type="number"
+                  placeholder="投入本金"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 md:col-span-1">
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    单价
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="买入单价"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-1">
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    份额
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="数量"
+                    value={manualShares}
+                    onChange={(e) => setManualShares(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                  />
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-1 md:col-span-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                 当前总市值
@@ -349,7 +415,7 @@ export default function AddHoldingForm({
         </div>
 
         <div className="flex flex-col justify-end gap-2">
-          <label className="flex items-center gap-2 cursor-pointer pb-1 h-[21px]">
+          <label className="flex items-center gap-2 cursor-pointer pb-1 h-5.25">
             <input
               type="checkbox"
               checked={deductFromCash}

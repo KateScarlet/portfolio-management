@@ -47,7 +47,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
       <div className="p-6 bg-white space-y-4">
         {allBalanced && (
           <div className="p-4 bg-white border border-[#E9ECEF] rounded-lg flex items-center gap-4 mb-2">
-            <div className="w-10 h-10 rounded-full bg-[#F8F9FA] flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-[#F8F9FA] flex items-center justify-center shrink-0">
               <svg
                 className="w-5 h-5 text-[#1A1A1A]"
                 fill="none"
