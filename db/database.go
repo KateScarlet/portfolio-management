@@ -29,6 +29,10 @@ type Config struct {
 		ClientSecret string `mapstructure:"clientSecret"`
 		RedirectURL  string `mapstructure:"redirectURL"`
 	} `mapstructure:"oidc"`
+	WebAuthn struct {
+		RPID      string   `mapstructure:"rpid"`
+		RPOrigins []string `mapstructure:"rpOrigins"`
+	} `mapstructure:"webauthn"`
 }
 
 func LoadConfig() *Config {
@@ -107,7 +111,7 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}); err != nil {
+	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +132,7 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}); err != nil {
+	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
 		return nil, err
 	}
 
@@ -156,6 +160,8 @@ func SaveConfig(cfg *Config) error {
 	v.Set("oidc.clientID", cfg.OIDC.ClientID)
 	v.Set("oidc.clientSecret", cfg.OIDC.ClientSecret)
 	v.Set("oidc.redirectURL", cfg.OIDC.RedirectURL)
+	v.Set("webauthn.rpid", cfg.WebAuthn.RPID)
+	v.Set("webauthn.rpOrigins", cfg.WebAuthn.RPOrigins)
 	v.SetConfigFile(ConfigFile)
 	v.SetConfigType("yaml")
 	return v.WriteConfig()

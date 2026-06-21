@@ -72,10 +72,16 @@ func main() {
 	h.GET("/api/auth/oidc/callback", handlers.OIDCCallback(database, cfg))
 	h.GET("/api/auth/oidc/status", handlers.OIDCStatus(cfg))
 
+	h.GET("/api/webauthn/status", handlers.WebAuthnStatus())
+	h.POST("/api/webauthn/login/start", handlers.WebAuthnLoginStart(database, cfg))
+	h.POST("/api/webauthn/login/finish", handlers.WebAuthnLoginFinish(database, cfg))
+
 	oidcAdmin := h.Group("/api/oidc")
 	oidcAdmin.Use(middleware.AuthRequired(), middleware.AdminRequired())
 	oidcAdmin.GET("/config", handlers.GetOIDCConfig(cfg))
 	oidcAdmin.PUT("/config", handlers.UpdateOIDCConfig(cfg))
+	oidcAdmin.GET("/webauthn-config", handlers.GetWebAuthnConfig(cfg))
+	oidcAdmin.PUT("/webauthn-config", handlers.UpdateWebAuthnConfig(cfg))
 
 	h.GET("/api/price/:symbol", handlers.GetPrice())
 	h.GET("/api/exchange/:pair", handlers.GetExchange())
@@ -102,6 +108,11 @@ func main() {
 	api.GET("/funds", handlers.GetAvailableFunds(database))
 	api.PUT("/funds", handlers.UpdateAvailableFunds(database))
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database))
+
+	api.POST("/webauthn/register/start", handlers.WebAuthnRegisterStart(database, cfg))
+	api.POST("/webauthn/register/finish", handlers.WebAuthnRegisterFinish(database, cfg))
+	api.GET("/webauthn/credentials", handlers.WebAuthnListCredentials(database))
+	api.DELETE("/webauthn/credentials/:id", handlers.WebAuthnDeleteCredential(database))
 
 	admin := api.Group("")
 	admin.Use(middleware.AdminRequired())

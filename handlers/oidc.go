@@ -224,3 +224,38 @@ func generateState() string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+func GetWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		c.JSON(consts.StatusOK, map[string]any{
+			"rpid":      cfg.WebAuthn.RPID,
+			"rpOrigins": cfg.WebAuthn.RPOrigins,
+		})
+	}
+}
+
+func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			RPID      string   `json:"rpid"`
+			RPOrigins []string `json:"rpOrigins"`
+		}
+		if err := c.BindAndValidate(&body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		cfg.WebAuthn.RPID = body.RPID
+		cfg.WebAuthn.RPOrigins = body.RPOrigins
+
+		if err := db.SaveConfig(cfg); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存配置失败"})
+			return
+		}
+
+		c.JSON(consts.StatusOK, map[string]any{
+			"rpid":      cfg.WebAuthn.RPID,
+			"rpOrigins": cfg.WebAuthn.RPOrigins,
+		})
+	}
+}

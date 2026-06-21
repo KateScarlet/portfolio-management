@@ -217,3 +217,59 @@ export async function updateOIDCConfig(config: OIDCConfig): Promise<OIDCConfig> 
     body: JSON.stringify(config),
   })
 }
+
+export interface WebAuthnConfig {
+  rpid: string
+  rpOrigins: string[]
+}
+
+export async function fetchWebAuthnConfig(): Promise<WebAuthnConfig> {
+  return request<WebAuthnConfig>("/api/oidc/webauthn-config")
+}
+
+export async function updateWebAuthnConfig(config: WebAuthnConfig): Promise<WebAuthnConfig> {
+  return request<WebAuthnConfig>("/api/oidc/webauthn-config", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  })
+}
+
+export interface WebAuthnCredentialInfo {
+  id: string
+  name: string
+  createdAt: number
+  lastUsedAt: number
+}
+
+export async function webAuthnRegisterStart(name: string): Promise<any> {
+  return request("/api/webauthn/register/start", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function webAuthnRegisterFinish(data: any): Promise<{ success: string }> {
+  return request("/api/webauthn/register/finish", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function webAuthnLoginStart(): Promise<any> {
+  return request("/api/webauthn/login/start", { method: "POST" })
+}
+
+export async function webAuthnLoginFinish(data: any): Promise<{ user: UserInfo }> {
+  return request<{ user: UserInfo }>("/api/webauthn/login/finish", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function webAuthnListCredentials(): Promise<WebAuthnCredentialInfo[]> {
+  return request<WebAuthnCredentialInfo[]>("/api/webauthn/credentials")
+}
+
+export async function webAuthnDeleteCredential(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/webauthn/credentials/${id}`, { method: "DELETE" })
+}

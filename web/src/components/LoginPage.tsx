@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { startAuthentication } from "@simplewebauthn/browser"
 import * as api from "../api"
 
 interface LoginPageProps {
@@ -11,12 +12,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [oidcEnabled, setOidcEnabled] = useState(false)
+  const [webauthnSupported, setWebauthnSupported] = useState(false)
 
   useEffect(() => {
     fetch("/api/auth/oidc/status")
       .then((res) => res.json())
       .then((data) => setOidcEnabled(data.enabled))
       .catch(() => {})
+    setWebauthnSupported(window.PublicKeyCredential !== undefined)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,6 +40,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setLoading(false)
     }
   }
+
+  const handlePasskeyLogin = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const options = await api.webAuthnLoginStart()
+      const credential = await startAuthentication(options)
+      await api.webAuthnLoginFinish(credential)
+      onLogin()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Passkey登录失败")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const showDivider = oidcEnabled || webauthnSupported
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
@@ -89,7 +109,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {loading ? "登录中..." : "登录"}
           </button>
 
-          {oidcEnabled && (
+          {showDivider && (
             <>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -99,13 +119,27 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   <span className="bg-white px-2 text-[#6C757D]">或</span>
                 </div>
               </div>
-              <a
-                href="/api/auth/oidc"
-                className="w-full px-4 py-2 text-sm border border-[#E9ECEF] text-[#1A1A1A] rounded-lg hover:bg-[#F8F9FA] transition-colors text-center block"
-              >
-                SSO 登录
-              </a>
             </>
+          )}
+
+          {webauthnSupported && (
+            <button
+              type="button"
+              onClick={handlePasskeyLogin}
+              disabled={loading}
+              className="w-full px-4 py-2 text-sm border border-[#E9ECEF] text-[#1A1A1A] rounded-lg hover:bg-[#F8F9FA] transition-colors disabled:opacity-50"
+            >
+              Passkey 登录
+            </button>
+          )}
+
+          {oidcEnabled && (
+            <a
+              href="/api/auth/oidc"
+              className="w-full px-4 py-2 text-sm border border-[#E9ECEF] text-[#1A1A1A] rounded-lg hover:bg-[#F8F9FA] transition-colors text-center block"
+            >
+              SSO 登录
+            </a>
           )}
         </form>
       </div>
