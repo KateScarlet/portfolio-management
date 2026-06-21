@@ -1,14 +1,15 @@
 import React from "react"
 import { format } from "date-fns"
-import { PortfolioRecord } from "../types"
-import { formatCurrency, formatPercent } from "../utils"
+import { PortfolioRecord, ColorScheme } from "../types"
+import { formatCurrency, formatPercent, getProfitColor } from "../utils"
 
 interface HistoryPanelProps {
   history: PortfolioRecord[]
   onDeleteRecord: (id: string) => void
+  colorScheme: ColorScheme
 }
 
-export default function HistoryPanel({ history, onDeleteRecord }: HistoryPanelProps) {
+export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: HistoryPanelProps) {
   if (history.length === 0) {
     return null
   }
@@ -19,7 +20,7 @@ export default function HistoryPanel({ history, onDeleteRecord }: HistoryPanelPr
         <h3 className="text-lg font-medium text-[#1A1A1A]">历史快照与盈亏记录</h3>
       </div>
 
-      <div className="flex-grow overflow-x-auto">
+      <div className="grow overflow-x-auto">
         <table className="w-full text-left">
           <thead className="text-[10px] uppercase tracking-widest text-[#ADB5BD] border-b border-[#F1F3F5] bg-white">
             <tr>
@@ -54,7 +55,7 @@ export default function HistoryPanel({ history, onDeleteRecord }: HistoryPanelPr
                   </td>
                   <td className="px-6 py-4 font-mono text-sm">
                     {principal > 0 ? (
-                      <span className={isPositive ? "text-emerald-600" : "text-orange-600"}>
+                      <span className={getProfitColor(isPositive, colorScheme)}>
                         {isPositive ? "+" : ""}
                         {formatCurrency(profit)}
                         <br />

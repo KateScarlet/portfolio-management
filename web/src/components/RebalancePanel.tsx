@@ -1,14 +1,15 @@
 import React from "react"
-import { AssetId, ASSET_DEFINITIONS } from "../types"
-import { formatCurrency } from "../utils"
+import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
+import { formatCurrency, getProfitColor } from "../utils"
 
 interface RebalancePanelProps {
   assets: Record<AssetId, number>
   total: number
   driftThreshold: number
+  colorScheme: ColorScheme
 }
 
-export default function RebalancePanel({ assets, total, driftThreshold }: RebalancePanelProps) {
+export default function RebalancePanel({ assets, total, driftThreshold, colorScheme }: RebalancePanelProps) {
   if (total === 0) {
     return null
   }
@@ -117,7 +118,7 @@ export default function RebalancePanel({ assets, total, driftThreshold }: Rebala
                   item.action === "buy"
                     ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
                     : item.action === "sell"
-                      ? "bg-white text-orange-600 border-orange-200"
+                      ? `bg-white ${getProfitColor(false, colorScheme)} border-orange-200`
                       : "bg-[#F8F9FA] text-[#6C757D] border-[#E9ECEF]"
                 }`}
               >

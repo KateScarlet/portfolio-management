@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { UserInfo } from "../types"
 import { Users, Trash2, UserPlus } from "lucide-react"
 import * as api from "../api"
@@ -25,13 +25,12 @@ export default function UserManager() {
     }
   }
 
-  useEffect(() => {
-    if (isOpen) {
-      loadUsers()
-      setShowAdd(false)
-      setError("")
-    }
-  }, [isOpen])
+  const handleOpen = async () => {
+    setIsOpen(true)
+    setShowAdd(false)
+    setError("")
+    await loadUsers()
+  }
 
   const handleAdd = async () => {
     if (!newUsername || !newPassword) {
@@ -69,7 +68,7 @@ export default function UserManager() {
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="p-2 rounded-lg hover:bg-[#F1F3F5] transition-colors text-[#6C757D] hover:text-[#1A1A1A]"
         title="用户管理"
       >

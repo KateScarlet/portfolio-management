@@ -1,16 +1,17 @@
 import React from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
-import { AssetId, ASSET_DEFINITIONS } from "../types"
-import { formatCurrency, formatPercent } from "../utils"
+import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
+import { formatCurrency, formatPercent, getProfitColor } from "../utils"
 
 interface DashboardProps {
   assets: Record<AssetId, number>
   total: number
   principal: number
   totalFees: number
+  colorScheme: ColorScheme
 }
 
-export default function Dashboard({ assets, total, principal, totalFees }: DashboardProps) {
+export default function Dashboard({ assets, total, principal, totalFees, colorScheme }: DashboardProps) {
   const chartData = Object.keys(assets)
     .map((key) => {
       const id = key as AssetId
@@ -49,7 +50,7 @@ export default function Dashboard({ assets, total, principal, totalFees }: Dashb
       <h2 className="text-4xl font-light mb-2 text-[#1A1A1A]">{formatCurrency(total)}</h2>
 
       <div
-        className={`flex items-center gap-2 mb-8 ${isPositive ? "text-emerald-600" : "text-orange-600"} font-mono`}
+        className={`flex items-center gap-2 mb-8 ${getProfitColor(isPositive, colorScheme)} font-mono`}
       >
         {isPositive ? (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +115,7 @@ export default function Dashboard({ assets, total, principal, totalFees }: Dashb
         )}
         {total > 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <p className={`text-2xl font-light ${isPositive ? "text-emerald-600" : "text-orange-600"}`}>
+            <p className={`text-2xl font-light ${getProfitColor(isPositive, colorScheme)}`}>
               {isPositive ? "+" : ""}{formatPercent(returnRate)}
             </p>
             <p className="text-[10px] text-[#ADB5BD] uppercase tracking-wider mt-1">累计收益</p>

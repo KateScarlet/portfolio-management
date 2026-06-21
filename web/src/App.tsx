@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { usePortfolio } from "./usePortfolio"
-import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS } from "./types"
+import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS, ColorScheme } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
@@ -52,6 +52,7 @@ export default function App() {
           setSettings({
             driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
             syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
+            colorScheme: (s.colorScheme as ColorScheme) || DEFAULT_SETTINGS.colorScheme,
             telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
             telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
             telegramEnabled: s.telegramEnabled === "true",
@@ -80,6 +81,7 @@ export default function App() {
       await api.updateSettings({
         driftThreshold: String(newSettings.driftThreshold),
         syncInterval: String(newSettings.syncInterval),
+        colorScheme: newSettings.colorScheme,
         telegramBotToken: newSettings.telegramBotToken,
         telegramChatID: newSettings.telegramChatID,
         telegramEnabled: String(newSettings.telegramEnabled),
@@ -157,7 +159,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">
-      <header className="h-20 bg-white border-b border-[#E9ECEF] flex items-center justify-between px-6 sm:px-10 flex-shrink-0 lg:sticky lg:top-0 lg:z-10">
+      <header className="h-20 bg-white border-b border-[#E9ECEF] flex items-center justify-between px-6 sm:px-10 shrink-0 lg:sticky lg:top-0 lg:z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
@@ -191,16 +193,17 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-grow p-4 sm:p-8 flex flex-col gap-8 max-w-[1400px] mx-auto w-full">
+      <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} />
+            <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
               assets={assets}
               total={total}
               driftThreshold={settings.driftThreshold}
+              colorScheme={settings.colorScheme}
             />
           </div>
         </div>
@@ -214,8 +217,9 @@ export default function App() {
             onUpdateHolding={updateHolding}
             onRemoveHolding={removeHolding}
             onSaveRecord={saveRecord}
+            colorScheme={settings.colorScheme}
           />
-          <HistoryPanel history={history} onDeleteRecord={deleteRecord} />
+          <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} />
         </div>
       </main>
     </div>

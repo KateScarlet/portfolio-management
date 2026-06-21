@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react"
-import { ASSET_DEFINITIONS, Holding, HoldingLot } from "../types"
-import { formatCurrency, formatPercent } from "../utils"
+import { ASSET_DEFINITIONS, Holding, HoldingLot, ColorScheme } from "../types"
+import { formatCurrency, formatPercent, getProfitColor } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import SellModal from "./SellModal"
@@ -13,6 +13,7 @@ interface HoldingsManagerProps {
   onUpdateHolding: (id: string, updates: Partial<Holding>) => void
   onRemoveHolding: (id: string) => void
   onSaveRecord: () => void
+  colorScheme: ColorScheme
 }
 
 export default function HoldingsManager({
@@ -23,6 +24,7 @@ export default function HoldingsManager({
   onUpdateHolding,
   onRemoveHolding,
   onSaveRecord,
+  colorScheme,
 }: HoldingsManagerProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -121,7 +123,7 @@ export default function HoldingsManager({
         />
       )}
 
-      <div className="flex-grow overflow-x-auto">
+      <div className="grow overflow-x-auto">
         <table className="w-full text-left">
           <thead className="text-[10px] uppercase tracking-widest text-[#ADB5BD] border-b border-[#F1F3F5] bg-white">
             <tr>
@@ -180,7 +182,7 @@ export default function HoldingsManager({
                               )}
                             </p>
                             <p
-                              className="text-[10px] text-[#ADB5BD] truncate max-w-[150px]"
+                              className="text-[10px] text-[#ADB5BD] truncate max-w-37.5"
                               title={h.name}
                             >
                               {h.name}
@@ -217,7 +219,7 @@ export default function HoldingsManager({
                               const isPositive = profit >= 0
                               return (
                                 <p
-                                  className={`text-[10px] ${isPositive ? "text-emerald-600" : "text-orange-600"}`}
+                                  className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
                                 >
                                   {isPositive ? "+" : ""}
                                   {formatPercent(returnRate)}
@@ -311,7 +313,7 @@ export default function HoldingsManager({
                               return (
                                 <div
                                   key={lot.id}
-                                  className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 whitespace-nowrap ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6] flex-wrap" : "text-[#495057]"} ${lot.type === "sell" ? "!text-orange-600" : ""}`}
+                                  className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 whitespace-nowrap ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6] flex-wrap" : "text-[#495057]"} ${lot.type === "sell" ? "text-orange-600!" : ""}`}
                                 >
                                   {isEditing ? (
                                     <div className="flex flex-wrap items-center gap-2 w-full">
@@ -401,7 +403,7 @@ export default function HoldingsManager({
                                         )}
                                         {new Date(lot.date).toLocaleDateString()}
                                       </span>
-                                      <div className="flex items-center gap-4 text-right flex-shrink-0">
+                                      <div className="flex items-center gap-4 text-right shrink-0">
                                         {h.symbol ? (
                                           <>
                                             <span className="w-28 text-right">
@@ -427,7 +429,7 @@ export default function HoldingsManager({
                                           </span>
                                         )}
                                         {lot.type !== "sell" && (
-                                          <div className="flex gap-2 flex-shrink-0">
+                                          <div className="flex gap-2 shrink-0">
                                             <button
                                               onClick={() => {
                                                 setEditingLotId(lot.id)

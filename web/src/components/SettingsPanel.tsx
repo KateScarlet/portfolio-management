@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Settings } from "../types"
-import { Settings as SettingsIcon } from "lucide-react"
+import { Settings as SettingsIcon, ArrowUp, ArrowDown } from "lucide-react"
 import * as api from "../api"
 
 interface SettingsPanelProps {
@@ -25,12 +25,14 @@ const SUMMARY_INTERVALS = [
 export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [draft, setDraft] = useState(settings)
-  useEffect(() => {
-    setDraft(settings)
-  }, [settings])
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
+
+  const handleOpen = () => {
+    setDraft(settings)
+    setIsOpen(true)
+  }
 
   const handleSave = () => {
     onSave(draft)
@@ -86,7 +88,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="p-2 rounded-lg hover:bg-[#F1F3F5] transition-colors text-[#6C757D] hover:text-[#1A1A1A]"
         title="设置"
       >
@@ -187,6 +189,38 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       {p.label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Color Scheme */}
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                  涨跌配色
+                </label>
+                <p className="text-xs text-[#6C757D] mb-3">选择盈亏颜色显示方式。</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setDraft({ ...draft, colorScheme: "green-up" })}
+                    className={`flex items-center gap-1 px-3 py-1 text-xs rounded-full border transition-colors ${
+                      draft.colorScheme === "green-up"
+                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                        : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
+                    }`}
+                  >
+                    <ArrowUp className="w-3 h-3 text-emerald-600" />
+                    <ArrowDown className="w-3 h-3 text-orange-600" />
+                  </button>
+                  <button
+                    onClick={() => setDraft({ ...draft, colorScheme: "red-up" })}
+                    className={`flex items-center gap-1 px-3 py-1 text-xs rounded-full border transition-colors ${
+                      draft.colorScheme === "red-up"
+                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                        : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
+                    }`}
+                  >
+                    <ArrowUp className="w-3 h-3 text-red-600" />
+                    <ArrowDown className="w-3 h-3 text-emerald-600" />
+                  </button>
                 </div>
               </div>
 

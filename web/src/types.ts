@@ -50,9 +50,12 @@ export interface PortfolioRecord {
   // We don't necessarily need to store holdings in history if we only want aggregate history, but it's okay.
 }
 
+export type ColorScheme = "green-up" | "red-up"
+
 export interface Settings {
   driftThreshold: number // 漂移阈值百分比，如 5 表示 5%
   syncInterval: number // 同步间隔（分钟），0 = 关闭
+  colorScheme: ColorScheme // 红涨绿跌 or 绿涨红跌
   // Telegram
   telegramBotToken: string
   telegramChatID: string
@@ -67,6 +70,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
   syncInterval: 60,
+  colorScheme: "green-up",
   telegramBotToken: "",
   telegramChatID: "",
   telegramEnabled: false,
