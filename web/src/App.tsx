@@ -72,8 +72,16 @@ export default function App() {
     (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
     0
   )
-  // principal = total amount invested (raw cost + fees)
-  const principal = totalCost + totalFees
+  // Buy-only fees for principal: sell fees are already deducted from
+  // realizedValue, so including them in principal would double-count.
+  const totalBuyFees = holdings.reduce(
+    (sum, h) =>
+      sum +
+      (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? (l.fee || 0) : 0), 0),
+    0
+  )
+  // principal = cost of current holdings + buy fees only
+  const principal = totalCost + totalBuyFees
 
   if (loading) {
     return (

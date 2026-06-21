@@ -35,8 +35,10 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 		for i := range holdings {
 			assets[holdings[i].AssetId] += holdings[i].Value
 			total += holdings[i].Value
-			// principal = raw cost + fees (total amount invested)
-			principal += holdings[i].Cost + holdings[i].TotalFees()
+			// principal = cost of current holdings + buy fees only
+			// Sell fees are already deducted from realizedValue, so including
+			// them in principal would double-count the cost.
+			principal += holdings[i].Cost + holdings[i].BuyFees()
 		}
 
 		if total == 0 {

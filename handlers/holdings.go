@@ -92,27 +92,16 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 			if res.Error == nil {
 				// Found existing holding - merge into it
-				existing.Shares += input.Shares
+				existing.Lots = append(existing.Lots, newLot)
 
-				switch {
-				case existing.Cost > 0 && input.Cost > 0:
-					existing.Cost += input.Cost
-				case input.Cost > 0:
-					existing.Cost = input.Cost
-				}
-
-				if existing.Shares > 0 && existing.Cost > 0 {
-					existing.CostPrice = existing.Cost / existing.Shares
-				}
-
+				// Update price if symbol-based and new price is provided
 				if existing.Symbol != "" && input.Price > 0 {
 					existing.Price = input.Price
-					existing.Value = existing.Shares * existing.Price
-				} else {
-					existing.Value += input.Value
 				}
 
-				existing.Lots = append(existing.Lots, newLot)
+				// RecalcFromLots is the single source of truth for financial calculations
+				existing.RecalcFromLots()
+
 				created = false
 				result = existing
 				if err := tx.Save(&existing).Error; err != nil {
@@ -130,6 +119,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				} else {
 					input.Lots = append(input.Lots, newLot)
 				}
+				input.RecalcFromLots()
 				created = true
 				result = input.Holding
 				if err := tx.Create(&input.Holding).Error; err != nil {
@@ -151,11 +141,8 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 						return err
 					}
 
-					// Proportional cost reduction based on cost/value ratio
-					var costReduction float64
-					if cashHolding.Value > 0 {
-						costReduction = (cashHolding.Cost / cashHolding.Value) * addedCost
-					}
+					// Cash is a 1:1 asset — spending cash reduces both cost and value equally
+					costReduction := addedCost
 
 					cashSellLot := models.HoldingLot{
 						ID:         uuid.New().String(),
@@ -204,7 +191,9 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// Whitelist of allowed fields to prevent mass assignment
+		// Whitelist of allowed fields to prevent mass assignment.
+		// Note: assetId is intentionally excluded — changing it would break
+		// portfolio composition integrity (e.g. reclassifying stocks as bonds).
 		allowedFields := map[string]bool{
 			"name": true, "symbol": true, "shares": true,
 			"price": true, "costPrice": true, "value": true,
@@ -215,6 +204,11 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			if allowedFields[k] {
 				safeUpdates[k] = v
 			}
+		}
+
+		if _, ok := updates["assetId"]; ok {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId cannot be changed"})
+			return
 		}
 
 		if lotsRaw, ok := safeUpdates["lots"]; ok {
@@ -235,6 +229,14 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					safeUpdates["shares"] = holding.Shares
 					safeUpdates["cost"] = holding.Cost
 					safeUpdates["costPrice"] = holding.CostPrice
+
+					// If price is also being updated, recompute value with the new price
+					if newPrice, ok := safeUpdates["price"]; ok {
+						if price, ok := newPrice.(float64); ok && holding.Symbol != "" {
+							holding.Price = price
+							holding.Value = holding.Shares * price
+						}
+					}
 					safeUpdates["value"] = holding.Value
 				}
 			}

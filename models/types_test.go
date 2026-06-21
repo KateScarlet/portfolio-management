@@ -193,3 +193,21 @@ func TestHolding_RecalcFromLots_ManualHolding(t *testing.T) {
 		t.Errorf("expected cost=6000, got %f", h.Cost)
 	}
 }
+
+func TestHolding_BuyFees(t *testing.T) {
+	h := &Holding{
+		Symbol: "VTI",
+		Lots: []HoldingLot{
+			{Type: "", Shares: 10, Cost: 950, Fee: 5},
+			{Type: "", Shares: 5, Cost: 490, Fee: 3},
+			{Type: "sell", Shares: 3, Cost: 285, Fee: 2},
+		},
+	}
+
+	if h.TotalFees() != 10 {
+		t.Errorf("expected totalFees=10, got %f", h.TotalFees())
+	}
+	if h.BuyFees() != 8 {
+		t.Errorf("expected buyFees=8, got %f", h.BuyFees())
+	}
+}

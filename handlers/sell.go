@@ -96,7 +96,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 		// Create sell lot
 		// ValueAdded = value removed from the holding (NOT the proceeds)
-		// For share-based: shares * currentPrice (market value removed)
+		// For share-based: shares * sellPrice (market value removed at actual sell price)
 		// For value-based: input.Value (value removed)
 		sellLot := models.HoldingLot{
 			ID:        uuid.New().String(),
@@ -108,7 +108,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 		if input.Shares > 0 {
 			sellLot.Shares = input.Shares
-			sellLot.ValueAdded = input.Shares * holding.Price
+			sellLot.ValueAdded = input.Shares * input.Price
 		} else {
 			sellLot.ValueAdded = input.Value
 		}
@@ -130,10 +130,19 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		cashBuyLot := models.HoldingLot{
+			ID:         uuid.New().String(),
+			Date:       time.Now().UnixMilli(),
+			Shares:     0,
+			Cost:       costReduction, // preserve cost basis from sold asset
+			ValueAdded: realizedValue,
+			Fee:        0,
+		}
+
 		var cashHolding models.Holding
 		if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err == nil {
-			cashHolding.Value += realizedValue
-			cashHolding.Cost += realizedValue
+			cashHolding.Lots = append(cashHolding.Lots, cashBuyLot)
+			cashHolding.RecalcFromLots()
 			if err := tx.Save(&cashHolding).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -144,15 +153,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				ID:      uuid.New().String(),
 				AssetId: "cash",
 				Name:    "可用现金",
-				Value:   realizedValue,
-				Cost:    realizedValue,
-				Lots: models.JSONColumn{{
-					ID:         uuid.New().String(),
-					Date:       time.Now().UnixMilli(),
-					Shares:     0,
-					ValueAdded: realizedValue,
-				}},
+				Lots:    models.JSONColumn{cashBuyLot},
 			}
+			cashHolding.RecalcFromLots()
 			if err := tx.Create(&cashHolding).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

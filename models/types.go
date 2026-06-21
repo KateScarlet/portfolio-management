@@ -151,3 +151,16 @@ func (h *Holding) TotalFees() float64 {
 	}
 	return total
 }
+
+// BuyFees returns the sum of buy lot fees only (excludes sell lot fees).
+// Sell fees are already deducted from realizedValue, so including them
+// in principal would double-count the cost.
+func (h *Holding) BuyFees() float64 {
+	var total float64
+	for _, lot := range h.Lots {
+		if lot.Type != "sell" {
+			total += lot.Fee
+		}
+	}
+	return total
+}
