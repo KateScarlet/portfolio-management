@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import * as api from "../api"
 
 interface LoginPageProps {
@@ -10,6 +10,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [oidcEnabled, setOidcEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/auth/oidc/status")
+      .then((res) => res.json())
+      .then((data) => setOidcEnabled(data.enabled))
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,6 +88,25 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           >
             {loading ? "登录中..." : "登录"}
           </button>
+
+          {oidcEnabled && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#E9ECEF]"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-[#6C757D]">或</span>
+                </div>
+              </div>
+              <a
+                href="/api/auth/oidc"
+                className="w-full px-4 py-2 text-sm border border-[#E9ECEF] text-[#1A1A1A] rounded-lg hover:bg-[#F8F9FA] transition-colors text-center block"
+              >
+                SSO 登录
+              </a>
+            </>
+          )}
         </form>
       </div>
     </div>

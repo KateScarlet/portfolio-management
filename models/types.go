@@ -98,11 +98,13 @@ type Setting struct {
 }
 
 type User struct {
-	ID        string `gorm:"primaryKey" json:"id"`
-	Username  string `gorm:"uniqueIndex;size:50;not null" json:"username"`
-	Password  string `gorm:"size:200;not null" json:"-"`
-	Role      string `gorm:"size:20;default:'user'" json:"role"`
-	CreatedAt int64  `json:"createdAt"`
+	ID          string `gorm:"primaryKey" json:"id"`
+	Username    string `gorm:"uniqueIndex;size:50;not null" json:"username"`
+	Password    string `gorm:"size:200;default:''" json:"-"`
+	Role        string `gorm:"size:20;default:'user'" json:"role"`
+	SSOProvider string `gorm:"size:20;default:''" json:"ssoProvider,omitempty"`
+	SSOId       string `gorm:"size:200;default:''" json:"-"`
+	CreatedAt   int64  `json:"createdAt"`
 }
 
 // RecalcFromLots recalculates holding fields from its lots.

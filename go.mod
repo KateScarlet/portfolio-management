@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/cloudwego/hertz v0.10.5
+	github.com/coreos/go-oidc/v3 v3.19.0
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -12,6 +13,7 @@ require (
 	github.com/libtnb/sqlite v1.1.2
 	github.com/spf13/viper v1.21.0
 	golang.org/x/crypto v0.41.0
+	golang.org/x/oauth2 v0.36.0
 	gonum.org/v1/plot v0.17.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
@@ -31,6 +33,7 @@ require (
 	github.com/cloudwego/netpoll v0.7.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

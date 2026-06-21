@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Settings } from "../types"
 import { Settings as SettingsIcon, ArrowUp, ArrowDown } from "lucide-react"
 import * as api from "../api"
@@ -28,14 +28,29 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
+  const [oidcConfig, setOidcConfig] = useState<api.OIDCConfig | null>(null)
+  const [oidcDraft, setOidcDraft] = useState<api.OIDCConfig>({ enabled: false, issuer: "", clientID: "", clientSecret: "", redirectURL: "" })
 
   const handleOpen = () => {
     setDraft(settings)
     setIsOpen(true)
+    api.fetchOIDCConfig().then((config) => {
+      setOidcConfig(config)
+      setOidcDraft(config)
+    }).catch(() => {})
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     onSave(draft)
+    if (oidcConfig) {
+      try {
+        const result = await api.updateOIDCConfig(oidcDraft)
+        setOidcConfig(result)
+        setOidcDraft(result)
+      } catch (e) {
+        console.error("Failed to save OIDC config", e)
+      }
+    }
     setIsOpen(false)
     setTestResult(null)
   }
@@ -392,6 +407,86 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                           ))}
                         </select>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* OIDC / SSO */}
+              <div className="border-t border-[#E9ECEF] pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#1A1A1A]">
+                      SSO 登录 (OIDC)
+                    </label>
+                    <p className="text-xs text-[#6C757D] mt-1">
+                      配置 OpenID Connect 单点登录
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setOidcDraft({ ...oidcDraft, enabled: !oidcDraft.enabled })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      oidcDraft.enabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        oidcDraft.enabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {oidcDraft.enabled && (
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                        Issuer URL
+                      </label>
+                      <input
+                        type="text"
+                        value={oidcDraft.issuer}
+                        onChange={(e) => setOidcDraft({ ...oidcDraft, issuer: e.target.value })}
+                        placeholder="https://your-provider.example.com"
+                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                        Client ID
+                      </label>
+                      <input
+                        type="text"
+                        value={oidcDraft.clientID}
+                        onChange={(e) => setOidcDraft({ ...oidcDraft, clientID: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                        Client Secret
+                      </label>
+                      <input
+                        type="password"
+                        value={oidcDraft.clientSecret}
+                        onChange={(e) => setOidcDraft({ ...oidcDraft, clientSecret: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                        Redirect URL
+                      </label>
+                      <input
+                        type="text"
+                        value={oidcDraft.redirectURL}
+                        onChange={(e) => setOidcDraft({ ...oidcDraft, redirectURL: e.target.value })}
+                        placeholder="http://localhost:3000/api/auth/oidc/callback"
+                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                      />
                     </div>
                   </div>
                 )}

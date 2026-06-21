@@ -21,6 +21,13 @@ type Config struct {
 		Type string `mapstructure:"type"`
 		DSN  string `mapstructure:"dsn"`
 	} `mapstructure:"database"`
+	OIDC struct {
+		Enabled      bool   `mapstructure:"enabled"`
+		Issuer       string `mapstructure:"issuer"`
+		ClientID     string `mapstructure:"clientID"`
+		ClientSecret string `mapstructure:"clientSecret"`
+		RedirectURL  string `mapstructure:"redirectURL"`
+	} `mapstructure:"oidc"`
 }
 
 func LoadConfig() *Config {
@@ -137,6 +144,11 @@ func SaveConfig(cfg *Config) error {
 	v := viper.New()
 	v.Set("database.type", cfg.Database.Type)
 	v.Set("database.dsn", cfg.Database.DSN)
+	v.Set("oidc.enabled", cfg.OIDC.Enabled)
+	v.Set("oidc.issuer", cfg.OIDC.Issuer)
+	v.Set("oidc.clientID", cfg.OIDC.ClientID)
+	v.Set("oidc.clientSecret", cfg.OIDC.ClientSecret)
+	v.Set("oidc.redirectURL", cfg.OIDC.RedirectURL)
 	v.SetConfigFile(ConfigFile)
 	v.SetConfigType("yaml")
 	return v.WriteConfig()

@@ -198,3 +198,22 @@ export async function listUsers(): Promise<UserInfo[]> {
 export async function deleteUser(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/users/${id}`, { method: "DELETE" })
 }
+
+export interface OIDCConfig {
+  enabled: boolean
+  issuer: string
+  clientID: string
+  clientSecret: string
+  redirectURL: string
+}
+
+export async function fetchOIDCConfig(): Promise<OIDCConfig> {
+  return request<OIDCConfig>("/api/oidc/config")
+}
+
+export async function updateOIDCConfig(config: OIDCConfig): Promise<OIDCConfig> {
+  return request<OIDCConfig>("/api/oidc/config", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  })
+}

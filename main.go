@@ -69,6 +69,15 @@ func main() {
 	h.POST("/api/auth/logout", handlers.Logout())
 	h.GET("/api/auth/me", middleware.AuthRequired(), handlers.Me(database))
 
+	h.GET("/api/auth/oidc", handlers.OIDCLogin(cfg))
+	h.GET("/api/auth/oidc/callback", handlers.OIDCCallback(database, cfg))
+	h.GET("/api/auth/oidc/status", handlers.OIDCStatus(cfg))
+
+	oidcAdmin := h.Group("/api/oidc")
+	oidcAdmin.Use(middleware.AuthRequired(), middleware.AdminRequired())
+	oidcAdmin.GET("/config", handlers.GetOIDCConfig(cfg))
+	oidcAdmin.PUT("/config", handlers.UpdateOIDCConfig(cfg))
+
 	h.GET("/api/price/:symbol", handlers.GetPrice())
 	h.GET("/api/exchange/:pair", handlers.GetExchange())
 

@@ -12,3 +12,13 @@
 database:
   type: sqlite          # sqlite | postgres
   dsn: portfolio.db     # SQLite: file path; Postgres: DSN string
+
+# OIDC/SSO configuration (optional)
+# Enables SSO login via any OpenID Connect provider (Keycloak, Auth0, etc.)
+#
+# oidc:
+#   enabled: true
+#   issuer: https://your-provider.example.com
+#   clientID: your-client-id
+#   clientSecret: your-client-secret
+#   redirectURL: http://localhost:3000/api/auth/oidc/callback
