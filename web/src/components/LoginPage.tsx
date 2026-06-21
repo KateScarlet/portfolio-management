@@ -12,14 +12,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [oidcEnabled, setOidcEnabled] = useState(false)
-  const [webauthnSupported, setWebauthnSupported] = useState(false)
+  const [webauthnEnabled, setWebauthnEnabled] = useState(false)
 
   useEffect(() => {
     fetch("/api/auth/oidc/status")
       .then((res) => res.json())
       .then((data) => setOidcEnabled(data.enabled))
       .catch(() => {})
-    setWebauthnSupported(window.PublicKeyCredential !== undefined)
+    fetch("/api/webauthn/status")
+      .then((res) => res.json())
+      .then((data) => setWebauthnEnabled(data.enabled))
+      .catch(() => {})
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +59,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
-  const showDivider = oidcEnabled || webauthnSupported
+  const showDivider = oidcEnabled || webauthnEnabled
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
@@ -122,7 +125,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </>
           )}
 
-          {webauthnSupported && (
+          {webauthnEnabled && window.PublicKeyCredential !== undefined && (
             <button
               type="button"
               onClick={handlePasskeyLogin}

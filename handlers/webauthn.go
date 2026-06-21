@@ -138,9 +138,9 @@ func newWebAuthnInstance(cfg *db.Config) (*webauthn.WebAuthn, error) {
 	})
 }
 
-func WebAuthnStatus() app.HandlerFunc {
+func WebAuthnStatus(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		c.JSON(consts.StatusOK, map[string]bool{"supported": true})
+		c.JSON(consts.StatusOK, map[string]bool{"enabled": cfg.WebAuthn.Enabled})
 	}
 }
 
@@ -152,8 +152,8 @@ func WebAuthnRegisterStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		if cfg.WebAuthn.RPID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未配置"})
+		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
 			return
 		}
 
@@ -226,8 +226,8 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		if cfg.WebAuthn.RPID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未配置"})
+		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
 			return
 		}
 
@@ -317,8 +317,8 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 func WebAuthnLoginStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		if cfg.WebAuthn.RPID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未配置"})
+		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
 			return
 		}
 
@@ -351,8 +351,8 @@ func WebAuthnLoginStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		if cfg.WebAuthn.RPID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未配置"})
+		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
 			return
 		}
 

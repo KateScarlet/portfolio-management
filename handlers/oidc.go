@@ -228,8 +228,9 @@ func generateState() string {
 func GetWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(consts.StatusOK, map[string]any{
-			"rpid":      cfg.WebAuthn.RPID,
-			"rpOrigins": cfg.WebAuthn.RPOrigins,
+			"enabled":    cfg.WebAuthn.Enabled,
+			"rpid":       cfg.WebAuthn.RPID,
+			"rpOrigins":  cfg.WebAuthn.RPOrigins,
 		})
 	}
 }
@@ -237,14 +238,18 @@ func GetWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			RPID      string   `json:"rpid"`
-			RPOrigins []string `json:"rpOrigins"`
+			Enabled    *bool    `json:"enabled"`
+			RPID       string   `json:"rpid"`
+			RPOrigins  []string `json:"rpOrigins"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 
+		if body.Enabled != nil {
+			cfg.WebAuthn.Enabled = *body.Enabled
+		}
 		cfg.WebAuthn.RPID = body.RPID
 		cfg.WebAuthn.RPOrigins = body.RPOrigins
 
@@ -254,8 +259,9 @@ func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 		}
 
 		c.JSON(consts.StatusOK, map[string]any{
-			"rpid":      cfg.WebAuthn.RPID,
-			"rpOrigins": cfg.WebAuthn.RPOrigins,
+			"enabled":    cfg.WebAuthn.Enabled,
+			"rpid":       cfg.WebAuthn.RPID,
+			"rpOrigins":  cfg.WebAuthn.RPOrigins,
 		})
 	}
 }

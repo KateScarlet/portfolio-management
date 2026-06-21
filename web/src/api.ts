@@ -219,6 +219,7 @@ export async function updateOIDCConfig(config: OIDCConfig): Promise<OIDCConfig> 
 }
 
 export interface WebAuthnConfig {
+  enabled: boolean
   rpid: string
   rpOrigins: string[]
 }

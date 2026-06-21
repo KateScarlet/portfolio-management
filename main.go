@@ -72,7 +72,7 @@ func main() {
 	h.GET("/api/auth/oidc/callback", handlers.OIDCCallback(database, cfg))
 	h.GET("/api/auth/oidc/status", handlers.OIDCStatus(cfg))
 
-	h.GET("/api/webauthn/status", handlers.WebAuthnStatus())
+	h.GET("/api/webauthn/status", handlers.WebAuthnStatus(cfg))
 	h.POST("/api/webauthn/login/start", handlers.WebAuthnLoginStart(database, cfg))
 	h.POST("/api/webauthn/login/finish", handlers.WebAuthnLoginFinish(database, cfg))
 

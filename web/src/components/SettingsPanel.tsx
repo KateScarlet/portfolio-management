@@ -30,6 +30,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
   const [oidcConfig, setOidcConfig] = useState<api.OIDCConfig | null>(null)
   const [oidcDraft, setOidcDraft] = useState<api.OIDCConfig>({ enabled: false, issuer: "", clientID: "", clientSecret: "", redirectURL: "" })
+  const [webauthnDraft, setWebauthnDraft] = useState<{ enabled: boolean; rpid: string; rpOrigins: string }>({ enabled: false, rpid: "", rpOrigins: "" })
 
   const handleOpen = () => {
     setDraft(settings)
@@ -37,6 +38,9 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
     api.fetchOIDCConfig().then((config) => {
       setOidcConfig(config)
       setOidcDraft(config)
+    }).catch(() => {})
+    api.fetchWebAuthnConfig().then((config) => {
+      setWebauthnDraft({ enabled: config.enabled, rpid: config.rpid, rpOrigins: config.rpOrigins.join(", ") })
     }).catch(() => {})
   }
 
@@ -50,6 +54,12 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
       } catch (e) {
         console.error("Failed to save OIDC config", e)
       }
+    }
+    try {
+      const origins = webauthnDraft.rpOrigins.split(",").map((s) => s.trim()).filter(Boolean)
+      await api.updateWebAuthnConfig({ enabled: webauthnDraft.enabled, rpid: webauthnDraft.rpid, rpOrigins: origins })
+    } catch (e) {
+      console.error("Failed to save WebAuthn config", e)
     }
     setIsOpen(false)
     setTestResult(null)
@@ -495,8 +505,8 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
               {/* Passkey 管理 */}
               <PasskeyManager />
 
-              {/* WebAuthn 配置 (仅管理员) */}
-              <WebAuthnConfigSection />
+              {/* WebAuthn 配置 */}
+              <WebAuthnConfigSection draft={webauthnDraft} onChange={setWebauthnDraft} />
             </div>
 
             {/* Fixed Footer */}
@@ -528,10 +538,6 @@ function PasskeyManager() {
   const [newName, setNewName] = useState("")
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    loadCredentials()
-  }, [])
-
   const loadCredentials = async () => {
     try {
       const creds = await api.webAuthnListCredentials()
@@ -542,6 +548,10 @@ function PasskeyManager() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadCredentials()
+  }, [])
 
   const handleRegister = async () => {
     setRegistering(true)
@@ -622,86 +632,61 @@ function PasskeyManager() {
   )
 }
 
-function WebAuthnConfigSection() {
-  const [config, setConfig] = useState<{ rpid: string; rpOrigins: string[] }>({ rpid: "", rpOrigins: [] })
-  const [draft, setDraft] = useState({ rpid: "", rpOrigins: "" })
-  const [saving, setSaving] = useState(false)
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
-
-  useEffect(() => {
-    api.fetchWebAuthnConfig().then((c) => {
-      setConfig(c)
-      setDraft({ rpid: c.rpid, rpOrigins: c.rpOrigins.join(", ") })
-    }).catch(() => {})
-  }, [])
-
-  const handleSave = async () => {
-    setSaving(true)
-    setResult(null)
-    try {
-      const origins = draft.rpOrigins.split(",").map((s) => s.trim()).filter(Boolean)
-      const result = await api.updateWebAuthnConfig({ rpid: draft.rpid, rpOrigins: origins })
-      setConfig(result)
-      setDraft({ rpid: result.rpid, rpOrigins: result.rpOrigins.join(", ") })
-      setResult({ success: true, message: "配置已保存" })
-    } catch (e) {
-      setResult({ success: false, message: "保存失败" })
-    } finally {
-      setSaving(false)
-    }
-  }
-
+function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean; rpid: string; rpOrigins: string }, onChange: (d: { enabled: boolean; rpid: string; rpOrigins: string }) => void }) {
   return (
     <div className="border-t border-[#E9ECEF] pt-6">
-      <label className="block text-sm font-medium text-[#1A1A1A] mb-1">
-        WebAuthn 配置
-      </label>
-      <p className="text-xs text-[#6C757D] mb-4">
-        配置 Passkey 的 Relying Party 信息
-      </p>
-
-      <div className="space-y-3">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <label className="block text-xs font-medium text-[#6C757D] mb-1">
-            RPID (域名)
+          <label className="block text-sm font-medium text-[#1A1A1A]">
+            Passkey 登录 (WebAuthn)
           </label>
-          <input
-            type="text"
-            value={draft.rpid}
-            onChange={(e) => setDraft({ ...draft, rpid: e.target.value })}
-            placeholder="localhost"
-            className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+          <p className="text-xs text-[#6C757D] mt-1">
+            配置 Passkey 无密码登录
+          </p>
+        </div>
+        <button
+          onClick={() => onChange({ ...draft, enabled: !draft.enabled })}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            draft.enabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              draft.enabled ? "translate-x-6" : "translate-x-1"
+            }`}
           />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-[#6C757D] mb-1">
-            RPOrigins (逗号分隔)
-          </label>
-          <input
-            type="text"
-            value={draft.rpOrigins}
-            onChange={(e) => setDraft({ ...draft, rpOrigins: e.target.value })}
-            placeholder="http://localhost:3000"
-            className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs text-[#1A1A1A] border border-[#E9ECEF] rounded-lg hover:bg-[#F1F3F5] transition-colors disabled:opacity-50"
-          >
-            {saving ? "保存中..." : "保存配置"}
-          </button>
-          {result && (
-            <span className={`text-xs ${result.success ? "text-green-600" : "text-red-500"}`}>
-              {result.message}
-            </span>
-          )}
-        </div>
+        </button>
       </div>
+
+      {draft.enabled && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+              RPID (域名)
+            </label>
+            <input
+              type="text"
+              value={draft.rpid}
+              onChange={(e) => onChange({ ...draft, rpid: e.target.value })}
+              placeholder="localhost"
+              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+              RPOrigins (逗号分隔)
+            </label>
+            <input
+              type="text"
+              value={draft.rpOrigins}
+              onChange={(e) => onChange({ ...draft, rpOrigins: e.target.value })}
+              placeholder="http://localhost:3000"
+              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

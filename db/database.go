@@ -30,8 +30,9 @@ type Config struct {
 		RedirectURL  string `mapstructure:"redirectURL"`
 	} `mapstructure:"oidc"`
 	WebAuthn struct {
-		RPID      string   `mapstructure:"rpid"`
-		RPOrigins []string `mapstructure:"rpOrigins"`
+		Enabled    bool     `mapstructure:"enabled"`
+		RPID       string   `mapstructure:"rpid"`
+		RPOrigins  []string `mapstructure:"rpOrigins"`
 	} `mapstructure:"webauthn"`
 }
 
@@ -160,6 +161,7 @@ func SaveConfig(cfg *Config) error {
 	v.Set("oidc.clientID", cfg.OIDC.ClientID)
 	v.Set("oidc.clientSecret", cfg.OIDC.ClientSecret)
 	v.Set("oidc.redirectURL", cfg.OIDC.RedirectURL)
+	v.Set("webauthn.enabled", cfg.WebAuthn.Enabled)
 	v.Set("webauthn.rpid", cfg.WebAuthn.RPID)
 	v.Set("webauthn.rpOrigins", cfg.WebAuthn.RPOrigins)
 	v.SetConfigFile(ConfigFile)
