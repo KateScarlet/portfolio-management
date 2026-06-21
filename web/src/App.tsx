@@ -29,8 +29,8 @@ export default function App() {
       .fetchSettings()
       .then((s) => {
         setSettings({
-          driftThreshold: Number(s.driftThreshold) || DEFAULT_SETTINGS.driftThreshold,
-          syncInterval: Number(s.syncInterval) || DEFAULT_SETTINGS.syncInterval,
+          driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
+          syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
         })
       })
       .catch(console.error)
