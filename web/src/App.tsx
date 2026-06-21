@@ -162,7 +162,7 @@ export default function App() {
           <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">投资组合</h1>
+          <h1 className="text-xl font-semibold tracking-tight">投资组合管理</h1>
         </div>
         <div className="hidden sm:flex items-center gap-4">
           {syncStatus && syncStatus.lastSyncAt && (

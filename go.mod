@@ -1,4 +1,4 @@
-module permanent-portfolio
+module portfolio-management
 
 go 1.26.4
 

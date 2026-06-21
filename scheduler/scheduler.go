@@ -3,8 +3,8 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
-	"permanent-portfolio/models"
-	"permanent-portfolio/yahoo"
+	"portfolio-management/models"
+	"portfolio-management/yahoo"
 	"sync"
 	"time"
 

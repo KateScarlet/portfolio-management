@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"os"
-	"permanent-portfolio/models"
+	"portfolio-management/models"
 	"time"
 
 	"github.com/libtnb/sqlite"

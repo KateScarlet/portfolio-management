@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"permanent-portfolio/models"
+	"portfolio-management/models"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"

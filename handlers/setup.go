@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"permanent-portfolio/db"
+	"portfolio-management/db"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"

@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"context"
-	"permanent-portfolio/models"
-	"permanent-portfolio/scheduler"
+	"portfolio-management/models"
+	"portfolio-management/scheduler"
 	"strconv"
 	"time"
 

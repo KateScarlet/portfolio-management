@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"permanent-portfolio/models"
-	"permanent-portfolio/telegram"
+	"portfolio-management/models"
+	"portfolio-management/telegram"
 	"strings"
 	"time"
 

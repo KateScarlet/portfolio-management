@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"permanent-portfolio/yahoo"
+	"portfolio-management/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"

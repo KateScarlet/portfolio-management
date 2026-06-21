@@ -198,7 +198,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       Telegram 通知
                     </label>
                     <p className="text-xs text-[#6C757D] mt-1">
-                      通过 Telegram Bot 接收投资组合通知
+                      通过 Telegram Bot 接收投资组合管理通知
                     </p>
                   </div>
                   <button

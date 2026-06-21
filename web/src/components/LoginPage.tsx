@@ -38,7 +38,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
               <div className="w-4 h-4 border-2 border-white rounded-full"></div>
             </div>
-            <h1 className="text-lg font-semibold text-[#1A1A1A]">投资组合</h1>
+            <h1 className="text-lg font-semibold text-[#1A1A1A]">投资组合管理</h1>
           </div>
           <p className="text-sm text-[#6C757D]">请登录以继续</p>
         </div>

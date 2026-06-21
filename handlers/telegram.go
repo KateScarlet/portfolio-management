@@ -3,8 +3,8 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"permanent-portfolio/models"
-	"permanent-portfolio/telegram"
+	"portfolio-management/models"
+	"portfolio-management/telegram"
 	"strings"
 	"time"
 
