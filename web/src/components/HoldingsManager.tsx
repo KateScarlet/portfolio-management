@@ -4,6 +4,7 @@ import { formatCurrency, formatPercent, getProfitColor } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import SellModal from "./SellModal"
+import ConfirmDialog from "./ConfirmDialog"
 
 interface HoldingsManagerProps {
   holdings: Holding[]
@@ -39,6 +40,7 @@ export default function HoldingsManager({
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
+  const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
 
   const syncAllPrices = useCallback(async () => {
     setSyncing(true)
@@ -290,7 +292,7 @@ export default function HoldingsManager({
                           </button>
                         )}
                         <button
-                          onClick={() => onRemoveHolding(h.id)}
+                          onClick={() => setDeletingHolding(h)}
                           className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
                         >
                           Del
@@ -470,6 +472,18 @@ export default function HoldingsManager({
           holding={sellingHolding}
           onConfirm={handleSellConfirm}
           onClose={() => setSellingHolding(null)}
+        />
+      )}
+
+      {deletingHolding && (
+        <ConfirmDialog
+          title="删除资产"
+          message={`确定删除 ${deletingHolding.name || deletingHolding.symbol || "此资产"}？此操作不可撤销。`}
+          onConfirm={() => {
+            onRemoveHolding(deletingHolding.id)
+            setDeletingHolding(null)
+          }}
+          onCancel={() => setDeletingHolding(null)}
         />
       )}
     </div>

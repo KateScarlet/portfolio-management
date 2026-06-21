@@ -2,6 +2,7 @@ import { useState } from "react"
 import { UserInfo } from "../types"
 import { Users, Trash2, UserPlus } from "lucide-react"
 import * as api from "../api"
+import ConfirmDialog from "./ConfirmDialog"
 
 export default function UserManager() {
   const [isOpen, setIsOpen] = useState(false)
@@ -12,6 +13,7 @@ export default function UserManager() {
   const [newPassword, setNewPassword] = useState("")
   const [newRole, setNewRole] = useState<"admin" | "user">("user")
   const [error, setError] = useState("")
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -56,13 +58,13 @@ export default function UserManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定删除此用户？")) return
     try {
       await api.deleteUser(id)
       setUsers(users.filter((u) => u.id !== id))
     } catch (e) {
       console.error("Failed to delete user", e)
     }
+    setDeletingUserId(null)
   }
 
   return (
@@ -163,7 +165,7 @@ export default function UserManager() {
                         </span>
                       </div>
                       <button
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => setDeletingUserId(user.id)}
                         className="p-1.5 text-[#6C757D] hover:text-red-500 transition-colors"
                         title="删除用户"
                       >
@@ -176,6 +178,15 @@ export default function UserManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {deletingUserId && (
+        <ConfirmDialog
+          title="删除用户"
+          message="确定删除此用户？此操作不可撤销。"
+          onConfirm={() => handleDelete(deletingUserId)}
+          onCancel={() => setDeletingUserId(null)}
+        />
       )}
     </>
   )
