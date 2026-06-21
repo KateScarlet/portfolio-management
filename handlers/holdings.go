@@ -24,9 +24,14 @@ func ListHoldings(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
+type CreateHoldingInput struct {
+	models.Holding
+	DeductFromCash bool `json:"deductFromCash"`
+}
+
 func CreateHolding(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		var input models.Holding
+		var input CreateHoldingInput
 		if err := c.BindJSON(&input); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -113,26 +118,61 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				existing.Lots = append(existing.Lots, newLot)
 				created = false
 				result = existing
-				return tx.Save(&existing).Error
-			}
-
-			if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
-				return res.Error
-			}
-
-			// No existing holding - create new
-			input.ID = uuid.New().String()
-			if input.Fee > 0 {
-				input.Cost += input.Fee
-			}
-			if input.Lots == nil {
-				input.Lots = models.JSONColumn{newLot}
+				if err := tx.Save(&existing).Error; err != nil {
+					return err
+				}
 			} else {
-				input.Lots = append(input.Lots, newLot)
+				if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
+					return res.Error
+				}
+
+				// No existing holding - create new
+				input.ID = uuid.New().String()
+				if input.Fee > 0 {
+					input.Cost += input.Fee
+				}
+				if input.Lots == nil {
+					input.Lots = models.JSONColumn{newLot}
+				} else {
+					input.Lots = append(input.Lots, newLot)
+				}
+				created = true
+				result = input.Holding
+				if err := tx.Create(&input.Holding).Error; err != nil {
+					return err
+				}
 			}
-			created = true
-			result = input
-			return tx.Create(&input).Error
+
+			// Handle deduct from cash in the same transaction
+			if input.DeductFromCash {
+				addedCost := input.Cost + input.Fee
+				if addedCost > 0 {
+					var cashHolding models.Holding
+					if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
+						if errors.Is(err, gorm.ErrRecordNotFound) {
+							// No cash holding found, skip deduction
+							return nil
+						}
+						return err
+					}
+
+					cashHolding.Value -= addedCost
+					if cashHolding.Value < 0 {
+						cashHolding.Value = 0
+					}
+
+					cashHolding.Cost -= addedCost
+					if cashHolding.Cost < 0 {
+						cashHolding.Cost = 0
+					}
+
+					if err := tx.Save(&cashHolding).Error; err != nil {
+						return err
+					}
+				}
+			}
+
+			return nil
 		})
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

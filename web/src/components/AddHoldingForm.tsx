@@ -35,13 +35,12 @@ export default function AddHoldingForm({
 
   const handleAdd = async () => {
     const feeNum = parseFloat(fee) || 0
-    let addedCost: number | undefined
 
     if (isManual) {
       const val = parseFloat(value)
       const c = parseFloat(cost)
       if (isNaN(val) || val <= 0) return
-      addedCost = (isNaN(c) || c <= 0 ? val : c) + feeNum
+      const addedCost = (isNaN(c) || c <= 0 ? val : c) + feeNum
       onAddHolding({
         assetId,
         symbol: "",
@@ -52,6 +51,7 @@ export default function AddHoldingForm({
         cost: addedCost - feeNum,
         fee: feeNum,
         date: new Date(date).getTime(),
+        deductFromCash: deductFromCash,
       })
     } else {
       const sharesNum = parseFloat(shares)
@@ -76,7 +76,6 @@ export default function AddHoldingForm({
             }
           }
 
-          addedCost = sharesNum * finalCostPrice + feeNum
           onAddHolding({
             assetId,
             symbol: authoritativeSymbol,
@@ -88,6 +87,7 @@ export default function AddHoldingForm({
             cost: sharesNum * finalCostPrice,
             fee: feeNum,
             date: new Date(date).getTime(),
+            deductFromCash: deductFromCash,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
@@ -100,20 +100,6 @@ export default function AddHoldingForm({
         return
       } finally {
         setIsFetching(false)
-      }
-    }
-
-    if (deductFromCash && addedCost && addedCost > 0) {
-      const cashHolding = holdings.find((hd) => hd.assetId === "cash")
-      if (cashHolding) {
-        const remainingValue = Math.max(0, cashHolding.value - addedCost)
-        onUpdateHolding(cashHolding.id, {
-          value: remainingValue,
-          cost:
-            (cashHolding.cost || cashHolding.value) - addedCost > 0
-              ? (cashHolding.cost || cashHolding.value) - addedCost
-              : remainingValue,
-        })
       }
     }
 
