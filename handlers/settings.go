@@ -75,6 +75,38 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	}
 }
 
+func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var setting models.Setting
+		if err := db.Where("`key` = ?", "availableFunds").First(&setting).Error; err != nil {
+			c.JSON(consts.StatusOK, map[string]string{"value": "0"})
+			return
+		}
+		c.JSON(consts.StatusOK, map[string]string{"value": setting.Value})
+	}
+}
+
+func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Value string `json:"value"`
+		}
+		if err := c.BindAndValidate(&body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		setting := models.Setting{Key: "availableFunds", Value: body.Value}
+		result := db.Where(models.Setting{Key: "availableFunds"}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
+		if result.Error != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+			return
+		}
+
+		c.JSON(consts.StatusOK, map[string]string{"key": "availableFunds", "value": body.Value})
+	}
+}
+
 func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body map[string]string

@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
 import { formatCurrency, formatPercent, getProfitColor } from "../utils"
@@ -9,9 +9,13 @@ interface DashboardProps {
   principal: number
   totalFees: number
   colorScheme: ColorScheme
+  availableFunds: number
+  onUpdateAvailableFunds: (value: number) => void
 }
 
-export default function Dashboard({ assets, total, principal, totalFees, colorScheme }: DashboardProps) {
+export default function Dashboard({ assets, total, principal, totalFees, colorScheme, availableFunds, onUpdateAvailableFunds }: DashboardProps) {
+  const [isEditingFunds, setIsEditingFunds] = useState(false)
+  const [tempFunds, setTempFunds] = useState("")
   const chartData = Object.keys(assets)
     .map((key) => {
       const id = key as AssetId
@@ -143,6 +147,63 @@ export default function Dashboard({ assets, total, principal, totalFees, colorSc
             </div>
           )
         })}
+      </div>
+
+      <div className="mt-6 pt-4 border-t border-[#E9ECEF]">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[#6C757D]">可用资金</span>
+          {isEditingFunds ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={tempFunds}
+                onChange={(e) => setTempFunds(e.target.value)}
+                className="w-28 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const num = parseFloat(tempFunds)
+                    if (!isNaN(num) && num >= 0) {
+                      onUpdateAvailableFunds(num)
+                      setIsEditingFunds(false)
+                    }
+                  } else if (e.key === "Escape") {
+                    setIsEditingFunds(false)
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  const num = parseFloat(tempFunds)
+                  if (!isNaN(num) && num >= 0) {
+                    onUpdateAvailableFunds(num)
+                    setIsEditingFunds(false)
+                  }
+                }}
+                className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90"
+              >
+                保存
+              </button>
+              <button
+                onClick={() => setIsEditingFunds(false)}
+                className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setTempFunds(availableFunds.toString())
+                setIsEditingFunds(true)
+              }}
+              className="text-sm font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
+              title="点击编辑"
+            >
+              {formatCurrency(availableFunds)}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

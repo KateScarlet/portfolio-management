@@ -127,36 +127,25 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			// Handle deduct from cash in the same transaction.
-			// Creates a sell lot on the cash holding so that RecalcFromLots keeps
-			// cash value/cost consistent and the deduction is auditable.
+			// Handle deduct from available funds in the same transaction.
 			if input.DeductFromCash {
 				addedCost := newLot.Cost + input.Fee
 				if addedCost > 0 {
-					var cashHolding models.Holding
-					if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
-						if errors.Is(err, gorm.ErrRecordNotFound) {
-							return fmt.Errorf("no cash holding found to deduct from; create a cash holding first")
-						}
-						return err
+					// Read current available funds
+					var fundsSetting models.Setting
+					fundsValue := 0.0
+					if err := tx.Where("`key` = ?", "availableFunds").First(&fundsSetting).Error; err == nil {
+						fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
 					}
 
-					// Cash is a 1:1 asset — spending cash reduces both cost and value equally
-					costReduction := addedCost
-
-					cashSellLot := models.HoldingLot{
-						ID:         uuid.New().String(),
-						Type:       "sell",
-						Date:       time.Now().UnixMilli(),
-						Shares:     0,
-						Cost:       costReduction,
-						ValueAdded: addedCost,
-						Fee:        0, // fee already accounted for in the buying lot
+					if fundsValue < addedCost {
+						return fmt.Errorf("可用资金不足: 可用 %.2f, 需要 %.2f", fundsValue, addedCost)
 					}
-					cashHolding.Lots = append(cashHolding.Lots, cashSellLot)
-					cashHolding.RecalcFromLots()
 
-					if err := tx.Save(&cashHolding).Error; err != nil {
+					newFundsValue := fundsValue - addedCost
+					fundsSetting.Key = "availableFunds"
+					fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
+					if err := tx.Where("`key` = ?", "availableFunds").Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
 						return err
 					}
 				}

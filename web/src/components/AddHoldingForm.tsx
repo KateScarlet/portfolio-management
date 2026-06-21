@@ -4,7 +4,7 @@ import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface AddHoldingFormProps {
-  onAddHolding: (holding: Parameters<typeof api.createHolding>[0]) => void
+  onAddHolding: (holding: Parameters<typeof api.createHolding>[0]) => Promise<void>
   onClose: () => void
 }
 
@@ -37,18 +37,23 @@ export default function AddHoldingForm({
       const c = parseFloat(cost)
       if (isNaN(val) || val <= 0) return
       const addedCost = (isNaN(c) || c <= 0 ? val : c) + feeNum
-      onAddHolding({
-        assetId,
-        symbol: "",
-        name: name.trim() || "手工资产",
-        shares: 0,
-        price: 0,
-        value: val,
-        cost: addedCost - feeNum,
-        fee: feeNum,
-        date: new Date(date).getTime(),
-        deductFromCash: deductFromCash,
-      })
+      try {
+        await onAddHolding({
+          assetId,
+          symbol: "",
+          name: name.trim() || "手工资产",
+          shares: 0,
+          price: 0,
+          value: val,
+          cost: addedCost - feeNum,
+          fee: feeNum,
+          date: new Date(date).getTime(),
+          deductFromCash: deductFromCash,
+        })
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "录入失败", "error")
+        return
+      }
     } else {
       const sharesNum = parseFloat(shares)
       const cPrice = parseFloat(costPrice)
@@ -72,7 +77,7 @@ export default function AddHoldingForm({
             }
           }
 
-          onAddHolding({
+          await onAddHolding({
             assetId,
             symbol: authoritativeSymbol,
             name: name.trim() || data.name || authoritativeSymbol,
@@ -90,8 +95,12 @@ export default function AddHoldingForm({
           setIsFetching(false)
           return
         }
-      } catch {
-        showToast("价格获取失败，请尝试手动录入", "error")
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("可用资金")) {
+          showToast(e.message, "error")
+        } else {
+          showToast("价格获取失败，请尝试手动录入", "error")
+        }
         setIsFetching(false)
         return
       } finally {
@@ -348,7 +357,7 @@ export default function AddHoldingForm({
               className="rounded border-[#E9ECEF] text-[#1A1A1A] focus:ring-[#1A1A1A]"
             />
             <span className="text-[10px] uppercase tracking-widest text-[#495057] font-bold">
-              从现金扣除本金
+              从可用资金扣除
             </span>
           </label>
           <button

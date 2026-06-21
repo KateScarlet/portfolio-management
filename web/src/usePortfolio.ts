@@ -23,20 +23,16 @@ export function usePortfolio() {
   })
 
   const addHolding = useCallback(async (holding: Omit<Holding, "id">) => {
-    try {
-      const result = await api.createHolding(holding)
-      setHoldings((prev) => {
-        const idx = prev.findIndex((h) => h.id === result.id)
-        if (idx >= 0) {
-          const updated = [...prev]
-          updated[idx] = result
-          return updated
-        }
-        return [...prev, result]
-      })
-    } catch (e) {
-      console.error("Failed to create holding", e)
-    }
+    const result = await api.createHolding(holding)
+    setHoldings((prev) => {
+      const idx = prev.findIndex((h) => h.id === result.id)
+      if (idx >= 0) {
+        const updated = [...prev]
+        updated[idx] = result
+        return updated
+      }
+      return [...prev, result]
+    })
   }, [])
 
   const updateHolding = useCallback(async (id: string, updates: Partial<Holding>) => {

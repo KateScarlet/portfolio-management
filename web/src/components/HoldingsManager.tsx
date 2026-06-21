@@ -9,11 +9,12 @@ interface HoldingsManagerProps {
   holdings: Holding[]
   setHoldings: React.Dispatch<React.SetStateAction<Holding[]>>
   total: number
-  onAddHolding: (holding: Omit<Holding, "id">) => void
+  onAddHolding: (holding: Omit<Holding, "id">) => Promise<void>
   onUpdateHolding: (id: string, updates: Partial<Holding>) => void
   onRemoveHolding: (id: string) => void
   onSaveRecord: () => void
   colorScheme: ColorScheme
+  onRefreshAvailableFunds: () => Promise<void>
 }
 
 export default function HoldingsManager({
@@ -25,6 +26,7 @@ export default function HoldingsManager({
   onRemoveHolding,
   onSaveRecord,
   colorScheme,
+  onRefreshAvailableFunds,
 }: HoldingsManagerProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -72,21 +74,16 @@ export default function HoldingsManager({
   )
 
   const handleSellConfirm = useCallback(
-    (soldHolding: Holding, cashHolding: Holding) => {
+    (soldHolding: Holding) => {
       setHoldings((prev) =>
-        prev
-          .map((h) => {
-            if (h.id === soldHolding.id) return soldHolding
-            if (h.id === cashHolding.id) return cashHolding
-            return h
-          })
-          .concat(
-            // Append cash holding if it's newly created (not in prev)
-            prev.every((h) => h.id !== cashHolding.id) ? [cashHolding] : []
-          )
+        prev.map((h) => {
+          if (h.id === soldHolding.id) return soldHolding
+          return h
+        })
       )
+      onRefreshAvailableFunds()
     },
-    [setHoldings]
+    [setHoldings, onRefreshAvailableFunds]
   )
 
   return (

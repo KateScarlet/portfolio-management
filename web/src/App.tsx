@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { usePortfolio } from "./usePortfolio"
-import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS, ColorScheme } from "./types"
+import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS, ColorScheme, Holding } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
@@ -29,6 +29,7 @@ export default function App() {
   } = usePortfolio()
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+  const [availableFunds, setAvailableFunds] = useState(0)
 
   useEffect(() => {
     api.fetchSetupStatus()
@@ -64,6 +65,9 @@ export default function App() {
           })
         })
         .catch(console.error)
+      api.fetchAvailableFunds()
+        .then((s) => setAvailableFunds(Number(s.value) || 0))
+        .catch(console.error)
       api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
     }
   }, [user])
@@ -96,6 +100,31 @@ export default function App() {
       console.error("Failed to save settings", e)
     }
   }, [])
+
+  const handleUpdateAvailableFunds = useCallback(async (value: number) => {
+    try {
+      await api.updateAvailableFunds(String(value))
+      setAvailableFunds(value)
+    } catch (e) {
+      console.error("Failed to update available funds", e)
+    }
+  }, [])
+
+  const handleRefreshAvailableFunds = useCallback(async () => {
+    try {
+      const s = await api.fetchAvailableFunds()
+      setAvailableFunds(Number(s.value) || 0)
+    } catch (e) {
+      console.error("Failed to refresh available funds", e)
+    }
+  }, [])
+
+  const handleAddHolding = useCallback(async (holding: Omit<Holding, "id">) => {
+    await addHolding(holding)
+    if (holding.deductFromCash) {
+      handleRefreshAvailableFunds()
+    }
+  }, [addHolding, handleRefreshAvailableFunds])
 
   const handleTriggerSync = useCallback(async () => {
     try {
@@ -196,7 +225,7 @@ export default function App() {
       <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} />
+            <Dashboard assets={assets} total={total} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} onUpdateAvailableFunds={handleUpdateAvailableFunds} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
@@ -213,11 +242,12 @@ export default function App() {
             holdings={holdings}
             setHoldings={setHoldings}
             total={total}
-            onAddHolding={addHolding}
+            onAddHolding={handleAddHolding}
             onUpdateHolding={updateHolding}
             onRemoveHolding={removeHolding}
             onSaveRecord={saveRecord}
             colorScheme={settings.colorScheme}
+            onRefreshAvailableFunds={handleRefreshAvailableFunds}
           />
           <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} />
         </div>

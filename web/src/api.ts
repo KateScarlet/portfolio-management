@@ -45,8 +45,8 @@ export async function sellHolding(
   price: number,
   fee: number,
   value: number
-): Promise<{ soldHolding: Holding; cashHolding: Holding }> {
-  return request<{ soldHolding: Holding; cashHolding: Holding }>(`/api/holdings/${id}/sell`, {
+): Promise<{ soldHolding: Holding; availableFunds: string }> {
+  return request<{ soldHolding: Holding; availableFunds: string }>(`/api/holdings/${id}/sell`, {
     method: "POST",
     body: JSON.stringify({ shares, price, fee, value }),
   })
@@ -88,6 +88,17 @@ export async function updateSettings(
   return request<Record<string, string>>("/api/settings", {
     method: "PUT",
     body: JSON.stringify(settings),
+  })
+}
+
+export async function fetchAvailableFunds(): Promise<{ value: string }> {
+  return request<{ value: string }>("/api/funds")
+}
+
+export async function updateAvailableFunds(value: string): Promise<{ key: string; value: string }> {
+  return request<{ key: string; value: string }>("/api/funds", {
+    method: "PUT",
+    body: JSON.stringify({ value }),
   })
 }
 

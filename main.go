@@ -91,6 +91,8 @@ func main() {
 	api.GET("/settings", handlers.ListSettings(database))
 	api.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
 	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
+	api.GET("/funds", handlers.GetAvailableFunds(database))
+	api.PUT("/funds", handlers.UpdateAvailableFunds(database))
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database))
 
 	admin := api.Group("")
