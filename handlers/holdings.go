@@ -74,16 +74,17 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		// Use a single transaction to atomically find-or-create, preventing
 		// two concurrent requests from both creating a new holding for the same symbol/name.
 		var created bool
+		var result models.Holding
 		err := db.Transaction(func(tx *gorm.DB) error {
 			var existing models.Holding
-			var result *gorm.DB
+			var res *gorm.DB
 			if input.Symbol != "" {
-				result = tx.Where("symbol = ? AND symbol != ''", input.Symbol).First(&existing)
+				res = tx.Where("symbol = ? AND symbol != ''", input.Symbol).First(&existing)
 			} else {
-				result = tx.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
+				res = tx.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
 			}
 
-			if result.Error == nil {
+			if res.Error == nil {
 				// Found existing holding - merge into it
 				existing.Shares += input.Shares
 
@@ -111,11 +112,12 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 				existing.Lots = append(existing.Lots, newLot)
 				created = false
+				result = existing
 				return tx.Save(&existing).Error
 			}
 
-			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				return result.Error
+			if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
+				return res.Error
 			}
 
 			// No existing holding - create new
@@ -129,6 +131,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				input.Lots = append(input.Lots, newLot)
 			}
 			created = true
+			result = input
 			return tx.Create(&input).Error
 		})
 		if err != nil {
@@ -136,9 +139,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if created {
-			c.JSON(consts.StatusCreated, input)
+			c.JSON(consts.StatusCreated, result)
 		} else {
-			c.JSON(consts.StatusOK, input)
+			c.JSON(consts.StatusOK, result)
 		}
 	}
 }
