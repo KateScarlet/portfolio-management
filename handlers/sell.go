@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"permanent-portfolio/models"
 	"time"
 
@@ -140,15 +141,12 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var cashHolding models.Holding
-		if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err == nil {
-			cashHolding.Lots = append(cashHolding.Lots, cashBuyLot)
-			cashHolding.RecalcFromLots()
-			if err := tx.Save(&cashHolding).Error; err != nil {
+		if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
-		} else {
 			cashHolding = models.Holding{
 				ID:      uuid.New().String(),
 				AssetId: "cash",
@@ -157,6 +155,14 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			}
 			cashHolding.RecalcFromLots()
 			if err := tx.Create(&cashHolding).Error; err != nil {
+				tx.Rollback()
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+		} else {
+			cashHolding.Lots = append(cashHolding.Lots, cashBuyLot)
+			cashHolding.RecalcFromLots()
+			if err := tx.Save(&cashHolding).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return

@@ -104,7 +104,7 @@ type Setting struct {
 //   - Buy lot: Cost = raw cost (shares * costPrice, NO fee); ValueAdded = market value at purchase; Fee = transaction fee
 //   - Sell lot: Cost = proportional cost reduction; ValueAdded = value removed from holding; Fee = transaction fee
 //   - Holding: Cost = total buy costs - total sell costs (NO fees); Value = current market value
-//   - Total investment (principal) = Cost + TotalFees()
+//   - Total investment (principal) = Cost + BuyFees()
 func (h *Holding) RecalcFromLots() {
 	if len(h.Lots) == 0 {
 		return
