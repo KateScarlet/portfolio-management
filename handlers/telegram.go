@@ -41,11 +41,11 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 		switch body.Type {
 		case "connection", "":
 			botName := client.BotName()
-			c.JSON(consts.StatusOK, map[string]any{
-				"success": true,
-				"botName": botName,
-			})
-			return
+			msg := fmt.Sprintf("✅ <b>连接测试成功</b>\n\nBot: %s\n<i>— 这是一条测试消息</i>", botName)
+			if err := client.SendMessage(msg); err != nil {
+				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
+				return
+			}
 
 		case "price":
 			msg := `⚠️ <b>价格波动提醒</b>
@@ -105,19 +105,19 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			}
 			lines = append(lines, "")
 
-		for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
-			pct := 0.0
-			if total > 0 {
-				pct = assets[id] / total * 100
+			for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
+				pct := 0.0
+				if total > 0 {
+					pct = assets[id] / total * 100
+				}
+				lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
 			}
-			lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
-		}
-		lines = append(lines, "", "<i>— 这是一条测试消息</i>")
+			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
 
-		if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
-			c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
-			return
-		}
+			if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
+				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
+				return
+			}
 
 		default:
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid test type: " + body.Type})

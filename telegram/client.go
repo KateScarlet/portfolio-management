@@ -23,7 +23,6 @@ func NewClient(token, chatID string) (*Client, error) {
 		return nil, fmt.Errorf("invalid chat ID %q: %w", chatID, scanErr)
 	}
 
-	slog.Info("telegram bot initialized", "username", bot.Self.UserName, "chatID", cid)
 	return &Client{bot: bot, chatID: cid}, nil
 }
 

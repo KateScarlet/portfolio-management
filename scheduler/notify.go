@@ -16,6 +16,9 @@ type Notifier struct {
 	prevPrices      map[string]float64
 	lastDriftAlert  time.Time
 	lastSummaryTime time.Time
+	telegramClient  *telegram.Client
+	telegramToken   string
+	telegramChatID  string
 }
 
 func NewNotifier(db *gorm.DB) *Notifier {
@@ -34,10 +37,23 @@ func (n *Notifier) LoadTelegramConfig() (*telegram.Client, error) {
 	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramEnabled").Select("value").Row().Scan(&enabled)
 
 	if enabled != "true" || token == "" || chatID == "" {
+		n.telegramClient = nil
 		return nil, nil
 	}
 
-	return telegram.NewClient(token, chatID)
+	if n.telegramClient != nil && n.telegramToken == token && n.telegramChatID == chatID {
+		return n.telegramClient, nil
+	}
+
+	client, err := telegram.NewClient(token, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	n.telegramClient = client
+	n.telegramToken = token
+	n.telegramChatID = chatID
+	return client, nil
 }
 
 func (n *Notifier) NotifyAfterSync(holdings []models.Holding, syncedSymbols map[string]float64) {
