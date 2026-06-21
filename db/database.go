@@ -17,7 +17,8 @@ const ConfigDir = "config"
 const ConfigFile = "config/config.yaml"
 
 type Config struct {
-	Database struct {
+	JWTSecret  string `mapstructure:"jwtSecret"`
+	Database   struct {
 		Type string `mapstructure:"type"`
 		DSN  string `mapstructure:"dsn"`
 	} `mapstructure:"database"`
@@ -53,10 +54,15 @@ func LoadConfig() *Config {
 		panic("failed to unmarshal config: " + err.Error())
 	}
 
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = generateJWTSecret()
+		SaveConfig(&cfg)
+	}
+
 	return &cfg
 }
 
-func GenerateJWTSecret() string {
+func generateJWTSecret() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
@@ -142,6 +148,7 @@ func SaveConfig(cfg *Config) error {
 	}
 
 	v := viper.New()
+	v.Set("jwtSecret", cfg.JWTSecret)
 	v.Set("database.type", cfg.Database.Type)
 	v.Set("database.dsn", cfg.Database.DSN)
 	v.Set("oidc.enabled", cfg.OIDC.Enabled)

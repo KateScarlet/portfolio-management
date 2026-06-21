@@ -35,8 +35,7 @@ func main() {
 		panic("Failed to init database: " + err.Error())
 	}
 
-	jwtSecret := db.GenerateJWTSecret()
-	middleware.SetJWTSecret(jwtSecret)
+	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	yahoo.Init()
 
