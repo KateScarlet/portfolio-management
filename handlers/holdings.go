@@ -71,24 +71,20 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		newLot.ValueAdded = input.Value
 		newLot.Fee = input.Fee
 
-		// Try to find an existing holding to merge into
-		var existing models.Holding
-		var result *gorm.DB
-		if input.Symbol != "" {
-			result = db.Where("symbol = ? AND symbol != ''", input.Symbol).First(&existing)
-		} else {
-			result = db.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
-		}
+		// Use a single transaction to atomically find-or-create, preventing
+		// two concurrent requests from both creating a new holding for the same symbol/name.
+		var created bool
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var existing models.Holding
+			var result *gorm.DB
+			if input.Symbol != "" {
+				result = tx.Where("symbol = ? AND symbol != ''", input.Symbol).First(&existing)
+			} else {
+				result = tx.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
+			}
 
-		switch {
-		case result.Error == nil:
-			// Found existing holding - use transaction for atomic read-modify-write
-			err := db.Transaction(func(tx *gorm.DB) error {
-				// Re-read within transaction to get latest version
-				if err := tx.First(&existing, "id = ?", existing.ID).Error; err != nil {
-					return err
-				}
-
+			if result.Error == nil {
+				// Found existing holding - merge into it
 				existing.Shares += input.Shares
 
 				switch {
@@ -114,15 +110,14 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				}
 
 				existing.Lots = append(existing.Lots, newLot)
-
+				created = false
 				return tx.Save(&existing).Error
-			})
-			if err != nil {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
 			}
-			c.JSON(consts.StatusOK, existing)
-		case errors.Is(result.Error, gorm.ErrRecordNotFound):
+
+			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return result.Error
+			}
+
 			// No existing holding - create new
 			input.ID = uuid.New().String()
 			if input.Fee > 0 {
@@ -133,14 +128,17 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			} else {
 				input.Lots = append(input.Lots, newLot)
 			}
-			if err := db.Create(&input).Error; err != nil {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
-			}
+			created = true
+			return tx.Create(&input).Error
+		})
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if created {
 			c.JSON(consts.StatusCreated, input)
-		default:
-			// Database error (not "not found")
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+		} else {
+			c.JSON(consts.StatusOK, input)
 		}
 	}
 }
