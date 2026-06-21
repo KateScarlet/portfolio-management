@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -16,6 +17,9 @@ var (
 	szPrefixRe = regexp.MustCompile(`^[0123]\d{5}$`)
 	shTagRe    = regexp.MustCompile(`^SH\d{6}$`)
 	szTagRe    = regexp.MustCompile(`^SZ\d{6}$`)
+
+	rateCache   sync.Map
+	cacheExpiry = 5 * time.Minute
 )
 
 func Init() {
@@ -23,6 +27,30 @@ func Init() {
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
 		SetTimeout(30 * time.Second)
+}
+
+type cachedRate struct {
+	rate      float64
+	fetchedAt time.Time
+}
+
+func getCachedRate(pair string) (float64, bool) {
+	if v, ok := rateCache.Load(pair); ok {
+		c := v.(*cachedRate)
+		if time.Since(c.fetchedAt) < cacheExpiry {
+			return c.rate, true
+		}
+		rateCache.Delete(pair)
+	}
+	return 0, false
+}
+
+func setCachedRate(pair string, rate float64) {
+	rateCache.Store(pair, &cachedRate{rate: rate, fetchedAt: time.Now()})
+}
+
+func ClearRateCache() {
+	rateCache = sync.Map{}
 }
 
 type YahooChartResponse struct {
@@ -112,25 +140,10 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	isPreciousMetal := upperSymbol == "GC=F" || upperSymbol == "SI=F" || upperSymbol == "PL=F" || upperSymbol == "PA=F"
 
 	if currency != "" && currency != "CNY" {
-		fxSymbol := fmt.Sprintf("%sCNY=X", currency)
-		var fxResult YahooChartResponse
-		fxResp, err := client.R().
-			SetQueryParam("range", "1d").
-			SetQueryParam("interval", "1d").
-			SetResult(&fxResult).
-			Get(fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", fxSymbol))
+		pair := fmt.Sprintf("%sCNY", currency)
+		rate, err := FetchExchangeRate(pair)
 		if err != nil {
-			return nil, fmt.Errorf("fx conversion request failed for %s->CNY: %w", currency, err)
-		}
-		if fxResp.IsError() {
-			return nil, fmt.Errorf("fx conversion returned status %d for %s->CNY", fxResp.StatusCode(), currency)
-		}
-		if len(fxResult.Chart.Result) == 0 {
-			return nil, fmt.Errorf("no fx result for %s->CNY", currency)
-		}
-		rate := fxResult.Chart.Result[0].Meta.RegularMarketPrice
-		if rate <= 0 {
-			return nil, fmt.Errorf("invalid fx rate for %s->CNY: %f", currency, rate)
+			return nil, fmt.Errorf("fx conversion failed for %s->CNY: %w", currency, err)
 		}
 		price *= rate
 	}
@@ -152,6 +165,10 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 }
 
 func FetchExchangeRate(pair string) (float64, error) {
+	if rate, ok := getCachedRate(pair); ok {
+		return rate, nil
+	}
+
 	if client == nil {
 		return 0, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
 	}
@@ -178,5 +195,6 @@ func FetchExchangeRate(pair string) (float64, error) {
 		return 0, fmt.Errorf("zero exchange rate for %s", pair)
 	}
 
+	setCachedRate(pair, rate)
 	return rate, nil
 }
