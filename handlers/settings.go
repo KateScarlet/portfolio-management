@@ -88,9 +88,11 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		}
 
 		for key, value := range body {
-			if value == "" {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "value is required for key: " + key})
-				return
+			if key == "syncInterval" || key == "driftThreshold" {
+				if value == "" {
+					c.JSON(consts.StatusBadRequest, map[string]string{"error": "value is required for key: " + key})
+					return
+				}
 			}
 		}
 

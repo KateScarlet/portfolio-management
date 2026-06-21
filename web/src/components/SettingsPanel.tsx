@@ -27,6 +27,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
   const [draft, setDraft] = useState(settings)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
 
   const handleSave = () => {
     onSave(draft)
@@ -50,6 +51,28 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
       }
     } catch (e) {
       setTestResult({ success: false, message: "连接失败: " + (e instanceof Error ? e.message : "未知错误") })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleTestMessage = async (type: "price" | "drift" | "summary") => {
+    if (!draft.telegramBotToken || !draft.telegramChatID) {
+      setTestResult({ success: false, message: "请先填写 Bot Token 和 Chat ID" })
+      return
+    }
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await api.testTelegramMessage(draft.telegramBotToken, draft.telegramChatID, type)
+      if (result.success) {
+        const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
+        setTestResult({ success: true, message: `已发送${labels[type]}测试消息` })
+      } else {
+        setTestResult({ success: false, message: result.error || "发送失败" })
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "发送失败: " + (e instanceof Error ? e.message : "未知错误") })
     } finally {
       setTesting(false)
     }
@@ -219,25 +242,35 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                       />
                     </div>
 
-                    {/* Test Connection */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleTestConnection}
-                        disabled={testing}
-                        className="px-4 py-2 text-sm text-[#1A1A1A] border border-[#E9ECEF] rounded-lg hover:bg-[#F1F3F5] transition-colors disabled:opacity-50"
+                    {/* Test */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={testType}
+                        onChange={(e) => setTestType(e.target.value as typeof testType)}
+                        className="px-2 py-1.5 text-xs border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1A1A1A]"
                       >
-                        {testing ? "测试中..." : "测试连接"}
+                        <option value="connection">测试连接</option>
+                        <option value="price">价格波动告警</option>
+                        <option value="drift">配比偏离提醒</option>
+                        <option value="summary">组合摘要</option>
+                      </select>
+                      <button
+                        onClick={() => testType === "connection" ? handleTestConnection() : handleTestMessage(testType)}
+                        disabled={testing}
+                        className="px-3 py-1.5 text-xs text-[#1A1A1A] border border-[#E9ECEF] rounded-lg hover:bg-[#F1F3F5] transition-colors disabled:opacity-50"
+                      >
+                        {testing ? "发送中..." : "发送测试"}
                       </button>
-                      {testResult && (
-                        <span
-                          className={`text-xs ${
-                            testResult.success ? "text-green-600" : "text-red-500"
-                          }`}
-                        >
-                          {testResult.message}
-                        </span>
-                      )}
                     </div>
+                    {testResult && (
+                      <span
+                        className={`text-xs ${
+                          testResult.success ? "text-green-600" : "text-red-500"
+                        }`}
+                      >
+                        {testResult.message}
+                      </span>
+                    )}
 
                     {/* Notification Toggles */}
                     <div className="space-y-3 pt-2">

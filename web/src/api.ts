@@ -122,7 +122,21 @@ export async function testTelegramConnection(
     "/api/telegram/test",
     {
       method: "POST",
-      body: JSON.stringify({ botToken, chatID }),
+      body: JSON.stringify({ botToken, chatID, type: "connection" }),
+    }
+  )
+}
+
+export async function testTelegramMessage(
+  botToken: string,
+  chatID: string,
+  type: "price" | "drift" | "summary"
+): Promise<{ success: boolean; error?: string }> {
+  return request<{ success: boolean; error?: string }>(
+    "/api/telegram/test",
+    {
+      method: "POST",
+      body: JSON.stringify({ botToken, chatID, type }),
     }
   )
 }

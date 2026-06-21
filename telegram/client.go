@@ -34,6 +34,10 @@ func NewClientFromSettings(token, chatID string) (*Client, error) {
 	return NewClient(token, chatID)
 }
 
+func (c *Client) BotName() string {
+	return c.bot.Self.UserName
+}
+
 func (c *Client) SendMessage(text string) error {
 	msg := tgbotapi.NewMessage(c.chatID, text)
 	msg.ParseMode = tgbotapi.ModeHTML

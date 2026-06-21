@@ -12,6 +12,13 @@ import (
 	"gonum.org/v1/plot/vg"
 )
 
+var assetColors = []color.Color{
+	color.RGBA{R: 26, G: 26, B: 26, A: 255},    // 股票 - 黑色
+	color.RGBA{R: 134, G: 142, B: 150, A: 255}, // 债券 - 灰色
+	color.RGBA{R: 180, G: 190, B: 200, A: 255}, // 现金 - 浅灰
+	color.RGBA{R: 212, G: 175, B: 55, A: 255},  // 商品 - 金色
+}
+
 type AssetData struct {
 	Name  string
 	Value float64
@@ -25,30 +32,42 @@ type HistoryPoint struct {
 func RenderAllocationBar(assets []AssetData) ([]byte, error) {
 	p := plot.New()
 	p.Title.Text = "资产配比"
-	p.Title.Padding = vg.Points(8)
+	p.Title.Padding = vg.Points(12)
+	p.X.Padding = vg.Points(20)
+	p.Y.Padding = vg.Points(10)
 	p.Y.Min = 0
 
-	values := make(plotter.Values, len(assets))
+	total := 0.0
+	for _, a := range assets {
+		total += a.Value
+	}
+	if total == 0 {
+		return nil, fmt.Errorf("total value is zero")
+	}
+
 	for i, a := range assets {
-		values[i] = a.Value
+		if a.Value == 0 {
+			continue
+		}
+		vals := plotter.Values{a.Value}
+		bar, err := plotter.NewBarChart(vals, vg.Points(60))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create bar: %w", err)
+		}
+		bar.Color = assetColors[i%len(assetColors)]
+		bar.LineStyle.Width = vg.Length(0)
+		bar.XMin = float64(i)
+		p.Add(bar)
 	}
-
-	bar, err := plotter.NewBarChart(values, vg.Points(50))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create bar chart: %w", err)
-	}
-	bar.Color = color.RGBA{R: 26, G: 26, B: 26, A: 255}
-	bar.LineStyle.Width = vg.Length(0)
-
-	p.Add(bar)
 
 	names := make([]string, len(assets))
 	for i, a := range assets {
-		names[i] = a.Name
+		pct := a.Value / total * 100
+		names[i] = fmt.Sprintf("%s %.0f%%", a.Name, pct)
 	}
 	p.NominalX(names...)
 
-	w, h := 5*vg.Inch, 3*vg.Inch
+	w, h := 5*vg.Inch, 3.2*vg.Inch
 	wt, err := p.WriterTo(w, h, "png")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
@@ -69,7 +88,9 @@ func RenderValueLine(points []HistoryPoint) ([]byte, error) {
 
 	p := plot.New()
 	p.Title.Text = "组合净值走势"
-	p.Title.Padding = vg.Points(8)
+	p.Title.Padding = vg.Points(12)
+	p.X.Padding = vg.Points(10)
+	p.Y.Padding = vg.Points(10)
 	p.X.Tick.Marker = plot.TimeTicks{Format: "01-02"}
 
 	pts := make(plotter.XYs, len(points))
@@ -83,7 +104,7 @@ func RenderValueLine(points []HistoryPoint) ([]byte, error) {
 		return nil, fmt.Errorf("failed to add line: %w", err)
 	}
 
-	w, h := 5*vg.Inch, 2.5*vg.Inch
+	w, h := 5*vg.Inch, 2.8*vg.Inch
 	wt, err := p.WriterTo(w, h, "png")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create writer: %w", err)
