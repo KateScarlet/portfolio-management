@@ -144,8 +144,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			// Handle deduct from cash in the same transaction
+			// Use newLot.Cost which holds the original cost (before fee was added to input.Cost)
 			if input.DeductFromCash {
-				addedCost := input.Cost + input.Fee
+				addedCost := newLot.Cost + input.Fee
 				if addedCost > 0 {
 					var cashHolding models.Holding
 					if err := tx.Where("asset_id = ?", "cash").First(&cashHolding).Error; err != nil {
