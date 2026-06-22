@@ -133,6 +133,18 @@ func (s *PriceScheduler) syncAllUsers() {
 	}
 }
 
+// syncResult holds the outcome of a single price fetch.
+type syncResult struct {
+	holding *models.Holding
+	result  *yahoo.PriceResult
+	err     error
+}
+
+const (
+	maxConcurrentFetch = 5
+	fetchRateLimit     = 50 * time.Millisecond // min interval between API calls
+)
+
 func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	defer func() {
 		state.mu.Lock()
@@ -164,32 +176,51 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	failed := 0
 	syncedPrices := make(map[string]float64)
 
-	for i := range holdings {
-		if i > 0 {
-			time.Sleep(200 * time.Millisecond)
-		}
+	// Concurrent price fetching with rate limiting.
+	sem := make(chan struct{}, maxConcurrentFetch)
+	results := make(chan syncResult, len(holdings))
+	rateLimiter := time.NewTicker(fetchRateLimit)
+	defer rateLimiter.Stop()
 
-		h := &holdings[i]
-		result, err := yahoo.FetchQuote(h.Symbol)
-		if err != nil {
-			slog.Error("failed to fetch price", "userId", userID, "name", h.Name, "symbol", h.Symbol, "error", err)
+	var wg sync.WaitGroup
+	for i := range holdings {
+		wg.Add(1)
+		go func(h *models.Holding) {
+			defer wg.Done()
+			sem <- struct{}{}        // acquire slot
+			<-rateLimiter.C          // wait for rate limit
+			result, err := yahoo.FetchQuote(h.Symbol)
+			<-sem                    // release slot
+			results <- syncResult{holding: h, result: result, err: err}
+		}(&holdings[i])
+	}
+
+	// Close results channel once all goroutines finish.
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for r := range results {
+		if r.err != nil {
+			slog.Error("failed to fetch price", "userId", userID, "name", r.holding.Name, "symbol", r.holding.Symbol, "error", r.err)
 			failed++
 			continue
 		}
 
 		updates := map[string]any{
-			"price": result.Price,
-			"value": h.Shares * result.Price,
+			"price": r.result.Price,
+			"value": r.holding.Shares * r.result.Price,
 		}
-		if err := s.db.Model(&models.Holding{}).Where("id = ? AND user_id = ?", h.ID, userID).Updates(updates).Error; err != nil {
-			slog.Error("failed to update holding", "userId", userID, "id", h.ID, "error", err)
+		if err := s.db.Model(&models.Holding{}).Where("id = ? AND user_id = ?", r.holding.ID, userID).Updates(updates).Error; err != nil {
+			slog.Error("failed to update holding", "userId", userID, "id", r.holding.ID, "error", err)
 			failed++
 			continue
 		}
 
 		synced++
-		syncedPrices[h.Symbol] = result.Price
-		slog.Info("synced holding", "userId", userID, "name", h.Name, "symbol", h.Symbol, "price", result.Price)
+		syncedPrices[r.holding.Symbol] = r.result.Price
+		slog.Info("synced holding", "userId", userID, "name", r.holding.Name, "symbol", r.holding.Symbol, "price", r.result.Price)
 	}
 
 	state.mu.Lock()
@@ -204,10 +235,7 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	slog.Info("sync completed", "userId", userID, "synced", synced, "failed", failed)
 
 	if s.notifier != nil {
-		var updatedHoldings []models.Holding
-		if err := s.db.Where("user_id = ?", userID).Find(&updatedHoldings).Error; err == nil {
-			s.notifier.NotifyAfterSync(userID, updatedHoldings, syncedPrices)
-		}
+		s.notifier.NotifyAfterSync(userID, holdings, syncedPrices)
 	}
 }
 
