@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { usePortfolio } from "./usePortfolio"
 import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS, ColorScheme, Holding } from "./types"
 import * as api from "./api"
@@ -72,13 +72,21 @@ export default function App() {
     }
   }, [user])
 
+  const prevSyncingRef = useRef(false)
+
   useEffect(() => {
     if (!user) return
     const interval = setInterval(() => {
-      api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
+      api.fetchSyncStatus().then((status) => {
+        if (prevSyncingRef.current && !status.syncing) {
+          api.fetchHoldings().then(setHoldings).catch(console.error)
+        }
+        prevSyncingRef.current = status.syncing
+        setSyncStatus(status)
+      }).catch(console.error)
     }, 30000)
     return () => clearInterval(interval)
-  }, [user])
+  }, [user, setHoldings])
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {

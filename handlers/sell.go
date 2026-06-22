@@ -89,13 +89,26 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			if holding.Value > 0 {
 				costReduction = (holding.Cost / holding.Value) * input.Value
 			}
-		default:
-			tx.Rollback()
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
-			return
-		}
+	default:
+		tx.Rollback()
+		c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
+		return
+	}
 
-		// Create sell lot
+	// Validate fee doesn't exceed gross proceeds
+	var grossProceeds float64
+	if input.Shares > 0 {
+		grossProceeds = input.Shares * input.Price
+	} else {
+		grossProceeds = input.Value
+	}
+	if input.Fee > 0 && input.Fee >= grossProceeds {
+		tx.Rollback()
+		c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot exceed sell proceeds"})
+		return
+	}
+
+	// Create sell lot
 		// ValueAdded = value removed from the holding (NOT the proceeds)
 		// For share-based: shares * sellPrice (market value removed at actual sell price)
 		// For value-based: input.Value (value removed)
