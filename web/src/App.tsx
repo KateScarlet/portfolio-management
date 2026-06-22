@@ -216,7 +216,7 @@ export default function App() {
                 : `上次同步: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`}
             </button>
           )}
-          <SettingsPanel settings={settings} onSave={handleSaveSettings} />
+          <SettingsPanel settings={settings} onSave={handleSaveSettings} userRole={user.role} />
           {user.role === "admin" && <UserManager />}
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#6C757D]">{user.username}</span>

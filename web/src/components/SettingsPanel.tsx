@@ -6,6 +6,7 @@ import * as api from "../api"
 interface SettingsPanelProps {
   settings: Settings
   onSave: (settings: Settings) => void
+  userRole: "admin" | "user"
 }
 
 const SYNC_PRESETS = [
@@ -22,7 +23,7 @@ const SUMMARY_INTERVALS = [
   { value: "weekly", label: "每周" },
 ]
 
-export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
+export default function SettingsPanel({ settings, onSave, userRole }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [draft, setDraft] = useState(settings)
   const [testing, setTesting] = useState(false)
@@ -35,31 +36,35 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
   const handleOpen = () => {
     setDraft(settings)
     setIsOpen(true)
-    api.fetchOIDCConfig().then((config) => {
-      setOidcConfig(config)
-      setOidcDraft(config)
-    }).catch(() => {})
-    api.fetchWebAuthnConfig().then((config) => {
-      setWebauthnDraft({ enabled: config.enabled, rpid: config.rpid, rpOrigins: config.rpOrigins.join(", ") })
-    }).catch(() => {})
+    if (userRole === "admin") {
+      api.fetchOIDCConfig().then((config) => {
+        setOidcConfig(config)
+        setOidcDraft(config)
+      }).catch(() => {})
+      api.fetchWebAuthnConfig().then((config) => {
+        setWebauthnDraft({ enabled: config.enabled, rpid: config.rpid, rpOrigins: config.rpOrigins.join(", ") })
+      }).catch(() => {})
+    }
   }
 
   const handleSave = async () => {
     onSave(draft)
-    if (oidcConfig) {
-      try {
-        const result = await api.updateOIDCConfig(oidcDraft)
-        setOidcConfig(result)
-        setOidcDraft(result)
-      } catch (e) {
-        console.error("Failed to save OIDC config", e)
+    if (userRole === "admin") {
+      if (oidcConfig) {
+        try {
+          const result = await api.updateOIDCConfig(oidcDraft)
+          setOidcConfig(result)
+          setOidcDraft(result)
+        } catch (e) {
+          console.error("Failed to save OIDC config", e)
+        }
       }
-    }
-    try {
-      const origins = webauthnDraft.rpOrigins.split(",").map((s) => s.trim()).filter(Boolean)
-      await api.updateWebAuthnConfig({ enabled: webauthnDraft.enabled, rpid: webauthnDraft.rpid, rpOrigins: origins })
-    } catch (e) {
-      console.error("Failed to save WebAuthn config", e)
+      try {
+        const origins = webauthnDraft.rpOrigins.split(",").map((s) => s.trim()).filter(Boolean)
+        await api.updateWebAuthnConfig({ enabled: webauthnDraft.enabled, rpid: webauthnDraft.rpid, rpOrigins: origins })
+      } catch (e) {
+        console.error("Failed to save WebAuthn config", e)
+      }
     }
     setIsOpen(false)
     setTestResult(null)
@@ -423,6 +428,7 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
               </div>
 
               {/* OIDC / SSO */}
+              {userRole === "admin" && (
               <div className="border-t border-[#E9ECEF] pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -501,12 +507,15 @@ export default function SettingsPanel({ settings, onSave }: SettingsPanelProps) 
                   </div>
                 )}
               </div>
+              )}
 
               {/* Passkey 管理 */}
               <PasskeyManager />
 
               {/* WebAuthn 配置 */}
+              {userRole === "admin" && (
               <WebAuthnConfigSection draft={webauthnDraft} onChange={setWebauthnDraft} />
+              )}
             </div>
 
             {/* Fixed Footer */}
