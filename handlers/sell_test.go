@@ -104,7 +104,9 @@ func TestSell_FeeExceedsProceeds_ShareBased(t *testing.T) {
 		t.Errorf("expected 400, got %d", c.Response.StatusCode())
 	}
 	var resp map[string]string
-	json.Unmarshal(c.Response.Body(), &resp)
+	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "Fee cannot exceed sell proceeds" {
 		t.Errorf("unexpected error: %q", resp["error"])
 	}

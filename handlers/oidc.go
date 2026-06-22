@@ -64,13 +64,13 @@ func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		state := string(c.Cookie("oidc_state"))
 		c.SetCookie("oidc_state", "", -1, "/", "", 0, false, true)
 
-		queryState := string(c.Query("state"))
+		queryState := c.Query("state")
 		if state == "" || state != queryState {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "state参数无效"})
 			return
 		}
 
-		code := string(c.Query("code"))
+		code := c.Query("code")
 		if code == "" {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "缺少授权码"})
 			return

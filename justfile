@@ -3,7 +3,7 @@ set shell := ["brush", "-c"]
 # 默认构建全部
 default: build
 
-go_binary := "server.exe"
+go_binary := "server"
 frontend_dir := "web"
 dist_dir := frontend_dir / "dist"
 
@@ -16,7 +16,7 @@ build-go:
 
 # 交叉编译 Windows 版本 (amd64)
 build-go-windows:
-    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o server.exe .
+    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o {{go_binary}}.exe .
 
 # 构建前端
 build-frontend:

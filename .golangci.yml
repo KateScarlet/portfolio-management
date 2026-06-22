@@ -6,15 +6,12 @@ run:
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
     - bodyclose
     - gocritic
-    - gofmt
-    - goimports
     - gosec
     - misspell
     - nilerr
@@ -39,3 +36,8 @@ linters:
         linters:
           - gosec
           - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

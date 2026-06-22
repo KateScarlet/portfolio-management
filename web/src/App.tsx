@@ -74,6 +74,7 @@ export default function App() {
 
   const prevSyncingRef = useRef(false)
   const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollSyncStatusRef = useRef<() => void>(() => {})
 
   const pollSyncStatus = useCallback(() => {
     api.fetchSyncStatus().then((status) => {
@@ -82,11 +83,14 @@ export default function App() {
       }
       prevSyncingRef.current = status.syncing
       setSyncStatus(status)
-      // Adjust polling interval: 2s while syncing, 30s when idle
       if (syncPollRef.current) clearInterval(syncPollRef.current)
-      syncPollRef.current = setInterval(pollSyncStatus, status.syncing ? 2000 : 30000)
+      syncPollRef.current = setInterval(pollSyncStatusRef.current, status.syncing ? 2000 : 30000)
     }).catch(console.error)
   }, [setHoldings])
+
+  useEffect(() => {
+    pollSyncStatusRef.current = pollSyncStatus
+  }, [pollSyncStatus])
 
   useEffect(() => {
     if (!user) return

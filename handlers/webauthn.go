@@ -96,7 +96,8 @@ func loadUserCredentials(db *gorm.DB, userID string) []webauthn.Credential {
 	var creds []models.WebAuthnCredential
 	db.Where("user_id = ?", userID).Find(&creds)
 	result := make([]webauthn.Credential, len(creds))
-	for i, c := range creds {
+	for i := range creds {
+		c := &creds[i]
 		result[i] = webauthn.Credential{
 			ID:        c.CredentialID,
 			PublicKey: c.PublicKey,
@@ -444,7 +445,8 @@ func WebAuthnListCredentials(db *gorm.DB) app.HandlerFunc {
 		db.Where("user_id = ?", claims.UserID).Find(&creds)
 
 		result := make([]map[string]any, len(creds))
-		for i, cred := range creds {
+		for i := range creds {
+			cred := &creds[i]
 			result[i] = map[string]any{
 				"id":         cred.ID,
 				"name":       cred.Name,

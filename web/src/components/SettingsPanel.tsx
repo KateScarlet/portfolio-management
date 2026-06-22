@@ -559,7 +559,19 @@ function PasskeyManager() {
   }
 
   useEffect(() => {
-    loadCredentials()
+    let cancelled = false
+    const load = async () => {
+      try {
+        const creds = await api.webAuthnListCredentials()
+        if (!cancelled) setCredentials(creds)
+      } catch (e) {
+        console.error("Failed to load credentials", e)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [])
 
   const handleRegister = async () => {

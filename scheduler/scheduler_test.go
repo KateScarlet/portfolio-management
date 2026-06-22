@@ -7,9 +7,7 @@ import (
 
 func TestSyncStatus(t *testing.T) {
 	status := SyncStatus{
-		LastSyncAt:  time.Now(),
-		LastSyncErr: "",
-		Syncing:     false,
+		LastSyncAt: time.Now(),
 	}
 	if status.Syncing {
 		t.Error("expected Syncing to be false")

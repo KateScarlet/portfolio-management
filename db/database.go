@@ -61,7 +61,9 @@ func LoadConfig() *Config {
 
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = generateJWTSecret()
-		SaveConfig(&cfg)
+		if err := SaveConfig(&cfg); err != nil {
+			panic("failed to save config: " + err.Error())
+		}
 	}
 
 	return &cfg
@@ -160,7 +162,7 @@ func IsSetupMode() bool {
 
 // SaveConfig writes the configuration to config file
 func SaveConfig(cfg *Config) error {
-	if err := os.MkdirAll(ConfigDir, 0755); err != nil {
+	if err := os.MkdirAll(ConfigDir, 0o750); err != nil {
 		return err
 	}
 
