@@ -14,6 +14,10 @@ build: build-frontend build-go
 build-go:
     go build -o {{go_binary}} .
 
+# 交叉编译 Windows 版本 (amd64)
+build-go-windows:
+    GOOS=windows GOARCH=amd64 go build -o server.exe .
+
 # 构建前端
 build-frontend:
     cd {{frontend_dir}} && pnpm build

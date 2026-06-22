@@ -263,6 +263,36 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 		}
 
+		// For manual holdings, when value is directly updated, sync the
+		// last buy lot's ValueAdded so that RecalcFromLots() produces
+		// a consistent result. This prevents the holding's value field
+		// and lot-derived value from diverging.
+		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
+			newVal, _ := newValue.(float64)
+			oldVal := holding.Value
+			if newVal != oldVal && len(holding.Lots) > 0 {
+				diff := newVal - oldVal
+				// Find the last buy lot to absorb the value difference
+				lastBuyIdx := -1
+				for i := len(holding.Lots) - 1; i >= 0; i-- {
+					if holding.Lots[i].Type != "sell" {
+						lastBuyIdx = i
+						break
+					}
+				}
+				if lastBuyIdx >= 0 {
+					holding.Lots[lastBuyIdx].ValueAdded += diff
+				}
+				holding.RecalcFromLots()
+				if err := db.Save(&holding).Error; err != nil {
+					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+					return
+				}
+				c.JSON(consts.StatusOK, holding)
+				return
+			}
+		}
+
 		if len(safeUpdates) == 0 {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no valid fields to update"})
 			return

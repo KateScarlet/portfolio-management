@@ -37,6 +37,7 @@ export default function HoldingsManager({
   const [tempEditValue, setTempEditValue] = useState("")
   const [editingLotId, setEditingLotId] = useState<string | null>(null)
   const [editingLotCost, setEditingLotCost] = useState("")
+  const [editingLotValue, setEditingLotValue] = useState("")
   const [editingLotFee, setEditingLotFee] = useState("")
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
@@ -410,19 +411,41 @@ export default function HoldingsManager({
                                           </div>
                                         </>
                                       )}
-                                      <div className="flex flex-col gap-0.5">
-                                        <span className="text-[9px] text-[#ADB5BD] uppercase">{h.symbol ? "成本 (CNY)" : "价值"}</span>
-                                        <input
-                                          type="number"
-                                          placeholder="0"
-                                          value={editingLotCost}
-                                          readOnly={!!h.symbol}
-                                          onChange={(e) => {
-                                            if (!h.symbol) setEditingLotCost(e.target.value)
-                                          }}
-                                          className={`w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs font-mono ${h.symbol ? "bg-gray-50 text-[#6C757D] cursor-not-allowed" : "focus:outline-none focus:border-[#1A1A1A]"}`}
-                                        />
-                                      </div>
+                                      {h.symbol ? (
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[9px] text-[#ADB5BD] uppercase">成本 (CNY)</span>
+                                          <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingLotCost}
+                                            readOnly
+                                            className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs font-mono bg-gray-50 text-[#6C757D] cursor-not-allowed"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <div className="flex flex-col gap-0.5">
+                                            <span className="text-[9px] text-[#ADB5BD] uppercase">成本</span>
+                                            <input
+                                              type="number"
+                                              placeholder="0"
+                                              value={editingLotCost}
+                                              onChange={(e) => setEditingLotCost(e.target.value)}
+                                              className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs font-mono focus:outline-none focus:border-[#1A1A1A]"
+                                            />
+                                          </div>
+                                          <div className="flex flex-col gap-0.5">
+                                            <span className="text-[9px] text-[#ADB5BD] uppercase">当前价值</span>
+                                            <input
+                                              type="number"
+                                              placeholder="0"
+                                              value={editingLotValue}
+                                              onChange={(e) => setEditingLotValue(e.target.value)}
+                                              className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs font-mono focus:outline-none focus:border-[#1A1A1A]"
+                                            />
+                                          </div>
+                                        </>
+                                      )}
                                       <div className="flex flex-col gap-0.5">
                                         <span className="text-[9px] text-[#ADB5BD] uppercase">手续费</span>
                                         <input
@@ -442,8 +465,9 @@ export default function HoldingsManager({
                                               const cost = parseFloat(editingLotCost) || 0
                                               saveEditLot(h, lot.id, { costPrice, shares, cost, fee: parseFloat(editingLotFee) || 0 })
                                             } else {
-                                              const valueAdded = parseFloat(editingLotCost) || 0
-                                              saveEditLot(h, lot.id, { valueAdded, cost: valueAdded, fee: parseFloat(editingLotFee) || 0 })
+                                              const cost = parseFloat(editingLotCost) || 0
+                                              const valueAdded = parseFloat(editingLotValue) || 0
+                                              saveEditLot(h, lot.id, { cost, valueAdded, fee: parseFloat(editingLotFee) || 0 })
                                             }
                                           }}
                                           className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90"
@@ -501,7 +525,8 @@ export default function HoldingsManager({
                                           <button
                                             onClick={() => {
                                               setEditingLotId(lot.id)
-                                              setEditingLotCost(h.symbol ? String(lot.cost ?? 0) : String(lot.valueAdded || lot.cost || 0))
+                                              setEditingLotCost(String(lot.cost ?? 0))
+                                              setEditingLotValue(String(lot.valueAdded ?? lot.cost ?? 0))
                                               setEditingLotFee(String(lot.fee || 0))
                                               setEditingLotShares(String(lot.shares))
                                               setEditingLotCostPrice(String(lot.costPrice || 0))
