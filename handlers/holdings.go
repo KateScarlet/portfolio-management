@@ -202,12 +202,13 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		// Whitelist of allowed fields to prevent mass assignment.
-		// Note: assetId is intentionally excluded — changing it would break
-		// portfolio composition integrity (e.g. reclassifying stocks as bonds).
+		// Only lots (source of truth) and non-derived fields are allowed.
+		// shares, costPrice, cost, value are derived from lots via RecalcFromLots
+		// and must not be set directly — doing so would break lot-based accounting.
+		// assetId is also excluded to preserve portfolio composition integrity.
 		allowedFields := map[string]bool{
-			"name": true, "symbol": true, "shares": true,
-			"price": true, "costPrice": true, "value": true,
-			"cost": true, "date": true, "lots": true,
+			"name": true, "symbol": true, "price": true,
+			"date": true, "lots": true, "value": true,
 		}
 		safeUpdates := make(map[string]any)
 		for k, v := range updates {
@@ -218,6 +219,13 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 
 		if _, ok := updates["assetId"]; ok {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId cannot be changed"})
+			return
+		}
+
+		// Block direct value updates for symbol-based holdings — their value
+		// is derived from shares × price and must only change via RecalcFromLots.
+		if _, ok := safeUpdates["value"]; ok && holding.Symbol != "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "cannot directly update value for symbol-based holding"})
 			return
 		}
 
@@ -232,7 +240,16 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					}
 					// Set lots and recalculate all derived fields
 					holding.Lots = lots
+
+					// Preserve the current price for symbol-based holdings.
+					// RecalcFromLots sets value = shares × price, but the user
+					// may have a different price from the last sync.
+					priceBefore := holding.Price
 					holding.RecalcFromLots()
+					if holding.Symbol != "" && priceBefore > 0 {
+						holding.Price = priceBefore
+						holding.Value = holding.Shares * holding.Price
+					}
 
 					// Save the full holding since lots is a JSON column
 					if err := db.Save(&holding).Error; err != nil {

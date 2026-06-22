@@ -236,13 +236,15 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 		"cash":   0,
 		"gold":   0,
 	}
-	var total, totalCost float64
+	var total, totalCost, totalBuyFees float64
 	for i := range holdings {
 		h := &holdings[i]
 		assets[h.AssetId] += h.Value
 		total += h.Value
 		totalCost += h.Cost
+		totalBuyFees += h.BuyFees()
 	}
+	principal := totalCost + totalBuyFees
 
 	assetNames := map[string]string{
 		"stocks": "股票",
@@ -255,10 +257,10 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 		fmt.Sprintf("📊 <b>投资组合摘要</b> — %s", now.Format("2006-01-02")),
 		"",
 		fmt.Sprintf("总资产: ¥%.0f", total),
-		fmt.Sprintf("总成本: ¥%.0f", totalCost),
+		fmt.Sprintf("累计投入: ¥%.0f", principal),
 	}
-	if totalCost > 0 {
-		pnl := (total - totalCost) / totalCost * 100
+	if principal > 0 {
+		pnl := (total - principal) / principal * 100
 		lines = append(lines, fmt.Sprintf("累计收益: %+.1f%%", pnl))
 	}
 	lines = append(lines, "")
