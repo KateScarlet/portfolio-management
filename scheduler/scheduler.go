@@ -179,20 +179,20 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	// Concurrent price fetching with rate limiting.
 	sem := make(chan struct{}, maxConcurrentFetch)
 	results := make(chan syncResult, len(holdings))
-	rateLimiter := time.NewTicker(fetchRateLimit)
-	defer rateLimiter.Stop()
 
 	var wg sync.WaitGroup
 	for i := range holdings {
 		wg.Add(1)
+		sem <- struct{}{} // acquire concurrency slot (blocks if max reached)
 		go func(h *models.Holding) {
-			defer wg.Done()
-			sem <- struct{}{}        // acquire slot
-			<-rateLimiter.C          // wait for rate limit
+			defer func() {
+				<-sem // release concurrency slot
+				wg.Done()
+			}()
 			result, err := yahoo.FetchQuote(h.Symbol)
-			<-sem                    // release slot
 			results <- syncResult{holding: h, result: result, err: err}
 		}(&holdings[i])
+		time.Sleep(fetchRateLimit) // rate limit between dispatches
 	}
 
 	// Close results channel once all goroutines finish.
