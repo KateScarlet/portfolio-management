@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
+	"embed"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"portfolio-management/db"
 	"portfolio-management/handlers"
 	"portfolio-management/middleware"
@@ -13,12 +13,13 @@ import (
 	"portfolio-management/yahoo"
 	"strings"
 
-	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
-	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/hertz-contrib/cors"
 )
+
+//go:embed web/dist/*
+var frontendFS embed.FS
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -108,31 +109,31 @@ func main() {
 	admin.POST("/users", handlers.Register(database))
 	admin.DELETE("/users/:id", handlers.DeleteUser(database))
 
-	distPath := filepath.Join(".", "web", "dist")
-	if _, err := os.Stat(distPath); err == nil {
-		fileServer := http.FileServer(http.Dir(distPath))
-		h.GET("/*filepath", adaptor.HertzHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			path := r.URL.Path
-			if path == "/" || path == "" {
-				http.ServeFile(w, r, filepath.Join(distPath, "index.html"))
-				return
-			}
-			fullPath := filepath.Join(distPath, path)
-			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-				if !strings.HasPrefix(path, "/api/") {
-					http.ServeFile(w, r, filepath.Join(distPath, "index.html"))
-					return
-				}
-				http.NotFound(w, r)
-				return
-			}
-			fileServer.ServeHTTP(w, r)
-		})))
-	} else {
-		h.GET("/*filepath", func(ctx context.Context, c *app.RequestContext) {
-			c.String(consts.StatusNotFound, "Frontend not built. Run 'cd web && npm run build' first.")
-		})
+	// Serve embedded frontend files
+	subFS, err := fs.Sub(frontendFS, "web/dist")
+	if err != nil {
+		slog.Error("failed to create sub filesystem", "error", err)
+		panic("Failed to create sub filesystem: " + err.Error())
 	}
+	fileServer := http.FileServer(http.FS(subFS))
+	h.GET("/*filepath", adaptor.HertzHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" || path == "" {
+			http.ServeFileFS(w, r, subFS, "index.html")
+			return
+		}
+		// Check if the requested file exists in the embedded FS
+		if _, err := fs.Stat(subFS, strings.TrimPrefix(path, "/")); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		// SPA fallback: serve index.html for non-API routes
+		if !strings.HasPrefix(path, "/api/") {
+			http.ServeFileFS(w, r, subFS, "index.html")
+			return
+		}
+		http.NotFound(w, r)
+	})))
 
 	h.Spin()
 }

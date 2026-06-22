@@ -21,6 +21,5 @@ FROM chainguard/wolfi-base AS runtime
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=backend /app/server .
-COPY --from=frontend /app/dist ./web/dist
 EXPOSE 3000
 ENTRYPOINT ["./server"]

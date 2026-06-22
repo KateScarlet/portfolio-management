@@ -8,15 +8,15 @@ frontend_dir := "web"
 dist_dir := frontend_dir / "dist"
 
 # 构建全部（前端 + Go）
-build: build-frontend build-go
+build: build-frontend build-go build-go-windows
 
 # 构建 Go 后端
 build-go:
-    go build -o {{go_binary}} .
+    go build -trimpath -ldflags="-s -w" -o {{go_binary}} .
 
 # 交叉编译 Windows 版本 (amd64)
 build-go-windows:
-    GOOS=windows GOARCH=amd64 go build -o server.exe .
+    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o server.exe .
 
 # 构建前端
 build-frontend:
