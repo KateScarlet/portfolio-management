@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useRef } from "react"
 import { ASSET_DEFINITIONS, Holding, HoldingLot, ColorScheme } from "../types"
 import { formatCurrency, formatPercent, getProfitColor } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import SellModal from "./SellModal"
 import ConfirmDialog from "./ConfirmDialog"
+import { useToast } from "./toast-context"
 
 interface HoldingsManagerProps {
   holdings: Holding[]
@@ -39,8 +40,26 @@ export default function HoldingsManager({
   const [editingLotFee, setEditingLotFee] = useState("")
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
+  const [editingLotCurrency, setEditingLotCurrency] = useState("CNY")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
+
+  const { showToast } = useToast()
+
+  const fxRateRef = useRef<Record<string, number>>({})
+
+  const computeCost = useCallback(
+    (costPriceStr: string, sharesStr: string, currency: string) => {
+      const p = parseFloat(costPriceStr) || 0
+      const s = parseFloat(sharesStr) || 0
+      if (currency === "CNY") {
+        return String(p * s)
+      }
+      const rate = fxRateRef.current[currency] || 0
+      return rate > 0 ? String(p * rate * s) : String(p * s)
+    },
+    []
+  )
 
   const syncAllPrices = useCallback(async () => {
     setSyncing(true)
@@ -323,61 +342,104 @@ export default function HoldingsManager({
                                   className={`flex justify-between items-center text-xs font-mono border-b border-[#E9ECEF] last:border-0 pb-2 last:pb-0 whitespace-nowrap ${isEditing ? "bg-white -mx-2 px-2 py-2 rounded-lg border border-[#DEE2E6] flex-wrap" : "text-[#495057]"} ${lot.type === "sell" ? "text-orange-600!" : ""}`}
                                 >
                                   {isEditing ? (
-                                    <div className="flex flex-wrap items-center gap-2 w-full">
-                                      <input
-                                        type="date"
-                                        value={new Date(lot.date).toISOString().split("T")[0]}
-                                        onChange={(e) => {
-                                          const dateVal = new Date(e.target.value).getTime() || lot.date
-                                          saveEditLot(h, lot.id, { date: dateVal })
-                                        }}
-                                        className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
-                                      />
+                                    <div className="flex flex-wrap items-center gap-3 w-full">
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="text-[9px] text-[#ADB5BD] uppercase">日期</span>
+                                        <input
+                                          type="date"
+                                          value={new Date(lot.date).toISOString().split("T")[0]}
+                                          onChange={(e) => {
+                                            const dateVal = new Date(e.target.value).getTime() || lot.date
+                                            saveEditLot(h, lot.id, { date: dateVal })
+                                          }}
+                                          className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
+                                        />
+                                      </div>
                                       {h.symbol && (
                                         <>
-                                          <input
-                                            type="number"
-                                            placeholder="单价"
-                                            value={editingLotCostPrice}
-                                            onChange={(e) => setEditingLotCostPrice(e.target.value)}
-                                            onBlur={() => {
-                                              const costPrice = parseFloat(editingLotCostPrice) || 0
-                                              const shares = parseFloat(editingLotShares) || lot.shares
-                                              const cost = parseFloat(editingLotCost) || shares * costPrice
-                                              saveEditLot(h, lot.id, { costPrice, shares, cost })
-                                            }}
-                                            className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
-                                          />
-                                          <input
-                                            type="number"
-                                            placeholder="数量"
-                                            value={editingLotShares}
-                                            onChange={(e) => setEditingLotShares(e.target.value)}
-                                            className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
-                                          />
+                                          <div className="flex flex-col gap-0.5">
+                                            <span className="text-[9px] text-[#ADB5BD] uppercase">单价</span>
+                                            <div className="flex w-full">
+                                              <select
+                                                value={editingLotCurrency}
+                                                onChange={async (e) => {
+                                                  const newCurrency = e.target.value
+                                                  setEditingLotCurrency(newCurrency)
+                                                  if (newCurrency !== "CNY" && !fxRateRef.current[newCurrency]) {
+                                                    try {
+                                                      const fxData = await api.fetchExchangeRate(`${newCurrency}CNY`)
+                                                      if (fxData && fxData.rate) {
+                                                        fxRateRef.current[newCurrency] = fxData.rate
+                                                      }
+                                                    } catch {
+                                                      showToast("汇率获取失败", "info")
+                                                    }
+                                                  }
+                                                  setEditingLotCost(computeCost(editingLotCostPrice, editingLotShares, newCurrency))
+                                                }}
+                                                className="px-1 py-1 border border-r-0 border-[#E9ECEF] rounded-l text-[10px] bg-gray-50 focus:outline-none focus:border-[#1A1A1A]"
+                                              >
+                                                <option value="CNY">CNY</option>
+                                                <option value="USD">USD</option>
+                                                <option value="HKD">HKD</option>
+                                              </select>
+                                              <input
+                                                type="number"
+                                                placeholder="0"
+                                                value={editingLotCostPrice}
+                                                onChange={(e) => {
+                                                  setEditingLotCostPrice(e.target.value)
+                                                  setEditingLotCost(computeCost(e.target.value, editingLotShares, editingLotCurrency))
+                                                }}
+                                                className="w-20 px-2 py-1 border border-[#E9ECEF] rounded-r text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-col gap-0.5">
+                                            <span className="text-[9px] text-[#ADB5BD] uppercase">数量</span>
+                                            <input
+                                              type="number"
+                                              placeholder="0"
+                                              value={editingLotShares}
+                                              onChange={(e) => {
+                                                setEditingLotShares(e.target.value)
+                                                setEditingLotCost(computeCost(editingLotCostPrice, e.target.value, editingLotCurrency))
+                                              }}
+                                              className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                            />
+                                          </div>
                                         </>
                                       )}
-                                      <input
-                                        type="number"
-                                        placeholder={h.symbol ? "成本" : "价值"}
-                                        value={editingLotCost}
-                                        onChange={(e) => setEditingLotCost(e.target.value)}
-                                        className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
-                                      />
-                                      <input
-                                        type="number"
-                                        placeholder="手续费"
-                                        value={editingLotFee}
-                                        onChange={(e) => setEditingLotFee(e.target.value)}
-                                        className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
-                                      />
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="text-[9px] text-[#ADB5BD] uppercase">{h.symbol ? "成本 (CNY)" : "价值"}</span>
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={editingLotCost}
+                                          readOnly={!!h.symbol}
+                                          onChange={(e) => {
+                                            if (!h.symbol) setEditingLotCost(e.target.value)
+                                          }}
+                                          className={`w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs font-mono ${h.symbol ? "bg-gray-50 text-[#6C757D] cursor-not-allowed" : "focus:outline-none focus:border-[#1A1A1A]"}`}
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="text-[9px] text-[#ADB5BD] uppercase">手续费</span>
+                                        <input
+                                          type="number"
+                                          placeholder="0"
+                                          value={editingLotFee}
+                                          onChange={(e) => setEditingLotFee(e.target.value)}
+                                          className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                        />
+                                      </div>
                                       <div className="flex gap-1 ml-auto">
                                         <button
                                           onClick={() => {
                                             if (h.symbol) {
                                               const costPrice = parseFloat(editingLotCostPrice) || 0
                                               const shares = parseFloat(editingLotShares) || lot.shares
-                                              const cost = parseFloat(editingLotCost) || shares * costPrice
+                                              const cost = parseFloat(editingLotCost) || 0
                                               saveEditLot(h, lot.id, { costPrice, shares, cost, fee: parseFloat(editingLotFee) || 0 })
                                             } else {
                                               const valueAdded = parseFloat(editingLotCost) || 0
@@ -443,6 +505,7 @@ export default function HoldingsManager({
                                               setEditingLotFee(String(lot.fee || 0))
                                               setEditingLotShares(String(lot.shares))
                                               setEditingLotCostPrice(String(lot.costPrice || 0))
+                                              setEditingLotCurrency("CNY")
                                             }}
                                             className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
                                           >

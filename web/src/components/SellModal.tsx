@@ -29,27 +29,44 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
     if (holding.shares && holding.shares > 0 && holding.price) {
       const sShares = parseFloat(sellShares)
       const sPrice = parseFloat(sellPrice)
-      if (isNaN(sShares) || sShares <= 0 || sShares > holding.shares) return
-      if (isNaN(sPrice) || sPrice < 0) return
+      if (isNaN(sShares) || sShares <= 0) {
+        showToast("请输入有效的卖出份额", "error")
+        return
+      }
+      if (sShares > holding.shares) {
+        showToast(`卖出份额不能超过持有量 ${holding.shares}`, "error")
+        return
+      }
+      if (isNaN(sPrice) || sPrice < 0) {
+        showToast("请输入有效的卖出价格", "error")
+        return
+      }
 
       try {
         const result = await api.sellHolding(holding.id, sShares, sPrice, feeNum, 0)
         onConfirm(result.soldHolding)
       } catch (e) {
         console.error("Failed to sell holding", e)
-        showToast("卖出失败，请重试", "error")
+        showToast(e instanceof Error ? e.message : "卖出失败，请重试", "error")
         return
       }
     } else {
       const sValue = parseFloat(sellPrice)
-      if (isNaN(sValue) || sValue <= 0 || sValue > holding.value) return
+      if (isNaN(sValue) || sValue <= 0) {
+        showToast("请输入有效的卖出金额", "error")
+        return
+      }
+      if (sValue > holding.value) {
+        showToast(`卖出金额不能超过持有值 ${formatCurrency(holding.value)}`, "error")
+        return
+      }
 
       try {
         const result = await api.sellHolding(holding.id, 0, 0, feeNum, sValue)
         onConfirm(result.soldHolding)
       } catch (e) {
         console.error("Failed to sell holding", e)
-        showToast("卖出失败，请重试", "error")
+        showToast(e instanceof Error ? e.message : "卖出失败，请重试", "error")
         return
       }
     }

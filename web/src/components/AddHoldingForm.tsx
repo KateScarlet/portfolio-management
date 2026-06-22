@@ -37,13 +37,19 @@ export default function AddHoldingForm({
 
     if (isManual) {
       const val = parseFloat(value)
-      if (isNaN(val) || val <= 0) return
+      if (isNaN(val) || val <= 0) {
+        showToast("请输入有效的当前总市值", "error")
+        return
+      }
 
       let addedCost: number
       if (manualInputMode === "priceShares") {
         const p = parseFloat(manualPrice)
         const s = parseFloat(manualShares)
-        if (isNaN(p) || p <= 0 || isNaN(s) || s <= 0) return
+        if (isNaN(p) || p <= 0 || isNaN(s) || s <= 0) {
+          showToast("请输入有效的单价和份额", "error")
+          return
+        }
         addedCost = p * s
       } else {
         const c = parseFloat(cost)
@@ -69,7 +75,14 @@ export default function AddHoldingForm({
     } else {
       const sharesNum = parseFloat(shares)
       const cPrice = parseFloat(costPrice)
-      if (isNaN(sharesNum) || sharesNum <= 0 || !symbol) return
+      if (!symbol) {
+        showToast("请输入股票/基金代码", "error")
+        return
+      }
+      if (isNaN(sharesNum) || sharesNum <= 0) {
+        showToast("请输入有效的份额", "error")
+        return
+      }
 
       setIsFetching(true)
       try {
