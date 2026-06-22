@@ -77,7 +77,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 	return id
 }
 
-func newCtx(id string, body interface{}) *app.RequestContext {
+func newCtx(id string, body any) *app.RequestContext {
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "id", Value: id}}
 	c.Request.SetRequestURI("/api/holdings/" + id + "/sell")

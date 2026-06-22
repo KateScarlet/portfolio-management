@@ -359,9 +359,9 @@ func TestFullFlow_AuthFailsThenAdminNeverRuns(t *testing.T) {
 
 func TestAuthRequired_MalformedBearerFormat(t *testing.T) {
 	tests := []struct {
-		name  string
-		auth  string
-		code  int
+		name string
+		auth string
+		code int
 	}{
 		{"lowercase bearer", "bearer token123", http.StatusUnauthorized},
 		{"no space", "Bearertoken123", http.StatusUnauthorized},

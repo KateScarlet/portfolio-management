@@ -568,7 +568,7 @@ function PasskeyManager() {
     try {
       const options = await api.webAuthnRegisterStart(newName)
       const { startRegistration } = await import("@simplewebauthn/browser")
-      const credential = await startRegistration(options)
+      const credential = await startRegistration({ optionsJSON: options })
       await api.webAuthnRegisterFinish(credential)
       setNewName("")
       loadCredentials()

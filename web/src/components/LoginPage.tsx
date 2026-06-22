@@ -49,7 +49,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setError("")
     try {
       const options = await api.webAuthnLoginStart()
-      const credential = await startAuthentication(options)
+      const credential = await startAuthentication({ optionsJSON: options })
       await api.webAuthnLoginFinish(credential)
       onLogin()
     } catch (e) {

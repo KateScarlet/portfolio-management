@@ -1,3 +1,9 @@
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/browser"
 import { Holding, PortfolioRecord, SyncStatus, UserInfo } from "./types"
 
 const BASE = ""
@@ -242,25 +248,25 @@ export interface WebAuthnCredentialInfo {
   lastUsedAt: number
 }
 
-export async function webAuthnRegisterStart(name: string): Promise<any> {
+export async function webAuthnRegisterStart(name: string): Promise<PublicKeyCredentialCreationOptionsJSON> {
   return request("/api/webauthn/register/start", {
     method: "POST",
     body: JSON.stringify({ name }),
   })
 }
 
-export async function webAuthnRegisterFinish(data: any): Promise<{ success: string }> {
+export async function webAuthnRegisterFinish(data: RegistrationResponseJSON): Promise<{ success: string }> {
   return request("/api/webauthn/register/finish", {
     method: "POST",
     body: JSON.stringify(data),
   })
 }
 
-export async function webAuthnLoginStart(): Promise<any> {
+export async function webAuthnLoginStart(): Promise<PublicKeyCredentialRequestOptionsJSON> {
   return request("/api/webauthn/login/start", { method: "POST" })
 }
 
-export async function webAuthnLoginFinish(data: any): Promise<{ user: UserInfo }> {
+export async function webAuthnLoginFinish(data: AuthenticationResponseJSON): Promise<{ user: UserInfo }> {
   return request<{ user: UserInfo }>("/api/webauthn/login/finish", {
     method: "POST",
     body: JSON.stringify(data),

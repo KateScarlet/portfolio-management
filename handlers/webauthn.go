@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log/slog"
+	"math"
 	"portfolio-management/db"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -24,7 +25,7 @@ type webauthnRegisterSession struct {
 	CredName    string
 }
 
-func saveSession(database *gorm.DB, id string, data interface{}) {
+func saveSession(database *gorm.DB, id string, data any) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		slog.Error("failed to marshal webauthn session", "error", err)
@@ -40,7 +41,7 @@ func saveSession(database *gorm.DB, id string, data interface{}) {
 	slog.Info("session saved", "id", id, "rows_affected", result.RowsAffected, "error", result.Error)
 }
 
-func loadSession(database *gorm.DB, id string) interface{} {
+func loadSession(database *gorm.DB, id string) any {
 	var session models.WebAuthnSession
 	if err := database.Where("id = ?", id).First(&session).Error; err != nil {
 		slog.Warn("session not found in db", "id", id, "error", err)
@@ -86,7 +87,7 @@ type webauthnUser struct {
 	credentials []webauthn.Credential
 }
 
-func (u *webauthnUser) WebAuthnID() []byte                        { return u.id }
+func (u *webauthnUser) WebAuthnID() []byte                         { return u.id }
 func (u *webauthnUser) WebAuthnName() string                       { return u.name }
 func (u *webauthnUser) WebAuthnDisplayName() string                { return u.displayName }
 func (u *webauthnUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
@@ -101,7 +102,7 @@ func loadUserCredentials(db *gorm.DB, userID string) []webauthn.Credential {
 			PublicKey: c.PublicKey,
 			Flags:     webauthn.CredentialFlagsFromMsgpByte(c.Flags),
 			Authenticator: webauthn.Authenticator{
-				SignCount: uint32(c.SignCount),
+				SignCount: uint32(min(c.SignCount, math.MaxUint32)),
 			},
 		}
 	}
@@ -401,7 +402,7 @@ func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 		var cred models.WebAuthnCredential
 		if err := db.Where("credential_id = ?", credential.ID).First(&cred).Error; err == nil {
-			db.Model(&cred).Updates(map[string]interface{}{
+			db.Model(&cred).Updates(map[string]any{
 				"sign_count":   credential.Authenticator.SignCount,
 				"last_used_at": time.Now().Unix(),
 			})
