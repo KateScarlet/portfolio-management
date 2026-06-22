@@ -69,10 +69,12 @@ export default function HoldingsManager({
     try {
       const status = await api.triggerSync()
       onSyncComplete(status)
+      const freshHoldings = await api.fetchHoldings()
+      setHoldings(freshHoldings)
     } finally {
       setSyncing(false)
     }
-  }, [onSyncComplete])
+  }, [onSyncComplete, setHoldings])
 
   const saveEditLot = useCallback(
     (h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
