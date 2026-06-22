@@ -2,6 +2,7 @@ package yahoo
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ var (
 	szTagRe  = regexp.MustCompile(`^SZ\d{6}$`)
 
 	rateCache   sync.Map
+	quoteCache  sync.Map
 	cacheExpiry = 5 * time.Minute
 )
 
@@ -29,6 +31,11 @@ func Init() {
 
 type cachedRate struct {
 	rate      float64
+	fetchedAt time.Time
+}
+
+type cachedQuote struct {
+	result    *PriceResult
 	fetchedAt time.Time
 }
 
@@ -47,8 +54,24 @@ func setCachedRate(pair string, rate float64) {
 	rateCache.Store(pair, &cachedRate{rate: rate, fetchedAt: time.Now()})
 }
 
+func getCachedQuote(symbol string) (*PriceResult, bool) {
+	if v, ok := quoteCache.Load(symbol); ok {
+		c := v.(*cachedQuote)
+		if time.Since(c.fetchedAt) < cacheExpiry {
+			return c.result, true
+		}
+		quoteCache.Delete(symbol)
+	}
+	return nil, false
+}
+
+func setCachedQuote(symbol string, result *PriceResult) {
+	quoteCache.Store(symbol, &cachedQuote{result: result, fetchedAt: time.Now()})
+}
+
 func ClearRateCache() {
 	rateCache = sync.Map{}
+	quoteCache = sync.Map{}
 }
 
 type YahooChartResponse struct {
@@ -109,6 +132,11 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	}
 	querySymbol := ConvertSymbol(symbol)
 
+	if cached, ok := getCachedQuote(querySymbol); ok {
+		slog.Info("price fetched from cache", "symbol", symbol, "querySymbol", querySymbol)
+		return cached, nil
+	}
+
 	var result YahooChartResponse
 	resp, err := client.R().
 		SetQueryParam("range", "1d").
@@ -160,7 +188,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		unit = "克"
 	}
 
-	return &PriceResult{
+	priceResult := &PriceResult{
 		Symbol:           meta.Symbol,
 		Name:             name,
 		Price:            price,
@@ -168,11 +196,15 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		Currency:         "CNY",
 		OriginalCurrency: currency,
 		Unit:             unit,
-	}, nil
+	}
+	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
+	setCachedQuote(querySymbol, priceResult)
+	return priceResult, nil
 }
 
 func FetchExchangeRate(pair string) (float64, error) {
 	if rate, ok := getCachedRate(pair); ok {
+		slog.Info("exchange rate fetched from cache", "pair", pair)
 		return rate, nil
 	}
 
@@ -202,6 +234,7 @@ func FetchExchangeRate(pair string) (float64, error) {
 		return 0, fmt.Errorf("zero exchange rate for %s", pair)
 	}
 
+	slog.Info("exchange rate fetched from API", "pair", pair)
 	setCachedRate(pair, rate)
 	return rate, nil
 }
