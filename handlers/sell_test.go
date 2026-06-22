@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/libtnb/sqlite"
 	"gorm.io/gorm"
 )
+
+const testUserID = "test-user-id"
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -55,6 +58,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 	}
 	h := models.Holding{
 		ID:      id,
+		UserID:  testUserID,
 		AssetId: "stocks",
 		Symbol:  "TEST",
 		Name:    "Test Stock",
@@ -81,6 +85,11 @@ func newCtx(id string, body interface{}) *app.RequestContext {
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)
 	c.Request.SetBodyRaw(b)
+	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
+		UserID:   testUserID,
+		Username: "testuser",
+		Role:     "user",
+	})
 	return c
 }
 

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"portfolio-management/models"
 	"portfolio-management/yahoo"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,28 +19,29 @@ type SyncStatus struct {
 }
 
 type PriceScheduler struct {
-	db          *gorm.DB
+	db       *gorm.DB
+	ticker   *time.Ticker
+	stopCh   chan struct{}
+	mu       sync.RWMutex
+	users    map[string]*userSyncState
+	notifier *Notifier
+}
+
+type userSyncState struct {
 	interval    time.Duration
-	ticker      *time.Ticker
-	stopCh      chan struct{}
-	doneCh      chan struct{} // closed when the run goroutine exits
-	mu          sync.RWMutex
 	lastSyncAt  time.Time
 	lastSyncErr string
 	syncing     bool
-	notifier    *Notifier
+	mu          sync.Mutex
 }
 
-func New(db *gorm.DB, interval time.Duration) *PriceScheduler {
+func New(db *gorm.DB) *PriceScheduler {
 	s := &PriceScheduler{
-		db:       db,
-		interval: interval,
-		stopCh:   make(chan struct{}),
-		doneCh:   make(chan struct{}),
+		db:     db,
+		stopCh: make(chan struct{}),
+		users:  make(map[string]*userSyncState),
 	}
-	if interval > 0 {
-		s.Start()
-	}
+	s.Start()
 	return s
 }
 
@@ -49,15 +51,13 @@ func (s *PriceScheduler) Start() {
 		s.mu.Unlock()
 		return
 	}
-	slog.Info("scheduler starting price sync", "interval", s.interval)
-	s.ticker = time.NewTicker(s.interval)
+	slog.Info("scheduler starting")
+	s.ticker = time.NewTicker(1 * time.Minute)
 	stopCh := s.stopCh
 	ticker := s.ticker
-	s.doneCh = make(chan struct{})
-	doneCh := s.doneCh
 	s.mu.Unlock()
 
-	go s.run(ticker, stopCh, doneCh)
+	go s.run(ticker, stopCh)
 }
 
 func (s *PriceScheduler) Stop() {
@@ -72,115 +72,91 @@ func (s *PriceScheduler) Stop() {
 		close(s.stopCh)
 	}
 	s.stopCh = make(chan struct{})
-	oldDoneCh := s.doneCh
-	s.doneCh = make(chan struct{})
 	s.mu.Unlock()
-
-	if oldDoneCh != nil {
-		<-oldDoneCh
-	}
 	slog.Info("scheduler stopped")
 }
 
-func (s *PriceScheduler) UpdateInterval(interval time.Duration) {
-	s.mu.Lock()
-	s.interval = interval
-	if interval <= 0 {
-		s.mu.Unlock()
-		s.Stop()
-		slog.Info("scheduler disabled", "interval", 0)
-		return
-	}
-
-	var oldDoneCh chan struct{}
-	if s.ticker != nil {
-		s.ticker.Stop()
-		if s.stopCh != nil {
-			close(s.stopCh)
-		}
-		oldDoneCh = s.doneCh
-	}
-	s.ticker = time.NewTicker(interval)
-	s.stopCh = make(chan struct{})
-	s.doneCh = make(chan struct{})
-	ticker := s.ticker
-	stopCh := s.stopCh
-	doneCh := s.doneCh
-	s.mu.Unlock()
-
-	if oldDoneCh != nil {
-		<-oldDoneCh
-	}
-
-	go s.run(ticker, stopCh, doneCh)
-	slog.Info("scheduler interval updated", "interval", interval)
-}
-
-func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}, doneCh chan struct{}) {
-	defer close(doneCh)
+func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			s.SyncNow()
+			s.syncAllUsers()
 		case <-stopCh:
 			return
 		}
 	}
 }
 
-// TryStartSync atomically attempts to start a sync.
-// Returns true if sync was started, false if already syncing.
-func (s *PriceScheduler) TryStartSync() bool {
-	s.mu.Lock()
-	if s.syncing {
-		s.mu.Unlock()
-		return false
-	}
-	s.syncing = true
-	s.mu.Unlock()
-
-	go s.doSync()
-	return true
-}
-
-func (s *PriceScheduler) SyncNow() {
-	s.mu.Lock()
-	if s.syncing {
-		s.mu.Unlock()
-		slog.Info("sync already in progress, skipping")
+func (s *PriceScheduler) syncAllUsers() {
+	var userIDs []string
+	if err := s.db.Model(&models.Holding{}).Distinct("user_id").Pluck("user_id", &userIDs).Error; err != nil {
+		slog.Error("failed to query user IDs", "error", err)
 		return
 	}
-	s.syncing = true
-	s.mu.Unlock()
 
-	s.doSync()
+	for _, userID := range userIDs {
+		var setting models.Setting
+		if err := s.db.Where("`key` = ? AND user_id = ?", "syncInterval", userID).First(&setting).Error; err != nil {
+			continue
+		}
+
+		interval, err := strconv.Atoi(setting.Value)
+		if err != nil || interval <= 0 {
+			continue
+		}
+
+		s.mu.RLock()
+		state, exists := s.users[userID]
+		s.mu.RUnlock()
+
+		if !exists {
+			s.mu.Lock()
+			state = &userSyncState{
+				interval: time.Duration(interval) * time.Minute,
+			}
+			s.users[userID] = state
+			s.mu.Unlock()
+		} else {
+			state.mu.Lock()
+			state.interval = time.Duration(interval) * time.Minute
+			state.mu.Unlock()
+		}
+
+		state.mu.Lock()
+		if time.Since(state.lastSyncAt) >= state.interval && !state.syncing {
+			state.syncing = true
+			state.mu.Unlock()
+			go s.syncUser(userID, state)
+		} else {
+			state.mu.Unlock()
+		}
+	}
 }
 
-// doSync performs the actual sync and resets the syncing flag when done.
-func (s *PriceScheduler) doSync() {
+func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	defer func() {
-		s.mu.Lock()
-		s.syncing = false
-		s.mu.Unlock()
+		state.mu.Lock()
+		state.syncing = false
+		state.mu.Unlock()
 	}()
 
-	slog.Info("starting price sync")
+	slog.Info("starting price sync", "userId", userID)
 
 	var holdings []models.Holding
-	if err := s.db.Where("symbol != ''").Find(&holdings).Error; err != nil {
-		s.mu.Lock()
-		s.lastSyncErr = err.Error()
-		s.mu.Unlock()
-		slog.Error("failed to query holdings", "error", err)
+	if err := s.db.Where("user_id = ? AND symbol != ''", userID).Find(&holdings).Error; err != nil {
+		state.mu.Lock()
+		state.lastSyncErr = err.Error()
+		state.mu.Unlock()
+		slog.Error("failed to query holdings", "userId", userID, "error", err)
 		return
 	}
 
 	if len(holdings) == 0 {
-		slog.Info("no holdings with symbols to sync")
-		s.mu.Lock()
-		s.lastSyncAt = time.Now()
-		s.lastSyncErr = ""
-		s.mu.Unlock()
+		slog.Info("no holdings with symbols to sync", "userId", userID)
+		state.mu.Lock()
+		state.lastSyncAt = time.Now()
+		state.lastSyncErr = ""
+		state.mu.Unlock()
 		return
 	}
 
@@ -196,7 +172,7 @@ func (s *PriceScheduler) doSync() {
 		h := &holdings[i]
 		result, err := yahoo.FetchQuote(h.Symbol)
 		if err != nil {
-			slog.Error("failed to fetch price", "name", h.Name, "symbol", h.Symbol, "error", err)
+			slog.Error("failed to fetch price", "userId", userID, "name", h.Name, "symbol", h.Symbol, "error", err)
 			failed++
 			continue
 		}
@@ -205,49 +181,77 @@ func (s *PriceScheduler) doSync() {
 			"price": result.Price,
 			"value": h.Shares * result.Price,
 		}
-		if err := s.db.Model(&models.Holding{}).Where("id = ?", h.ID).Updates(updates).Error; err != nil {
-			slog.Error("failed to update holding", "id", h.ID, "error", err)
+		if err := s.db.Model(&models.Holding{}).Where("id = ? AND user_id = ?", h.ID, userID).Updates(updates).Error; err != nil {
+			slog.Error("failed to update holding", "userId", userID, "id", h.ID, "error", err)
 			failed++
 			continue
 		}
 
 		synced++
 		syncedPrices[h.Symbol] = result.Price
-		slog.Info("synced holding", "name", h.Name, "symbol", h.Symbol, "price", result.Price)
+		slog.Info("synced holding", "userId", userID, "name", h.Name, "symbol", h.Symbol, "price", result.Price)
 	}
 
-	s.mu.Lock()
-	s.lastSyncAt = time.Now()
+	state.mu.Lock()
+	state.lastSyncAt = time.Now()
 	if failed > 0 {
-		s.lastSyncErr = fmt.Sprintf("%d/%d failed", failed, synced+failed)
+		state.lastSyncErr = fmt.Sprintf("%d/%d failed", failed, synced+failed)
 	} else {
-		s.lastSyncErr = ""
+		state.lastSyncErr = ""
 	}
-	s.mu.Unlock()
+	state.mu.Unlock()
 
-	slog.Info("sync completed", "synced", synced, "failed", failed)
+	slog.Info("sync completed", "userId", userID, "synced", synced, "failed", failed)
 
-	// Send notifications after sync
 	if s.notifier != nil {
-		// Reload holdings with updated prices
 		var updatedHoldings []models.Holding
-		if err := s.db.Find(&updatedHoldings).Error; err == nil {
-			s.notifier.NotifyAfterSync(updatedHoldings, syncedPrices)
+		if err := s.db.Where("user_id = ?", userID).Find(&updatedHoldings).Error; err == nil {
+			s.notifier.NotifyAfterSync(userID, updatedHoldings, syncedPrices)
 		}
 	}
 }
 
-func (s *PriceScheduler) GetStatus() SyncStatus {
+func (s *PriceScheduler) GetStatusForUser(userID string) SyncStatus {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	status := SyncStatus{
-		LastSyncAt: s.lastSyncAt,
-		Syncing:    s.syncing,
+	state, exists := s.users[userID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return SyncStatus{}
 	}
-	if s.lastSyncErr != "" {
-		status.LastSyncErr = s.lastSyncErr
+
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	return SyncStatus{
+		LastSyncAt:  state.lastSyncAt,
+		LastSyncErr: state.lastSyncErr,
+		Syncing:     state.syncing,
 	}
-	return status
+}
+
+func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
+	s.mu.RLock()
+	state, exists := s.users[userID]
+	s.mu.RUnlock()
+
+	if !exists {
+		s.mu.Lock()
+		state = &userSyncState{}
+		s.users[userID] = state
+		s.mu.Unlock()
+	}
+
+	state.mu.Lock()
+	if state.syncing {
+		state.mu.Unlock()
+		return false
+	}
+	state.syncing = true
+	state.mu.Unlock()
+
+	go s.syncUser(userID, state)
+	return true
 }
 
 func (s *PriceScheduler) SetNotifier(n *Notifier) {

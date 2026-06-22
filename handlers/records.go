@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
 
@@ -13,8 +14,14 @@ import (
 
 func ListRecords(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var records []models.PortfolioRecord
-		if err := db.Order("timestamp DESC").Find(&records).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).Order("timestamp DESC").Find(&records).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -24,8 +31,14 @@ func ListRecords(db *gorm.DB) app.HandlerFunc {
 
 func CreateRecord(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var holdings []models.Holding
-		if err := db.Find(&holdings).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -48,6 +61,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 
 		record := models.PortfolioRecord{
 			ID:        uuid.New().String(),
+			UserID:    user.UserID,
 			Timestamp: time.Now().UnixMilli(),
 			Assets:    assets,
 			Total:     total,
@@ -65,8 +79,14 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 
 func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		id := c.Param("id")
-		result := db.Delete(&models.PortfolioRecord{}, "id = ?", id)
+		result := db.Where("user_id = ?", user.UserID).Delete(&models.PortfolioRecord{}, "id = ?", id)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return

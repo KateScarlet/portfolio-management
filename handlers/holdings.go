@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
 
@@ -16,8 +17,14 @@ import (
 
 func ListHoldings(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var holdings []models.Holding
-		if err := db.Order("asset_id").Find(&holdings).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).Order("asset_id").Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -32,6 +39,12 @@ type CreateHoldingInput struct {
 
 func CreateHolding(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var input CreateHoldingInput
 		if err := c.BindJSON(&input); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -85,9 +98,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
-				res = tx.Where("symbol = ? AND symbol != ''", input.Symbol).First(&existing)
+				res = tx.Where("user_id = ? AND symbol = ? AND symbol != ''", user.UserID, input.Symbol).First(&existing)
 			} else {
-				res = tx.Where("name = ? AND asset_id = ? AND symbol = ''", input.Name, input.AssetId).First(&existing)
+				res = tx.Where("user_id = ? AND name = ? AND asset_id = ? AND symbol = ''", user.UserID, input.Name, input.AssetId).First(&existing)
 			}
 
 			if res.Error == nil {
@@ -114,6 +127,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 				// No existing holding - create new
 				input.ID = uuid.New().String()
+				input.UserID = user.UserID
 				if input.Lots == nil {
 					input.Lots = models.JSONColumn{newLot}
 				} else {
@@ -134,7 +148,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					// Read current available funds
 					var fundsSetting models.Setting
 					fundsValue := 0.0
-					if err := tx.Where("`key` = ?", "availableFunds").First(&fundsSetting).Error; err == nil {
+					if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).First(&fundsSetting).Error; err == nil {
 						fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
 					}
 
@@ -144,8 +158,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 					newFundsValue := fundsValue - addedCost
 					fundsSetting.Key = "availableFunds"
+					fundsSetting.UserID = user.UserID
 					fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
-					if err := tx.Where("`key` = ?", "availableFunds").Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
+					if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
 						return err
 					}
 				}
@@ -167,9 +182,15 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		id := c.Param("id")
 		var holding models.Holding
-		if err := db.First(&holding, "id = ?", id).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).First(&holding, "id = ?", id).Error; err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
 			return
 		}
@@ -235,7 +256,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if err := db.First(&holding, "id = ?", id).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).First(&holding, "id = ?", id).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -245,8 +266,14 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 
 func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		id := c.Param("id")
-		result := db.Delete(&models.Holding{}, "id = ?", id)
+		result := db.Where("user_id = ?", user.UserID).Delete(&models.Holding{}, "id = ?", id)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return

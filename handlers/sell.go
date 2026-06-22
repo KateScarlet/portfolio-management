@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
 
@@ -21,6 +22,12 @@ type SellRequest struct {
 
 func SellHolding(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		id := c.Param("id")
 
 		var input SellRequest
@@ -52,7 +59,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var holding models.Holding
-		if err := tx.First(&holding, "id = ?", id).Error; err != nil {
+		if err := tx.Where("user_id = ?", user.UserID).First(&holding, "id = ?", id).Error; err != nil {
 			tx.Rollback()
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
 			return
@@ -89,26 +96,26 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			if holding.Value > 0 {
 				costReduction = (holding.Cost / holding.Value) * input.Value
 			}
-	default:
-		tx.Rollback()
-		c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
-		return
-	}
+		default:
+			tx.Rollback()
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
+			return
+		}
 
-	// Validate fee doesn't exceed gross proceeds
-	var grossProceeds float64
-	if input.Shares > 0 {
-		grossProceeds = input.Shares * input.Price
-	} else {
-		grossProceeds = input.Value
-	}
-	if input.Fee > 0 && input.Fee >= grossProceeds {
-		tx.Rollback()
-		c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot exceed sell proceeds"})
-		return
-	}
+		// Validate fee doesn't exceed gross proceeds
+		var grossProceeds float64
+		if input.Shares > 0 {
+			grossProceeds = input.Shares * input.Price
+		} else {
+			grossProceeds = input.Value
+		}
+		if input.Fee > 0 && input.Fee >= grossProceeds {
+			tx.Rollback()
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot exceed sell proceeds"})
+			return
+		}
 
-	// Create sell lot
+		// Create sell lot
 		// ValueAdded = value removed from the holding (NOT the proceeds)
 		// For share-based: shares * sellPrice (market value removed at actual sell price)
 		// For value-based: input.Value (value removed)
@@ -149,14 +156,15 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		if realizedValue > 0 {
 			var fundsSetting models.Setting
 			fundsValue := 0.0
-			if err := tx.Where("`key` = ?", "availableFunds").First(&fundsSetting).Error; err == nil {
+			if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).First(&fundsSetting).Error; err == nil {
 				fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
 			}
 
 			newFundsValue = fundsValue + realizedValue
 			fundsSetting.Key = "availableFunds"
+			fundsSetting.UserID = user.UserID
 			fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
-			if err := tx.Where("`key` = ?", "availableFunds").Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
+			if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return

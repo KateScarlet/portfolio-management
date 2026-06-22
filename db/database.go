@@ -17,8 +17,8 @@ const ConfigDir = "config"
 const ConfigFile = "config/config.yaml"
 
 type Config struct {
-	JWTSecret  string `mapstructure:"jwtSecret"`
-	Database   struct {
+	JWTSecret string `mapstructure:"jwtSecret"`
+	Database  struct {
 		Type string `mapstructure:"type"`
 		DSN  string `mapstructure:"dsn"`
 	} `mapstructure:"database"`
@@ -30,9 +30,9 @@ type Config struct {
 		RedirectURL  string `mapstructure:"redirectURL"`
 	} `mapstructure:"oidc"`
 	WebAuthn struct {
-		Enabled    bool     `mapstructure:"enabled"`
-		RPID       string   `mapstructure:"rpid"`
-		RPOrigins  []string `mapstructure:"rpOrigins"`
+		Enabled   bool     `mapstructure:"enabled"`
+		RPID      string   `mapstructure:"rpid"`
+		RPOrigins []string `mapstructure:"rpOrigins"`
 	} `mapstructure:"webauthn"`
 }
 
@@ -116,6 +116,12 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_name_asset ON holdings(user_id, name, asset_id) WHERE symbol = ''")
+	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
+	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
+	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
+
 	return db, nil
 }
 
@@ -136,6 +142,12 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
 		return nil, err
 	}
+
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_name_asset ON holdings(user_id, name, asset_id) WHERE symbol = ''")
+	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
+	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
+	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
 
 	return db, nil
 }

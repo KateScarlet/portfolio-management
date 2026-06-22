@@ -71,7 +71,8 @@ func (a AssetMapColumn) Value() (driver.Value, error) {
 
 type Holding struct {
 	ID        string     `gorm:"primaryKey" json:"id"`
-	AssetId   string     `gorm:"index;size:20;not null" json:"assetId"`
+	UserID    string     `gorm:"index;not null" json:"userId"`
+	AssetId   string     `gorm:"size:20;not null" json:"assetId"`
 	Symbol    string     `gorm:"size:20;default:''" json:"symbol"`
 	Name      string     `gorm:"size:200;default:''" json:"name,omitempty"`
 	Shares    float64    `gorm:"default:0" json:"shares"`
@@ -86,6 +87,7 @@ type Holding struct {
 
 type PortfolioRecord struct {
 	ID        string         `gorm:"primaryKey" json:"id"`
+	UserID    string         `gorm:"index;not null" json:"userId"`
 	Timestamp int64          `gorm:"index;not null" json:"timestamp"`
 	Assets    AssetMapColumn `gorm:"type:text;not null;default:'{}'" json:"assets"`
 	Total     float64        `gorm:"default:0" json:"total"`
@@ -93,8 +95,9 @@ type PortfolioRecord struct {
 }
 
 type Setting struct {
-	Key   string `gorm:"primaryKey" json:"key"`
-	Value string `gorm:"not null" json:"value"`
+	Key    string `gorm:"primaryKey;size:100" json:"key"`
+	Value  string `gorm:"not null" json:"value"`
+	UserID string `gorm:"primaryKey;size:50;default:''" json:"userId,omitempty"`
 }
 
 type User struct {

@@ -9,12 +9,9 @@ import (
 	"portfolio-management/db"
 	"portfolio-management/handlers"
 	"portfolio-management/middleware"
-	"portfolio-management/models"
 	"portfolio-management/scheduler"
 	"portfolio-management/yahoo"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -39,16 +36,7 @@ func main() {
 
 	yahoo.Init()
 
-	var syncInterval time.Duration = 60 * time.Minute
-	var setting models.Setting
-	if database.Find(&setting, "key = ?", "syncInterval").Error == nil {
-		if mins, err := strconv.Atoi(setting.Value); err == nil && mins > 0 {
-			syncInterval = time.Duration(mins) * time.Minute
-		} else if mins == 0 {
-			syncInterval = 0
-		}
-	}
-	priceScheduler := scheduler.New(database, syncInterval)
+	priceScheduler := scheduler.New(database)
 	notifier := scheduler.NewNotifier(database)
 	priceScheduler.SetNotifier(notifier)
 

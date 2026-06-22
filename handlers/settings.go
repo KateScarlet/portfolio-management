@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"context"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"portfolio-management/scheduler"
 	"strconv"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -14,8 +14,14 @@ import (
 
 func ListSettings(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var settings []models.Setting
-		if err := db.Find(&settings).Error; err != nil {
+		if err := db.Where("user_id = ?", user.UserID).Find(&settings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -29,6 +35,12 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 
 func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		key := c.Param("key")
 		var body struct {
 			Value string `json:"value"`
@@ -55,20 +67,11 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			}
 		}
 
-		setting := models.Setting{Key: key, Value: body.Value}
-		result := db.Where(models.Setting{Key: key}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
+		setting := models.Setting{Key: key, Value: body.Value, UserID: user.UserID}
+		result := db.Where(models.Setting{Key: key, UserID: user.UserID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return
-		}
-
-		if key == "syncInterval" && s != nil {
-			mins, _ := strconv.Atoi(body.Value)
-			if mins == 0 {
-				s.UpdateInterval(0)
-			} else {
-				s.UpdateInterval(time.Duration(mins) * time.Minute)
-			}
 		}
 
 		c.JSON(consts.StatusOK, map[string]string{"key": key, "value": body.Value})
@@ -77,8 +80,14 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 
 func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var setting models.Setting
-		if err := db.Where("`key` = ?", "availableFunds").First(&setting).Error; err != nil {
+		if err := db.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).First(&setting).Error; err != nil {
 			c.JSON(consts.StatusOK, map[string]string{"value": "0"})
 			return
 		}
@@ -88,6 +97,12 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 
 func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var body struct {
 			Value string `json:"value"`
 		}
@@ -96,8 +111,8 @@ func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		setting := models.Setting{Key: "availableFunds", Value: body.Value}
-		result := db.Where(models.Setting{Key: "availableFunds"}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
+		setting := models.Setting{Key: "availableFunds", Value: body.Value, UserID: user.UserID}
+		result := db.Where(models.Setting{Key: "availableFunds", UserID: user.UserID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return
@@ -109,6 +124,12 @@ func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 
 func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
 		var body map[string]string
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -143,8 +164,8 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 
 		err := db.Transaction(func(tx *gorm.DB) error {
 			for key, value := range body {
-				setting := models.Setting{Key: key, Value: value}
-				if err := tx.Where(models.Setting{Key: key}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
+				setting := models.Setting{Key: key, Value: value, UserID: user.UserID}
+				if err := tx.Where(models.Setting{Key: key, UserID: user.UserID}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
 					return err
 				}
 			}
@@ -153,17 +174,6 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
-		}
-
-		if s != nil {
-			if syncVal, ok := body["syncInterval"]; ok {
-				mins, _ := strconv.Atoi(syncVal)
-				if mins == 0 {
-					s.UpdateInterval(0)
-				} else {
-					s.UpdateInterval(time.Duration(mins) * time.Minute)
-				}
-			}
 		}
 
 		c.JSON(consts.StatusOK, body)

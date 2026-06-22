@@ -7,6 +7,7 @@ import (
 	"portfolio-management/models"
 	"portfolio-management/telegram"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -14,36 +15,31 @@ import (
 
 type Notifier struct {
 	db              *gorm.DB
-	prevPrices      map[string]float64
-	lastDriftAlert  time.Time
-	lastSummaryTime time.Time
-	telegramClient  *telegram.Client
-	telegramToken   string
-	telegramChatID  string
+	mu              sync.RWMutex
+	prevPrices      map[string]map[string]float64
+	lastDriftAlert  map[string]time.Time
+	lastSummaryTime map[string]time.Time
 }
 
 func NewNotifier(db *gorm.DB) *Notifier {
 	return &Notifier{
-		db:         db,
-		prevPrices: make(map[string]float64),
+		db:              db,
+		prevPrices:      make(map[string]map[string]float64),
+		lastDriftAlert:  make(map[string]time.Time),
+		lastSummaryTime: make(map[string]time.Time),
 	}
 }
 
-func (n *Notifier) LoadTelegramConfig() (*telegram.Client, error) {
+func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
 	var token, chatID string
 	var enabled string
 
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramBotToken").Select("value").Row().Scan(&token)
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramChatID").Select("value").Row().Scan(&chatID)
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramEnabled").Select("value").Row().Scan(&enabled)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramBotToken", userID).Select("value").Row().Scan(&token)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramChatID", userID).Select("value").Row().Scan(&chatID)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramEnabled", userID).Select("value").Row().Scan(&enabled)
 
 	if enabled != "true" || token == "" || chatID == "" {
-		n.telegramClient = nil
 		return nil, nil
-	}
-
-	if n.telegramClient != nil && n.telegramToken == token && n.telegramChatID == chatID {
-		return n.telegramClient, nil
 	}
 
 	client, err := telegram.NewClient(token, chatID)
@@ -51,44 +47,47 @@ func (n *Notifier) LoadTelegramConfig() (*telegram.Client, error) {
 		return nil, err
 	}
 
-	n.telegramClient = client
-	n.telegramToken = token
-	n.telegramChatID = chatID
 	return client, nil
 }
 
-func (n *Notifier) NotifyAfterSync(holdings []models.Holding, syncedSymbols map[string]float64) {
-	client, err := n.LoadTelegramConfig()
+func (n *Notifier) NotifyAfterSync(userID string, holdings []models.Holding, syncedSymbols map[string]float64) {
+	client, err := n.LoadTelegramConfig(userID)
 	if err != nil {
-		slog.Error("failed to load telegram config for notification", "error", err)
+		slog.Error("failed to load telegram config for notification", "userId", userID, "error", err)
 		return
 	}
 	if client == nil {
 		return
 	}
 
-	n.checkPriceAlert(client, holdings, syncedSymbols)
-	n.checkDriftAlert(client)
-	n.checkSummary(client, holdings)
+	n.checkPriceAlert(userID, client, holdings, syncedSymbols)
+	n.checkDriftAlert(userID, client)
+	n.checkSummary(userID, client, holdings)
 }
 
-func (n *Notifier) checkPriceAlert(client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
+func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
 	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramPriceAlert").Select("value").Row().Scan(&enabled)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramPriceAlert", userID).Select("value").Row().Scan(&enabled)
 	if enabled != "true" {
 		return
 	}
 
 	var thresholdStr string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramPriceThreshold").Select("value").Row().Scan(&thresholdStr)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramPriceThreshold", userID).Select("value").Row().Scan(&thresholdStr)
 	threshold := 5.0
 	if thresholdStr != "" {
 		_, _ = fmt.Sscanf(thresholdStr, "%f", &threshold)
 	}
 
+	n.mu.Lock()
+	if n.prevPrices[userID] == nil {
+		n.prevPrices[userID] = make(map[string]float64)
+	}
+	oldPrices := n.prevPrices[userID]
+
 	var alerts []string
 	for symbol, newPrice := range syncedPrices {
-		oldPrice, ok := n.prevPrices[symbol]
+		oldPrice, ok := oldPrices[symbol]
 		if !ok || oldPrice == 0 {
 			continue
 		}
@@ -113,35 +112,40 @@ func (n *Notifier) checkPriceAlert(client *telegram.Client, holdings []models.Ho
 		}
 	}
 
-	maps.Copy(n.prevPrices, syncedPrices)
+	maps.Copy(oldPrices, syncedPrices)
+	n.mu.Unlock()
 
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>价格波动提醒</b>\n\n" + strings.Join(alerts, "\n\n")
 		_ = client.SendMessage(msg)
-		slog.Info("sent price alert", "count", len(alerts))
+		slog.Info("sent price alert", "userId", userID, "count", len(alerts))
 	}
 }
 
-func (n *Notifier) checkDriftAlert(client *telegram.Client) {
+func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramDriftAlert").Select("value").Row().Scan(&enabled)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramDriftAlert", userID).Select("value").Row().Scan(&enabled)
 	if enabled != "true" {
 		return
 	}
 
-	if time.Since(n.lastDriftAlert) < 24*time.Hour {
+	n.mu.RLock()
+	lastAlert, exists := n.lastDriftAlert[userID]
+	n.mu.RUnlock()
+
+	if exists && time.Since(lastAlert) < 24*time.Hour {
 		return
 	}
 
 	var driftThresholdStr string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "driftThreshold").Select("value").Row().Scan(&driftThresholdStr)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "driftThreshold", userID).Select("value").Row().Scan(&driftThresholdStr)
 	driftThreshold := 5.0
 	if driftThresholdStr != "" {
 		_, _ = fmt.Sscanf(driftThresholdStr, "%f", &driftThreshold)
 	}
 
 	var holdings []models.Holding
-	if err := n.db.Find(&holdings).Error; err != nil {
+	if err := n.db.Where("user_id = ?", userID).Find(&holdings).Error; err != nil {
 		return
 	}
 
@@ -185,31 +189,37 @@ func (n *Notifier) checkDriftAlert(client *telegram.Client) {
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>配比偏离提醒</b>\n\n当前资产配置 vs 目标 25%:\n" + strings.Join(alerts, "\n")
 		_ = client.SendMessage(msg)
-		n.lastDriftAlert = time.Now()
-		slog.Info("sent drift alert", "count", len(alerts))
+		n.mu.Lock()
+		n.lastDriftAlert[userID] = time.Now()
+		n.mu.Unlock()
+		slog.Info("sent drift alert", "userId", userID, "count", len(alerts))
 	}
 }
 
-func (n *Notifier) checkSummary(client *telegram.Client, holdings []models.Holding) {
+func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings []models.Holding) {
 	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramSummary").Select("value").Row().Scan(&enabled)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramSummary", userID).Select("value").Row().Scan(&enabled)
 	if enabled != "true" {
 		return
 	}
 
 	var interval string
-	_ = n.db.Model(&models.Setting{}).Where("key = ?", "telegramSummaryInterval").Select("value").Row().Scan(&interval)
+	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramSummaryInterval", userID).Select("value").Row().Scan(&interval)
 
 	shouldSend := false
 	now := time.Now()
 
+	n.mu.RLock()
+	lastTime, exists := n.lastSummaryTime[userID]
+	n.mu.RUnlock()
+
 	switch interval {
 	case "daily":
-		if n.lastSummaryTime.IsZero() || now.Sub(n.lastSummaryTime) >= 24*time.Hour {
+		if !exists || now.Sub(lastTime) >= 24*time.Hour {
 			shouldSend = true
 		}
 	case "weekly":
-		if n.lastSummaryTime.IsZero() || now.Sub(n.lastSummaryTime) >= 7*24*time.Hour {
+		if !exists || now.Sub(lastTime) >= 7*24*time.Hour {
 			shouldSend = true
 		}
 	default:
@@ -263,6 +273,8 @@ func (n *Notifier) checkSummary(client *telegram.Client, holdings []models.Holdi
 
 	_ = client.SendMessage(strings.Join(lines, "\n"))
 
-	n.lastSummaryTime = now
-	slog.Info("sent portfolio summary")
+	n.mu.Lock()
+	n.lastSummaryTime[userID] = now
+	n.mu.Unlock()
+	slog.Info("sent portfolio summary", "userId", userID)
 }

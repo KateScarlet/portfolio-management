@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"portfolio-management/telegram"
 	"strings"
@@ -76,8 +77,13 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			}
 
 		case "summary":
+			user := middleware.GetUser(c)
+			if user == nil {
+				c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+				return
+			}
 			var holdings []models.Holding
-			_ = db.Find(&holdings).Error
+			_ = db.Where("user_id = ?", user.UserID).Find(&holdings).Error
 
 			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
 			var total, totalCost float64
