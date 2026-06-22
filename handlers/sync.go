@@ -29,10 +29,11 @@ func TriggerSync(s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		if !s.TriggerSyncForUser(user.UserID) {
-			c.JSON(consts.StatusConflict, map[string]string{"error": "sync already in progress"})
+		status, ok := s.TriggerSyncForUserSync(user.UserID)
+		if !ok {
+			c.JSON(consts.StatusConflict, status)
 			return
 		}
-		c.JSON(consts.StatusOK, s.GetStatusForUser(user.UserID))
+		c.JSON(consts.StatusOK, status)
 	}
 }

@@ -282,6 +282,42 @@ func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
 	return true
 }
 
+// TriggerSyncForUserSync runs sync synchronously and returns the final status.
+func (s *PriceScheduler) TriggerSyncForUserSync(userID string) (SyncStatus, bool) {
+	s.mu.RLock()
+	state, exists := s.users[userID]
+	s.mu.RUnlock()
+
+	if !exists {
+		s.mu.Lock()
+		state = &userSyncState{}
+		s.users[userID] = state
+		s.mu.Unlock()
+	}
+
+	state.mu.Lock()
+	if state.syncing {
+		state.mu.Unlock()
+		return SyncStatus{
+			LastSyncAt:  state.lastSyncAt,
+			LastSyncErr: state.lastSyncErr,
+			Syncing:     true,
+		}, false
+	}
+	state.syncing = true
+	state.mu.Unlock()
+
+	s.syncUser(userID, state)
+
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return SyncStatus{
+		LastSyncAt:  state.lastSyncAt,
+		LastSyncErr: state.lastSyncErr,
+		Syncing:     false,
+	}, true
+}
+
 func (s *PriceScheduler) SetNotifier(n *Notifier) {
 	s.notifier = n
 }

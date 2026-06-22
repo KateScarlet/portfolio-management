@@ -17,6 +17,7 @@ interface HoldingsManagerProps {
   onSaveRecord: () => void
   colorScheme: ColorScheme
   onRefreshAvailableFunds: () => Promise<void>
+  onSyncComplete: (status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => void
 }
 
 export default function HoldingsManager({
@@ -29,6 +30,7 @@ export default function HoldingsManager({
   onSaveRecord,
   colorScheme,
   onRefreshAvailableFunds,
+  onSyncComplete,
 }: HoldingsManagerProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -65,11 +67,12 @@ export default function HoldingsManager({
   const syncAllPrices = useCallback(async () => {
     setSyncing(true)
     try {
-      await api.triggerSync()
+      const status = await api.triggerSync()
+      onSyncComplete(status)
     } finally {
       setSyncing(false)
     }
-  }, [])
+  }, [onSyncComplete])
 
   const saveEditLot = useCallback(
     (h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {

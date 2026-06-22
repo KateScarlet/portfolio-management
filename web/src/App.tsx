@@ -73,20 +73,28 @@ export default function App() {
   }, [user])
 
   const prevSyncingRef = useRef(false)
+  const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const pollSyncStatus = useCallback(() => {
+    api.fetchSyncStatus().then((status) => {
+      if (prevSyncingRef.current && !status.syncing) {
+        api.fetchHoldings().then(setHoldings).catch(console.error)
+      }
+      prevSyncingRef.current = status.syncing
+      setSyncStatus(status)
+      // Adjust polling interval: 2s while syncing, 30s when idle
+      if (syncPollRef.current) clearInterval(syncPollRef.current)
+      syncPollRef.current = setInterval(pollSyncStatus, status.syncing ? 2000 : 30000)
+    }).catch(console.error)
+  }, [setHoldings])
 
   useEffect(() => {
     if (!user) return
-    const interval = setInterval(() => {
-      api.fetchSyncStatus().then((status) => {
-        if (prevSyncingRef.current && !status.syncing) {
-          api.fetchHoldings().then(setHoldings).catch(console.error)
-        }
-        prevSyncingRef.current = status.syncing
-        setSyncStatus(status)
-      }).catch(console.error)
-    }, 30000)
-    return () => clearInterval(interval)
-  }, [user, setHoldings])
+    syncPollRef.current = setInterval(pollSyncStatus, 30000)
+    return () => {
+      if (syncPollRef.current) clearInterval(syncPollRef.current)
+    }
+  }, [user, pollSyncStatus])
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
     try {
@@ -141,6 +149,10 @@ export default function App() {
     } catch (e) {
       console.error("Failed to trigger sync", e)
     }
+  }, [])
+
+  const handleSyncComplete = useCallback((status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => {
+    setSyncStatus(status)
   }, [])
 
   const handleLogout = useCallback(async () => {
@@ -256,6 +268,7 @@ export default function App() {
             onSaveRecord={saveRecord}
             colorScheme={settings.colorScheme}
             onRefreshAvailableFunds={handleRefreshAvailableFunds}
+            onSyncComplete={handleSyncComplete}
           />
           <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} />
         </div>
