@@ -85,13 +85,51 @@ type Holding struct {
 	Lots      JSONColumn `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
 }
 
+type HoldingSnapshot struct {
+	AssetId   string  `json:"assetId"`
+	Symbol    string  `json:"symbol"`
+	Name      string  `json:"name"`
+	Shares    float64 `json:"shares"`
+	Price     float64 `json:"price"`
+	CostPrice float64 `json:"costPrice"`
+	Value     float64 `json:"value"`
+	Cost      float64 `json:"cost"`
+}
+
+type HoldingSnapshotColumn []HoldingSnapshot
+
+func (h *HoldingSnapshotColumn) Scan(value any) error {
+	if value == nil {
+		*h = HoldingSnapshotColumn{}
+		return nil
+	}
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("HoldingSnapshotColumn.Scan: expected []byte or string, got %T", value)
+	}
+	return json.Unmarshal(bytes, h)
+}
+
+func (h HoldingSnapshotColumn) Value() (driver.Value, error) {
+	if h == nil {
+		return "[]", nil
+	}
+	return json.Marshal(h)
+}
+
 type PortfolioRecord struct {
-	ID        string         `gorm:"primaryKey" json:"id"`
-	UserID    string         `gorm:"index;not null" json:"userId"`
-	Timestamp int64          `gorm:"index;not null" json:"timestamp"`
-	Assets    AssetMapColumn `gorm:"type:text;not null;default:'{}'" json:"assets"`
-	Total     float64        `gorm:"default:0" json:"total"`
-	Principal float64        `gorm:"default:0" json:"principal,omitempty"`
+	ID        string                `gorm:"primaryKey" json:"id"`
+	UserID    string                `gorm:"index;not null" json:"userId"`
+	Timestamp int64                 `gorm:"index;not null" json:"timestamp"`
+	Assets    AssetMapColumn        `gorm:"type:text;not null;default:'{}'" json:"assets"`
+	Holdings  HoldingSnapshotColumn `gorm:"type:text;not null;default:'[]'" json:"holdings"`
+	Total     float64               `gorm:"default:0" json:"total"`
+	Principal float64               `gorm:"default:0" json:"principal"`
 }
 
 type Setting struct {

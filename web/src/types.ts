@@ -41,13 +41,24 @@ export interface Holding {
   deductFromCash?: boolean // 从现金扣除本金（仅用于创建时传递）
 }
 
+export interface HoldingSnapshot {
+  assetId: AssetId
+  symbol: string
+  name: string
+  shares: number
+  price: number
+  costPrice: number
+  value: number
+  cost: number
+}
+
 export interface PortfolioRecord {
   id: string
   timestamp: number
-  assets: Record<AssetId, number> // total value per asset category at the time
+  assets: Record<AssetId, number>
+  holdings: HoldingSnapshot[]
   total: number
-  principal?: number
-  // We don't necessarily need to store holdings in history if we only want aggregate history, but it's okay.
+  principal: number
 }
 
 export type ColorScheme = "green-up" | "red-up"

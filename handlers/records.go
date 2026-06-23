@@ -45,13 +45,24 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 
 		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
 		var total, principal float64
+		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
 		for i := range holdings {
 			assets[holdings[i].AssetId] += holdings[i].Value
 			total += holdings[i].Value
-			// principal = cost of current holdings + buy fees only
-			// Sell fees are already deducted from realizedValue, so including
-			// them in principal would double-count the cost.
 			principal += holdings[i].Cost + holdings[i].BuyFees()
+
+			if holdings[i].Value > 0 {
+				snapshotHoldings = append(snapshotHoldings, models.HoldingSnapshot{
+					AssetId:   holdings[i].AssetId,
+					Symbol:    holdings[i].Symbol,
+					Name:      holdings[i].Name,
+					Shares:    holdings[i].Shares,
+					Price:     holdings[i].Price,
+					CostPrice: holdings[i].CostPrice,
+					Value:     holdings[i].Value,
+					Cost:      holdings[i].Cost,
+				})
+			}
 		}
 
 		if total == 0 {
@@ -64,6 +75,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 			UserID:    user.UserID,
 			Timestamp: time.Now().UnixMilli(),
 			Assets:    assets,
+			Holdings:  snapshotHoldings,
 			Total:     total,
 			Principal: principal,
 		}

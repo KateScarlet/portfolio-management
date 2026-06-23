@@ -114,6 +114,18 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	if record.Assets["stocks"] != 1000 {
 		t.Errorf("expected stocks 1000, got %f", record.Assets["stocks"])
 	}
+	if len(record.Holdings) != 1 {
+		t.Fatalf("expected 1 holding snapshot, got %d", len(record.Holdings))
+	}
+	if record.Holdings[0].Symbol != "AAPL" {
+		t.Errorf("expected symbol AAPL, got %s", record.Holdings[0].Symbol)
+	}
+	if record.Holdings[0].Value != 1000 {
+		t.Errorf("expected holding value 1000, got %f", record.Holdings[0].Value)
+	}
+	if record.Holdings[0].Cost != 900 {
+		t.Errorf("expected holding cost 900, got %f", record.Holdings[0].Cost)
+	}
 }
 
 func TestCreateRecord_NoHoldings(t *testing.T) {
