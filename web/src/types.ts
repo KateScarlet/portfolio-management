@@ -6,6 +6,30 @@ export interface UserInfo {
   role: "admin" | "user"
 }
 
+export interface Portfolio {
+  id: string
+  userId: string
+  name: string
+  description?: string
+  isDefault: boolean
+  createdAt: number
+}
+
+export interface PortfolioSummaryItem {
+  id: string
+  name: string
+  total: number
+  principal: number
+  assets: Record<AssetId, number>
+}
+
+export interface PortfolioSummary {
+  total: number
+  principal: number
+  assets: Record<AssetId, number>
+  portfolios: PortfolioSummaryItem[]
+}
+
 export interface AssetInfo {
   id: AssetId
   name: string

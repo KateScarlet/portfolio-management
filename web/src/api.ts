@@ -4,7 +4,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser"
-import { Holding, PortfolioRecord, SyncStatus, UserInfo } from "./types"
+import { Holding, Portfolio, PortfolioRecord, PortfolioSummary, SyncStatus, UserInfo } from "./types"
 
 const BASE = ""
 
@@ -21,95 +21,102 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export async function fetchHoldings(): Promise<Holding[]> {
-  return request<Holding[]>("/api/holdings")
+export async function fetchHoldings(pid: string): Promise<Holding[]> {
+  return request<Holding[]>(`/api/portfolios/${pid}/holdings`)
 }
 
-export async function createHolding(h: Omit<Holding, "id">): Promise<Holding> {
-  return request<Holding>("/api/holdings", {
+export async function createHolding(pid: string, h: Omit<Holding, "id">): Promise<Holding> {
+  return request<Holding>(`/api/portfolios/${pid}/holdings`, {
     method: "POST",
     body: JSON.stringify(h),
   })
 }
 
-export async function updateHolding(id: string, updates: Partial<Holding>): Promise<Holding> {
-  return request<Holding>(`/api/holdings/${id}`, {
+export async function updateHolding(pid: string, id: string, updates: Partial<Holding>): Promise<Holding> {
+  return request<Holding>(`/api/portfolios/${pid}/holdings/${id}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   })
 }
 
-export async function deleteHolding(id: string): Promise<void> {
-  await request<{ success: boolean }>(`/api/holdings/${id}`, {
+export async function deleteHolding(pid: string, id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/portfolios/${pid}/holdings/${id}`, {
     method: "DELETE",
   })
 }
 
 export async function sellHolding(
+  pid: string,
   id: string,
   shares: number,
   price: number,
   fee: number,
   value: number
 ): Promise<{ soldHolding: Holding; availableFunds: string }> {
-  return request<{ soldHolding: Holding; availableFunds: string }>(`/api/holdings/${id}/sell`, {
+  return request<{ soldHolding: Holding; availableFunds: string }>(`/api/portfolios/${pid}/holdings/${id}/sell`, {
     method: "POST",
     body: JSON.stringify({ shares, price, fee, value }),
   })
 }
 
-export async function fetchRecords(): Promise<PortfolioRecord[]> {
-  return request<PortfolioRecord[]>("/api/records")
+export async function fetchRecords(pid: string): Promise<PortfolioRecord[]> {
+  return request<PortfolioRecord[]>(`/api/portfolios/${pid}/records`)
 }
 
-export async function createRecord(): Promise<PortfolioRecord> {
-  return request<PortfolioRecord>("/api/records", {
+export async function createRecord(pid: string): Promise<PortfolioRecord> {
+  return request<PortfolioRecord>(`/api/portfolios/${pid}/records`, {
     method: "POST",
   })
 }
 
-export async function deleteRecord(id: string): Promise<void> {
-  await request<{ success: boolean }>(`/api/records/${id}`, {
+export async function deleteRecord(pid: string, id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/portfolios/${pid}/records/${id}`, {
     method: "DELETE",
   })
 }
 
-export async function fetchSettings(): Promise<Record<string, string>> {
-  return request<Record<string, string>>("/api/settings")
+export async function fetchSettings(pid: string): Promise<Record<string, string>> {
+  return request<Record<string, string>>(`/api/portfolios/${pid}/settings`)
 }
 
 export async function updateSetting(
+  pid: string,
   key: string,
   value: string
 ): Promise<{ key: string; value: string }> {
-  return request<{ key: string; value: string }>(`/api/settings/${key}`, {
+  return request<{ key: string; value: string }>(`/api/portfolios/${pid}/settings/${key}`, {
     method: "PUT",
     body: JSON.stringify({ value }),
   })
 }
 
 export async function updateSettings(
+  pid: string,
   settings: Record<string, string>
 ): Promise<Record<string, string>> {
-  return request<Record<string, string>>("/api/settings", {
+  return request<Record<string, string>>(`/api/portfolios/${pid}/settings`, {
     method: "PUT",
     body: JSON.stringify(settings),
   })
 }
 
-export async function fetchAvailableFunds(): Promise<{ value: string }> {
-  return request<{ value: string }>("/api/funds")
+export async function fetchAvailableFunds(pid: string): Promise<{ value: string }> {
+  return request<{ value: string }>(`/api/portfolios/${pid}/funds`)
 }
 
-export async function updateAvailableFunds(value: string): Promise<{ key: string; value: string }> {
-  return request<{ key: string; value: string }>("/api/funds", {
+export async function updateAvailableFunds(pid: string, value: string): Promise<{ key: string; value: string }> {
+  return request<{ key: string; value: string }>(`/api/portfolios/${pid}/funds`, {
     method: "PUT",
     body: JSON.stringify({ value }),
   })
 }
 
-export async function fetchSyncStatus(): Promise<SyncStatus> {
-  return request<SyncStatus>("/api/sync/status")
+export async function fetchSyncStatus(pid: string): Promise<SyncStatus> {
+  return request<SyncStatus>(`/api/portfolios/${pid}/sync/status`)
+}
+
+export async function triggerSync(pid: string): Promise<SyncStatus> {
+  return request<SyncStatus>(`/api/portfolios/${pid}/sync/trigger`, { method: "POST" })
 }
 
 export async function fetchPrice(symbol: string): Promise<{
@@ -128,8 +135,32 @@ export async function fetchExchangeRate(pair: string): Promise<{ rate: number }>
   return request(`/api/exchange/${encodeURIComponent(pair)}`)
 }
 
-export async function triggerSync(): Promise<SyncStatus> {
-  return request<SyncStatus>("/api/sync/trigger", { method: "POST" })
+export async function fetchPortfolios(): Promise<Portfolio[]> {
+  return request<Portfolio[]>("/api/portfolios")
+}
+
+export async function createPortfolio(name: string, description?: string): Promise<Portfolio> {
+  return request<Portfolio>("/api/portfolios", {
+    method: "POST",
+    body: JSON.stringify({ name, description }),
+  })
+}
+
+export async function updatePortfolio(id: string, updates: { name?: string; description?: string }): Promise<Portfolio> {
+  return request<Portfolio>(`/api/portfolios/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  })
+}
+
+export async function deletePortfolio(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/portfolios/${id}`, {
+    method: "DELETE",
+  })
+}
+
+export async function fetchSummary(): Promise<PortfolioSummary> {
+  return request<PortfolioSummary>("/api/summary")
 }
 
 export async function testTelegramConnection(

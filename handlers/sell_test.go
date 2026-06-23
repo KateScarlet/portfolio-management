@@ -15,6 +15,7 @@ import (
 )
 
 const testUserID = "test-user-id"
+const testPortfolioID = "test-portfolio-id"
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -22,9 +23,16 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Holding{}, &models.Setting{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}); err != nil {
 		t.Fatal(err)
 	}
+	db.Create(&models.Portfolio{
+		ID:        testPortfolioID,
+		UserID:    testUserID,
+		Name:      "默认组合",
+		IsDefault: true,
+		CreatedAt: 1000,
+	})
 	return db
 }
 
@@ -57,9 +65,10 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		}
 	}
 	h := models.Holding{
-		ID:      id,
-		UserID:  testUserID,
-		AssetId: "stocks",
+		ID:          id,
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		AssetId:     "stocks",
 		Symbol:  "TEST",
 		Name:    "Test Stock",
 		Shares:  shares,
@@ -79,8 +88,8 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 
 func newCtx(id string, body any) *app.RequestContext {
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id + "/sell")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id + "/sell")
 	c.Request.Header.SetMethod("POST")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)

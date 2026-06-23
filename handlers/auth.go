@@ -135,6 +135,8 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		ensureDefaultPortfolio(db, user.ID)
+
 		c.JSON(consts.StatusOK, map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
@@ -183,6 +185,9 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
 				return err
 			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
+				return err
+			}
 			if err := tx.Where("user_id = ?", id).Delete(&models.WebAuthnCredential{}).Error; err != nil {
 				return err
 			}
@@ -222,7 +227,33 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		CreatedAt: time.Now().Unix(),
 	}
 
-	return db.Create(&user).Error
+	if err := db.Create(&user).Error; err != nil {
+		return err
+	}
+
+	ensureDefaultPortfolio(db, user.ID)
+	return nil
+}
+
+func ensureDefaultPortfolio(db *gorm.DB, userID string) {
+	var count int64
+	db.Model(&models.Portfolio{}).Where("user_id = ?", userID).Count(&count)
+	if count > 0 {
+		return
+	}
+	portfolio := models.Portfolio{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Name:      "默认组合",
+		IsDefault: true,
+		CreatedAt: time.Now().UnixMilli(),
+	}
+	if err := db.Create(&portfolio).Error; err != nil {
+		return
+	}
+	db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
+	db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
+	db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
 }
 
 func generateToken(user *models.User) (string, error) {

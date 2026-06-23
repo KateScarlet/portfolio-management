@@ -28,6 +28,12 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		id := c.Param("id")
 
 		var input SellRequest
@@ -59,7 +65,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var holding models.Holding
-		if err := tx.Where("user_id = ?", user.UserID).First(&holding, "id = ?", id).Error; err != nil {
+		if err := tx.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
 			tx.Rollback()
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
 			return
@@ -156,15 +162,16 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		if realizedValue > 0 {
 			var fundsSetting models.Setting
 			fundsValue := 0.0
-			if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).First(&fundsSetting).Error; err == nil {
+			if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).First(&fundsSetting).Error; err == nil {
 				fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
 			}
 
 			newFundsValue = fundsValue + realizedValue
 			fundsSetting.Key = "availableFunds"
 			fundsSetting.UserID = user.UserID
+			fundsSetting.PortfolioID = portfolioID
 			fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
-			if err := tx.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
+			if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return

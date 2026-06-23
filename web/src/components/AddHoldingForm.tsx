@@ -4,7 +4,7 @@ import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface AddHoldingFormProps {
-  onAddHolding: (holding: Parameters<typeof api.createHolding>[0]) => Promise<void>
+  onAddHolding: (holding: Omit<import("../types").Holding, "id">) => Promise<void>
   onClose: () => void
 }
 

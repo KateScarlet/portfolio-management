@@ -3,6 +3,7 @@ package db
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"os"
 	"portfolio-management/models"
 	"time"
@@ -118,18 +119,21 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 
 	db.Exec("PRAGMA journal_mode=WAL")
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
 		return nil, err
 	}
 
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_name_asset ON holdings(user_id, name, asset_id) WHERE symbol = ''")
+	migrateToMultiPortfolio(db)
+
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_user_ts ON portfolio_records(user_id, timestamp DESC)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_portfolio_ts ON portfolio_records(portfolio_id, timestamp DESC)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_user_asset ON holdings(user_id, asset_id)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
@@ -151,23 +155,71 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.AutoMigrate(&models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
 		return nil, err
 	}
 
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_user_name_asset ON holdings(user_id, name, asset_id) WHERE symbol = ''")
+	migrateToMultiPortfolio(db)
+
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_user_ts ON portfolio_records(user_id, timestamp DESC)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_portfolio_ts ON portfolio_records(portfolio_id, timestamp DESC)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_user_asset ON holdings(user_id, asset_id)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
 
 	return db, nil
+}
+
+// migrateToMultiPortfolio creates a default portfolio for existing users
+// and links their holdings, records, and settings to it.
+func migrateToMultiPortfolio(db *gorm.DB) {
+	var count int64
+	db.Model(&models.Holding{}).Where("portfolio_id = '' OR portfolio_id IS NULL").Count(&count)
+	if count == 0 {
+		return
+	}
+
+	slog.Info("migrating to multi-portfolio: found holdings without portfolio_id", "count", count)
+
+	var userIDs []string
+	db.Model(&models.Holding{}).Where("portfolio_id = '' OR portfolio_id IS NULL").Distinct("user_id").Pluck("user_id", &userIDs)
+
+	for _, userID := range userIDs {
+		portfolioID := generateID()
+
+		portfolio := models.Portfolio{
+			ID:        portfolioID,
+			UserID:    userID,
+			Name:      "默认组合",
+			IsDefault: true,
+			CreatedAt: time.Now().UnixMilli(),
+		}
+		if err := db.Create(&portfolio).Error; err != nil {
+			slog.Error("failed to create default portfolio during migration", "userId", userID, "error", err)
+			continue
+		}
+
+		db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
+		db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
+		db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
+
+		slog.Info("migrated user to default portfolio", "userId", userID, "portfolioId", portfolioID)
+	}
+}
+
+func generateID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic("failed to generate ID: " + err.Error())
+	}
+	return hex.EncodeToString(b)
 }
 
 // IsSetupMode checks if config file exists

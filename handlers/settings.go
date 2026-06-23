@@ -20,8 +20,14 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		var settings []models.Setting
-		if err := db.Where("user_id = ?", user.UserID).Find(&settings).Error; err != nil {
+		if err := db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -41,6 +47,12 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		key := c.Param("key")
 		var body struct {
 			Value string `json:"value"`
@@ -54,7 +66,6 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		// Validate before persisting
 		if key == "syncInterval" {
 			mins, err := strconv.Atoi(body.Value)
 			if err != nil {
@@ -67,8 +78,8 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			}
 		}
 
-		setting := models.Setting{Key: key, Value: body.Value, UserID: user.UserID}
-		result := db.Where(models.Setting{Key: key, UserID: user.UserID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
+		setting := models.Setting{Key: key, Value: body.Value, UserID: user.UserID, PortfolioID: portfolioID}
+		result := db.Where(models.Setting{Key: key, UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return
@@ -86,8 +97,14 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		var setting models.Setting
-		if err := db.Where("`key` = ? AND user_id = ?", "availableFunds", user.UserID).First(&setting).Error; err != nil {
+		if err := db.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).First(&setting).Error; err != nil {
 			c.JSON(consts.StatusOK, map[string]string{"value": "0"})
 			return
 		}
@@ -103,6 +120,12 @@ func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		var body struct {
 			Value string `json:"value"`
 		}
@@ -111,8 +134,8 @@ func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		setting := models.Setting{Key: "availableFunds", Value: body.Value, UserID: user.UserID}
-		result := db.Where(models.Setting{Key: "availableFunds", UserID: user.UserID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
+		setting := models.Setting{Key: "availableFunds", Value: body.Value, UserID: user.UserID, PortfolioID: portfolioID}
+		result := db.Where(models.Setting{Key: "availableFunds", UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return
@@ -127,6 +150,12 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		user := middleware.GetUser(c)
 		if user == nil {
 			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
 
@@ -149,7 +178,6 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 			}
 		}
 
-		// Validate syncInterval before persisting
 		if syncVal, ok := body["syncInterval"]; ok {
 			mins, err := strconv.Atoi(syncVal)
 			if err != nil {
@@ -164,8 +192,8 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 
 		err := db.Transaction(func(tx *gorm.DB) error {
 			for key, value := range body {
-				setting := models.Setting{Key: key, Value: value, UserID: user.UserID}
-				if err := tx.Where(models.Setting{Key: key, UserID: user.UserID}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
+				setting := models.Setting{Key: key, Value: value, UserID: user.UserID, PortfolioID: portfolioID}
+				if err := tx.Where(models.Setting{Key: key, UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
 					return err
 				}
 			}

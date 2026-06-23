@@ -16,7 +16,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Holding{}, &models.Setting{}, &models.User{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.User{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -43,11 +43,11 @@ func TestPriceScheduler_New(t *testing.T) {
 	}
 }
 
-func TestPriceScheduler_GetStatusForUser_Unknown(t *testing.T) {
+func TestPriceScheduler_GetStatusForPortfolio_Unknown(t *testing.T) {
 	db := setupTestDB(t)
 	s := New(db)
 	s.Stop()
-	status := s.GetStatusForUser("nonexistent")
+	status := s.GetStatusForPortfolio("nonexistent", "nonexistent-portfolio")
 	if status.Syncing {
 		t.Error("expected Syncing to be false")
 	}
@@ -66,18 +66,17 @@ func TestPriceScheduler_StopIdempotent(t *testing.T) {
 	}
 }
 
-func TestPriceScheduler_TriggerSyncForUser(t *testing.T) {
+func TestPriceScheduler_TriggerSyncForPortfolio(t *testing.T) {
 	db := setupTestDB(t)
 	s := New(db)
 	s.Stop()
 
-	if !s.TriggerSyncForUser("user1") {
+	if !s.TriggerSyncForPortfolio("user1", "portfolio1") {
 		t.Error("expected first trigger to succeed")
 	}
-	// Wait for the async goroutine to finish
 	time.Sleep(50 * time.Millisecond)
 
-	status := s.GetStatusForUser("user1")
+	status := s.GetStatusForPortfolio("user1", "portfolio1")
 	if status.LastSyncAt.IsZero() {
 		t.Error("expected LastSyncAt to be set after sync")
 	}
@@ -95,26 +94,26 @@ func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			defer wg.Done()
-			s.TriggerSyncForUser("concurrent-user")
+			s.TriggerSyncForPortfolio("concurrent-user", "concurrent-portfolio")
 		}()
 	}
 
 	wg.Wait()
 
 	s.mu.RLock()
-	count := len(s.users)
-	_, exists := s.users["concurrent-user"]
+	count := len(s.states)
+	_, exists := s.states[syncKey("concurrent-user", "concurrent-portfolio")]
 	s.mu.RUnlock()
 
 	if count != 1 {
-		t.Errorf("expected exactly 1 user entry, got %d (race condition!)", count)
+		t.Errorf("expected exactly 1 state entry, got %d (race condition!)", count)
 	}
 	if !exists {
-		t.Error("expected user entry to exist")
+		t.Error("expected state entry to exist")
 	}
 }
 
-func TestPriceScheduler_ConcurrentTriggerSyncForUserSync_NoDuplicateStates(t *testing.T) {
+func TestPriceScheduler_ConcurrentTriggerSyncForPortfolioSync_NoDuplicateStates(t *testing.T) {
 	db := setupTestDB(t)
 	s := New(db)
 	s.Stop()
@@ -126,22 +125,22 @@ func TestPriceScheduler_ConcurrentTriggerSyncForUserSync_NoDuplicateStates(t *te
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			defer wg.Done()
-			s.TriggerSyncForUserSync("sync-user")
+			s.TriggerSyncForPortfolioSync("sync-user", "sync-portfolio")
 		}()
 	}
 
 	wg.Wait()
 
 	s.mu.RLock()
-	count := len(s.users)
+	count := len(s.states)
 	s.mu.RUnlock()
 
 	if count != 1 {
-		t.Errorf("expected exactly 1 user entry, got %d (race condition!)", count)
+		t.Errorf("expected exactly 1 state entry, got %d (race condition!)", count)
 	}
 }
 
-func TestPriceScheduler_ConcurrentDifferentUsers(t *testing.T) {
+func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 	db := setupTestDB(t)
 	s := New(db)
 	s.Stop()
@@ -153,18 +152,18 @@ func TestPriceScheduler_ConcurrentDifferentUsers(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(idx int) {
 			defer wg.Done()
-			s.TriggerSyncForUser("user-" + string(rune('A'+idx%26)))
+			s.TriggerSyncForPortfolio("user-"+string(rune('A'+idx%26)), "portfolio-"+string(rune('A'+idx%26)))
 		}(i)
 	}
 
 	wg.Wait()
 
 	s.mu.RLock()
-	count := len(s.users)
+	count := len(s.states)
 	s.mu.RUnlock()
 
 	if count > 26 {
-		t.Errorf("expected at most 26 unique users, got %d", count)
+		t.Errorf("expected at most 26 unique entries, got %d", count)
 	}
 }
 

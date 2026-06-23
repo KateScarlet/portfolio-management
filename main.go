@@ -90,30 +90,39 @@ func main() {
 	api := h.Group("/api")
 	api.Use(middleware.AuthRequired())
 
-	api.GET("/sync/status", handlers.GetSyncStatus(priceScheduler))
-	api.POST("/sync/trigger", handlers.TriggerSync(priceScheduler))
+	api.GET("/portfolios", handlers.ListPortfolios(database))
+	api.POST("/portfolios", handlers.CreatePortfolio(database))
+	api.PATCH("/portfolios/:id", handlers.UpdatePortfolio(database))
+	api.DELETE("/portfolios/:id", handlers.DeletePortfolio(database))
 
-	api.GET("/holdings", handlers.ListHoldings(database))
-	api.POST("/holdings", handlers.CreateHolding(database))
-	api.PATCH("/holdings/:id", handlers.UpdateHolding(database))
-	api.DELETE("/holdings/:id", handlers.DeleteHolding(database))
-	api.POST("/holdings/:id/sell", handlers.SellHolding(database))
+	api.GET("/summary", handlers.GetSummary(database))
 
-	api.GET("/records", handlers.ListRecords(database))
-	api.POST("/records", handlers.CreateRecord(database))
-	api.DELETE("/records/:id", handlers.DeleteRecord(database))
-
-	api.GET("/settings", handlers.ListSettings(database))
-	api.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
-	api.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
-	api.GET("/funds", handlers.GetAvailableFunds(database))
-	api.PUT("/funds", handlers.UpdateAvailableFunds(database))
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database))
 
 	api.POST("/webauthn/register/start", handlers.WebAuthnRegisterStart(database, cfg))
 	api.POST("/webauthn/register/finish", handlers.WebAuthnRegisterFinish(database, cfg))
 	api.GET("/webauthn/credentials", handlers.WebAuthnListCredentials(database))
 	api.DELETE("/webauthn/credentials/:id", handlers.WebAuthnDeleteCredential(database))
+
+	pf := api.Group("/portfolios/:pid")
+	pf.GET("/sync/status", handlers.GetSyncStatus(priceScheduler))
+	pf.POST("/sync/trigger", handlers.TriggerSync(priceScheduler))
+
+	pf.GET("/holdings", handlers.ListHoldings(database))
+	pf.POST("/holdings", handlers.CreateHolding(database))
+	pf.PATCH("/holdings/:id", handlers.UpdateHolding(database))
+	pf.DELETE("/holdings/:id", handlers.DeleteHolding(database))
+	pf.POST("/holdings/:id/sell", handlers.SellHolding(database))
+
+	pf.GET("/records", handlers.ListRecords(database))
+	pf.POST("/records", handlers.CreateRecord(database))
+	pf.DELETE("/records/:id", handlers.DeleteRecord(database))
+
+	pf.GET("/settings", handlers.ListSettings(database))
+	pf.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
+	pf.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
+	pf.GET("/funds", handlers.GetAvailableFunds(database))
+	pf.PUT("/funds", handlers.UpdateAvailableFunds(database))
 
 	admin := api.Group("")
 	admin.Use(middleware.AdminRequired())

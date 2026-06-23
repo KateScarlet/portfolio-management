@@ -15,23 +15,20 @@ import (
 
 func setupRecordsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db := setupTestDB(t)
-	if err := db.AutoMigrate(&models.PortfolioRecord{}); err != nil {
-		t.Fatal(err)
-	}
-	return db
+	return setupTestDB(t)
 }
 
 func createTestRecord(t *testing.T, db *gorm.DB, timestamp int64) string {
 	t.Helper()
 	id := uuid.New().String()
 	r := models.PortfolioRecord{
-		ID:        id,
-		UserID:    testUserID,
-		Timestamp: timestamp,
-		Assets:    models.AssetMapColumn{"stocks": 1000, "bonds": 500},
-		Total:     1500,
-		Principal: 1400,
+		ID:          id,
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		Timestamp:   timestamp,
+		Assets:      models.AssetMapColumn{"stocks": 1000, "bonds": 500},
+		Total:       1500,
+		Principal:   1400,
 	}
 	if err := db.Create(&r).Error; err != nil {
 		t.Fatal(err)
@@ -94,7 +91,7 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	db := setupRecordsTestDB(t)
 	// Need holdings for CreateRecord to work
 	db.Create(&models.Holding{
-		ID: uuid.New().String(), UserID: testUserID, AssetId: "stocks",
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID, AssetId: "stocks",
 		Symbol: "AAPL", Shares: 10, Price: 100, Value: 1000, Cost: 900,
 		Lots: models.JSONColumn{{ID: uuid.New().String(), Shares: 10, Cost: 900, ValueAdded: 1000}},
 	})
@@ -146,8 +143,8 @@ func TestDeleteRecord_Success(t *testing.T) {
 	id := createTestRecord(t, db, 1000)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/records/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/records/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID: testUserID, Username: "testuser", Role: "user",
@@ -170,8 +167,8 @@ func TestDeleteRecord_NotFound(t *testing.T) {
 	db := setupRecordsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/records/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/records/nonexistent")
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID: testUserID, Username: "testuser", Role: "user",
@@ -204,8 +201,8 @@ func TestListSettings_Empty(t *testing.T) {
 
 func TestListSettings_ReturnsUserSettings(t *testing.T) {
 	db := setupTestDB(t)
-	db.Create(&models.Setting{Key: "syncInterval", Value: "5", UserID: testUserID})
-	db.Create(&models.Setting{Key: "driftThreshold", Value: "10", UserID: testUserID})
+	db.Create(&models.Setting{Key: "syncInterval", Value: "5", UserID: testUserID, PortfolioID: testPortfolioID})
+	db.Create(&models.Setting{Key: "driftThreshold", Value: "10", UserID: testUserID, PortfolioID: testPortfolioID})
 
 	c := newUserCtx("GET", "/api/settings", nil)
 	ListSettings(db)(context.Background(), c)
@@ -238,7 +235,7 @@ func TestGetAvailableFunds_Default(t *testing.T) {
 
 func TestGetAvailableFunds_WithValue(t *testing.T) {
 	db := setupTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "50000.50", UserID: testUserID})
+	db.Create(&models.Setting{Key: "availableFunds", Value: "50000.50", UserID: testUserID, PortfolioID: testPortfolioID})
 
 	c := newUserCtx("GET", "/api/funds", nil)
 	GetAvailableFunds(db)(context.Background(), c)

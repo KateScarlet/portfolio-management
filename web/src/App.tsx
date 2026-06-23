@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { usePortfolio } from "./usePortfolio"
-import { Settings, SyncStatus, UserInfo, DEFAULT_SETTINGS, ColorScheme, Holding } from "./types"
+import { Settings, SyncStatus, UserInfo, Portfolio, PortfolioSummary, DEFAULT_SETTINGS, ColorScheme, Holding } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
@@ -10,11 +10,20 @@ import SettingsPanel from "./components/SettingsPanel"
 import SetupWizard from "./components/SetupWizard"
 import LoginPage from "./components/LoginPage"
 import UserManager from "./components/UserManager"
+import PortfolioSelector from "./components/PortfolioSelector"
+import PortfolioManager from "./components/PortfolioManager"
+import SummaryDashboard from "./components/SummaryDashboard"
 
 export default function App() {
   const [setupMode, setSetupMode] = useState<boolean | null>(null)
   const [user, setUser] = useState<UserInfo | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | null>(null)
+  const [showPortfolioManager, setShowPortfolioManager] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
+  const [summary, setSummary] = useState<PortfolioSummary | null>(null)
+
   const {
     holdings,
     setHoldings,
@@ -26,7 +35,8 @@ export default function App() {
     removeHolding,
     saveRecord,
     deleteRecord,
-  } = usePortfolio()
+  } = usePortfolio(currentPortfolio?.id || null)
+
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [availableFunds, setAvailableFunds] = useState(0)
@@ -46,67 +56,91 @@ export default function App() {
     }
   }, [setupMode])
 
+  const loadPortfolios = useCallback(async () => {
+    try {
+      let ps = await api.fetchPortfolios()
+      if (ps.length === 0) {
+        const created = await api.createPortfolio("默认组合")
+        ps = [created]
+      }
+      setPortfolios(ps)
+      setCurrentPortfolio((prev) => {
+        const existing = prev ? ps.find((p) => p.id === prev.id) : null
+        return existing || ps[0]
+      })
+    } catch (e) {
+      console.error("Failed to load portfolios", e)
+    }
+  }, [])
+
   useEffect(() => {
     if (user) {
-      api.fetchSettings()
-        .then((s) => {
-          setSettings({
-            driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
-            syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
-            colorScheme: (s.colorScheme as ColorScheme) || DEFAULT_SETTINGS.colorScheme,
-            targetStocks: s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
-            targetBonds: s.targetBonds != null ? Number(s.targetBonds) : DEFAULT_SETTINGS.targetBonds,
-            targetCash: s.targetCash != null ? Number(s.targetCash) : DEFAULT_SETTINGS.targetCash,
-            targetCommodities: s.targetCommodities != null ? Number(s.targetCommodities) : (s as any).targetGold != null ? Number((s as any).targetGold) : DEFAULT_SETTINGS.targetCommodities,
-            telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
-            telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
-            telegramEnabled: s.telegramEnabled === "true",
-            telegramPriceAlert: s.telegramPriceAlert !== "false",
-            telegramDriftAlert: s.telegramDriftAlert !== "false",
-            telegramSummary: s.telegramSummary !== "false",
-            telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
-            telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
-          })
-        })
-        .catch(console.error)
-      api.fetchAvailableFunds()
-        .then((s) => setAvailableFunds(Number(s.value) || 0))
-        .catch(console.error)
-      api.fetchSyncStatus().then(setSyncStatus).catch(console.error)
+      loadPortfolios()
     }
-  }, [user])
+  }, [user, loadPortfolios])
+
+  useEffect(() => {
+    if (!currentPortfolio) return
+    api.fetchSettings(currentPortfolio.id)
+      .then((s) => {
+        setSettings({
+          driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
+          syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
+          colorScheme: (s.colorScheme as ColorScheme) || DEFAULT_SETTINGS.colorScheme,
+          targetStocks: s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
+          targetBonds: s.targetBonds != null ? Number(s.targetBonds) : DEFAULT_SETTINGS.targetBonds,
+          targetCash: s.targetCash != null ? Number(s.targetCash) : DEFAULT_SETTINGS.targetCash,
+          targetCommodities: s.targetCommodities != null ? Number(s.targetCommodities) : (s as any).targetGold != null ? Number((s as any).targetGold) : DEFAULT_SETTINGS.targetCommodities,
+          telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
+          telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
+          telegramEnabled: s.telegramEnabled === "true",
+          telegramPriceAlert: s.telegramPriceAlert !== "false",
+          telegramDriftAlert: s.telegramDriftAlert !== "false",
+          telegramSummary: s.telegramSummary !== "false",
+          telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
+          telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
+        })
+      })
+      .catch(console.error)
+    api.fetchAvailableFunds(currentPortfolio.id)
+      .then((s) => setAvailableFunds(Number(s.value) || 0))
+      .catch(console.error)
+    api.fetchSyncStatus(currentPortfolio.id).then(setSyncStatus).catch(console.error)
+  }, [currentPortfolio])
 
   const prevSyncingRef = useRef(false)
   const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollSyncStatusRef = useRef<() => void>(() => {})
 
   const pollSyncStatus = useCallback(() => {
-    api.fetchSyncStatus().then((status) => {
-      if (prevSyncingRef.current && !status.syncing) {
-        api.fetchHoldings().then(setHoldings).catch(console.error)
+    if (!currentPortfolio) return
+    api.fetchSyncStatus(currentPortfolio.id).then((status) => {
+      if (prevSyncingRef.current && !status.syncing && currentPortfolio) {
+        api.fetchHoldings(currentPortfolio.id).then(setHoldings).catch(console.error)
       }
       prevSyncingRef.current = status.syncing
       setSyncStatus(status)
       if (syncPollRef.current) clearInterval(syncPollRef.current)
       syncPollRef.current = setInterval(pollSyncStatusRef.current, status.syncing ? 2000 : 30000)
     }).catch(console.error)
-  }, [setHoldings])
+  }, [setHoldings, currentPortfolio])
 
   useEffect(() => {
     pollSyncStatusRef.current = pollSyncStatus
   }, [pollSyncStatus])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !currentPortfolio) return
     syncPollRef.current = setInterval(pollSyncStatus, 30000)
     return () => {
       if (syncPollRef.current) clearInterval(syncPollRef.current)
     }
-  }, [user, pollSyncStatus])
+  }, [user, currentPortfolio, pollSyncStatus])
 
   const handleSaveSettings = useCallback(async (newSettings: Settings) => {
+    if (!currentPortfolio) return
     try {
-      await api.updateSettings({
+      await api.updateSettings(currentPortfolio.id, {
         driftThreshold: String(newSettings.driftThreshold),
         syncInterval: String(newSettings.syncInterval),
         colorScheme: newSettings.colorScheme,
@@ -127,25 +161,27 @@ export default function App() {
     } catch (e) {
       console.error("Failed to save settings", e)
     }
-  }, [])
+  }, [currentPortfolio])
 
   const handleUpdateAvailableFunds = useCallback(async (value: number) => {
+    if (!currentPortfolio) return
     try {
-      await api.updateAvailableFunds(String(value))
+      await api.updateAvailableFunds(currentPortfolio.id, String(value))
       setAvailableFunds(value)
     } catch (e) {
       console.error("Failed to update available funds", e)
     }
-  }, [])
+  }, [currentPortfolio])
 
   const handleRefreshAvailableFunds = useCallback(async () => {
+    if (!currentPortfolio) return
     try {
-      const s = await api.fetchAvailableFunds()
+      const s = await api.fetchAvailableFunds(currentPortfolio.id)
       setAvailableFunds(Number(s.value) || 0)
     } catch (e) {
       console.error("Failed to refresh available funds", e)
     }
-  }, [])
+  }, [currentPortfolio])
 
   const handleAddHolding = useCallback(async (holding: Omit<Holding, "id">) => {
     await addHolding(holding)
@@ -155,13 +191,14 @@ export default function App() {
   }, [addHolding, handleRefreshAvailableFunds])
 
   const handleTriggerSync = useCallback(async () => {
+    if (!currentPortfolio) return
     try {
-      const status = await api.triggerSync()
+      const status = await api.triggerSync(currentPortfolio.id)
       setSyncStatus(status)
     } catch (e) {
       console.error("Failed to trigger sync", e)
     }
-  }, [])
+  }, [currentPortfolio])
 
   const handleSyncComplete = useCallback((status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => {
     setSyncStatus(status)
@@ -170,6 +207,16 @@ export default function App() {
   const handleLogout = useCallback(async () => {
     await api.logout()
     setUser(null)
+  }, [])
+
+  const handleShowSummary = useCallback(async () => {
+    try {
+      const s = await api.fetchSummary()
+      setSummary(s)
+      setShowSummary(true)
+    } catch (e) {
+      console.error("Failed to fetch summary", e)
+    }
   }, [])
 
   if (setupMode === null) {
@@ -194,6 +241,14 @@ export default function App() {
 
   if (!user) {
     return <LoginPage onLogin={() => window.location.reload()} />
+  }
+
+  if (!currentPortfolio) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <p className="text-sm text-[#6C757D]">加载投资组合中...</p>
+      </div>
+    )
   }
 
   if (loading) {
@@ -226,6 +281,12 @@ export default function App() {
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
           </div>
           <h1 className="text-xl font-semibold tracking-tight">投资组合管理</h1>
+          <PortfolioSelector
+            portfolios={portfolios}
+            current={currentPortfolio}
+            onSelect={setCurrentPortfolio}
+            onManage={() => setShowPortfolioManager(true)}
+          />
         </div>
         <div className="hidden sm:flex items-center gap-4">
           {syncStatus && syncStatus.lastSyncAt && (
@@ -240,6 +301,13 @@ export default function App() {
                 : `上次同步: ${new Date(syncStatus.lastSyncAt).toLocaleTimeString()}`}
             </button>
           )}
+          <button
+            onClick={handleShowSummary}
+            className="text-xs text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
+            title="查看汇总"
+          >
+            汇总
+          </button>
           <SettingsPanel settings={settings} onSave={handleSaveSettings} userRole={user.role} />
           {user.role === "admin" && <UserManager />}
           <div className="flex items-center gap-2">
@@ -277,6 +345,7 @@ export default function App() {
 
         <div className="flex flex-col gap-6">
           <HoldingsManager
+            portfolioId={currentPortfolio.id}
             holdings={holdings}
             setHoldings={setHoldings}
             total={total}
@@ -291,6 +360,21 @@ export default function App() {
           <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} />
         </div>
       </main>
+
+      {showPortfolioManager && (
+        <PortfolioManager
+          portfolios={portfolios}
+          onClose={() => setShowPortfolioManager(false)}
+          onRefresh={loadPortfolios}
+        />
+      )}
+      {showSummary && (
+        <SummaryDashboard
+          summary={summary}
+          colorScheme={settings.colorScheme}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
     </div>
   )
 }

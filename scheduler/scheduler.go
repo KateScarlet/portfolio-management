@@ -23,11 +23,11 @@ type PriceScheduler struct {
 	ticker   *time.Ticker
 	stopCh   chan struct{}
 	mu       sync.RWMutex
-	users    map[string]*userSyncState
+	states   map[string]*syncState
 	notifier *Notifier
 }
 
-type userSyncState struct {
+type syncState struct {
 	interval    time.Duration
 	lastSyncAt  time.Time
 	lastSyncErr string
@@ -35,11 +35,15 @@ type userSyncState struct {
 	mu          sync.Mutex
 }
 
+func syncKey(userID, portfolioID string) string {
+	return userID + ":" + portfolioID
+}
+
 func New(db *gorm.DB) *PriceScheduler {
 	s := &PriceScheduler{
 		db:     db,
 		stopCh: make(chan struct{}),
-		users:  make(map[string]*userSyncState),
+		states: make(map[string]*syncState),
 	}
 	s.Start()
 	return s
@@ -80,23 +84,23 @@ func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			s.syncAllUsers()
+			s.syncAllPortfolios()
 		case <-stopCh:
 			return
 		}
 	}
 }
 
-func (s *PriceScheduler) syncAllUsers() {
-	var userIDs []string
-	if err := s.db.Model(&models.Holding{}).Distinct("user_id").Pluck("user_id", &userIDs).Error; err != nil {
-		slog.Error("failed to query user IDs", "error", err)
+func (s *PriceScheduler) syncAllPortfolios() {
+	var portfolios []models.Portfolio
+	if err := s.db.Find(&portfolios).Error; err != nil {
+		slog.Error("failed to query portfolios", "error", err)
 		return
 	}
 
-	for _, userID := range userIDs {
+	for _, p := range portfolios {
 		var setting models.Setting
-		if err := s.db.Where("`key` = ? AND user_id = ?", "syncInterval", userID).First(&setting).Error; err != nil {
+		if err := s.db.Where("`key` = ? AND portfolio_id = ?", "syncInterval", p.ID).First(&setting).Error; err != nil {
 			continue
 		}
 
@@ -105,13 +109,14 @@ func (s *PriceScheduler) syncAllUsers() {
 			continue
 		}
 
+		key := syncKey(p.UserID, p.ID)
 		s.mu.Lock()
-		state, exists := s.users[userID]
+		state, exists := s.states[key]
 		if !exists {
-			state = &userSyncState{
+			state = &syncState{
 				interval: time.Duration(interval) * time.Minute,
 			}
-			s.users[userID] = state
+			s.states[key] = state
 		} else {
 			state.mu.Lock()
 			state.interval = time.Duration(interval) * time.Minute
@@ -124,12 +129,11 @@ func (s *PriceScheduler) syncAllUsers() {
 		state.mu.Unlock()
 
 		if shouldSync {
-			go s.syncUser(userID, state)
+			go s.syncPortfolio(p.UserID, p.ID, state)
 		}
 	}
 }
 
-// syncResult holds the outcome of a single price fetch.
 type syncResult struct {
 	holding *models.Holding
 	result  *yahoo.PriceResult
@@ -138,10 +142,10 @@ type syncResult struct {
 
 const (
 	maxConcurrentFetch = 5
-	fetchRateLimit     = 50 * time.Millisecond // min interval between API calls
+	fetchRateLimit     = 50 * time.Millisecond
 )
 
-func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
+func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) {
 	state.mu.Lock()
 	if state.syncing {
 		state.mu.Unlock()
@@ -156,19 +160,19 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 		state.mu.Unlock()
 	}()
 
-	slog.Info("starting price sync", "userId", userID)
+	slog.Info("starting price sync", "userId", userID, "portfolioId", portfolioID)
 
 	var holdings []models.Holding
-	if err := s.db.Where("user_id = ? AND symbol != ''", userID).Find(&holdings).Error; err != nil {
+	if err := s.db.Where("portfolio_id = ? AND symbol != ''", portfolioID).Find(&holdings).Error; err != nil {
 		state.mu.Lock()
 		state.lastSyncErr = err.Error()
 		state.mu.Unlock()
-		slog.Error("failed to query holdings", "userId", userID, "error", err)
+		slog.Error("failed to query holdings", "userId", userID, "portfolioId", portfolioID, "error", err)
 		return
 	}
 
 	if len(holdings) == 0 {
-		slog.Info("no holdings with symbols to sync", "userId", userID)
+		slog.Info("no holdings with symbols to sync", "userId", userID, "portfolioId", portfolioID)
 		state.mu.Lock()
 		state.lastSyncAt = time.Now()
 		state.lastSyncErr = ""
@@ -180,26 +184,24 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	failed := 0
 	syncedPrices := make(map[string]float64)
 
-	// Concurrent price fetching with rate limiting.
 	sem := make(chan struct{}, maxConcurrentFetch)
 	results := make(chan syncResult, len(holdings))
 
 	var wg sync.WaitGroup
 	for i := range holdings {
 		wg.Add(1)
-		sem <- struct{}{} // acquire concurrency slot (blocks if max reached)
+		sem <- struct{}{}
 		go func(h *models.Holding) {
 			defer func() {
-				<-sem // release concurrency slot
+				<-sem
 				wg.Done()
 			}()
 			result, err := yahoo.FetchQuote(h.Symbol)
 			results <- syncResult{holding: h, result: result, err: err}
 		}(&holdings[i])
-		time.Sleep(fetchRateLimit) // rate limit between dispatches
+		time.Sleep(fetchRateLimit)
 	}
 
-	// Close results channel once all goroutines finish.
 	go func() {
 		wg.Wait()
 		close(results)
@@ -207,7 +209,7 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 
 	for r := range results {
 		if r.err != nil {
-			slog.Error("failed to fetch price", "userId", userID, "name", r.holding.Name, "symbol", r.holding.Symbol, "error", r.err)
+			slog.Error("failed to fetch price", "userId", userID, "portfolioId", portfolioID, "name", r.holding.Name, "symbol", r.holding.Symbol, "error", r.err)
 			failed++
 			continue
 		}
@@ -216,15 +218,15 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 			"price": r.result.Price,
 			"value": r.holding.Shares * r.result.Price,
 		}
-		if err := s.db.Model(&models.Holding{}).Where("id = ? AND user_id = ?", r.holding.ID, userID).Updates(updates).Error; err != nil {
-			slog.Error("failed to update holding", "userId", userID, "id", r.holding.ID, "error", err)
+		if err := s.db.Model(&models.Holding{}).Where("id = ? AND portfolio_id = ?", r.holding.ID, portfolioID).Updates(updates).Error; err != nil {
+			slog.Error("failed to update holding", "userId", userID, "portfolioId", portfolioID, "id", r.holding.ID, "error", err)
 			failed++
 			continue
 		}
 
 		synced++
 		syncedPrices[r.holding.Symbol] = r.result.Price
-		slog.Info("synced holding", "userId", userID, "name", r.holding.Name, "symbol", r.holding.Symbol, "price", r.result.Price)
+		slog.Info("synced holding", "userId", userID, "portfolioId", portfolioID, "name", r.holding.Name, "symbol", r.holding.Symbol, "price", r.result.Price)
 	}
 
 	state.mu.Lock()
@@ -236,16 +238,17 @@ func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
 	}
 	state.mu.Unlock()
 
-	slog.Info("sync completed", "userId", userID, "synced", synced, "failed", failed)
+	slog.Info("sync completed", "userId", userID, "portfolioId", portfolioID, "synced", synced, "failed", failed)
 
 	if s.notifier != nil {
-		s.notifier.NotifyAfterSync(userID, holdings, syncedPrices)
+		s.notifier.NotifyAfterSync(userID, portfolioID, holdings, syncedPrices)
 	}
 }
 
-func (s *PriceScheduler) GetStatusForUser(userID string) SyncStatus {
+func (s *PriceScheduler) GetStatusForPortfolio(userID, portfolioID string) SyncStatus {
+	key := syncKey(userID, portfolioID)
 	s.mu.RLock()
-	state, exists := s.users[userID]
+	state, exists := s.states[key]
 	s.mu.RUnlock()
 
 	if !exists {
@@ -262,30 +265,31 @@ func (s *PriceScheduler) GetStatusForUser(userID string) SyncStatus {
 	}
 }
 
-func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
+func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) bool {
+	key := syncKey(userID, portfolioID)
 	s.mu.Lock()
-	state, exists := s.users[userID]
+	state, exists := s.states[key]
 	if !exists {
-		state = &userSyncState{}
-		s.users[userID] = state
+		state = &syncState{}
+		s.states[key] = state
 	}
 	s.mu.Unlock()
 
-	go s.syncUser(userID, state)
+	go s.syncPortfolio(userID, portfolioID, state)
 	return true
 }
 
-// TriggerSyncForUserSync runs sync synchronously and returns the final status.
-func (s *PriceScheduler) TriggerSyncForUserSync(userID string) (SyncStatus, bool) {
+func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string) (SyncStatus, bool) {
+	key := syncKey(userID, portfolioID)
 	s.mu.Lock()
-	state, exists := s.users[userID]
+	state, exists := s.states[key]
 	if !exists {
-		state = &userSyncState{}
-		s.users[userID] = state
+		state = &syncState{}
+		s.states[key] = state
 	}
 	s.mu.Unlock()
 
-	s.syncUser(userID, state)
+	s.syncPortfolio(userID, portfolioID, state)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()

@@ -266,9 +266,11 @@ func TestDeleteUser_CleansUpRelatedData(t *testing.T) {
 	db := setupAuthTestDB(t)
 	uid := createTestUser(t, db, "deleteme", "user")
 
-	db.Create(&models.Holding{ID: uuid.New().String(), UserID: uid, AssetId: "stocks", Symbol: "AAPL"})
-	db.Create(&models.PortfolioRecord{ID: uuid.New().String(), UserID: uid, Timestamp: 1000, Assets: models.AssetMapColumn{"stocks": 100}, Total: 100})
-	db.Create(&models.Setting{Key: "syncInterval", Value: "5", UserID: uid})
+	portfolioID := uuid.New().String()
+	db.Create(&models.Portfolio{ID: portfolioID, UserID: uid, Name: "Test", IsDefault: true, CreatedAt: 1000})
+	db.Create(&models.Holding{ID: uuid.New().String(), UserID: uid, PortfolioID: portfolioID, AssetId: "stocks", Symbol: "AAPL"})
+	db.Create(&models.PortfolioRecord{ID: uuid.New().String(), UserID: uid, PortfolioID: portfolioID, Timestamp: 1000, Assets: models.AssetMapColumn{"stocks": 100}, Total: 100})
+	db.Create(&models.Setting{Key: "syncInterval", Value: "5", UserID: uid, PortfolioID: portfolioID})
 	db.Create(&models.WebAuthnCredential{ID: uuid.New().String(), UserID: uid, CredentialID: []byte("test"), PublicKey: []byte("test")})
 
 	adminID := createTestUser(t, db, "admin", "admin")

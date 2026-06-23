@@ -17,7 +17,8 @@ func GetSyncStatus(s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		c.JSON(consts.StatusOK, s.GetStatusForUser(user.UserID))
+		portfolioID := c.Param("pid")
+		c.JSON(consts.StatusOK, s.GetStatusForPortfolio(user.UserID, portfolioID))
 	}
 }
 
@@ -29,7 +30,8 @@ func TriggerSync(s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		status, ok := s.TriggerSyncForUserSync(user.UserID)
+		portfolioID := c.Param("pid")
+		status, ok := s.TriggerSyncForPortfolioSync(user.UserID, portfolioID)
 		if !ok {
 			c.JSON(consts.StatusConflict, status)
 			return

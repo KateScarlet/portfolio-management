@@ -8,6 +8,7 @@ import ConfirmDialog from "./ConfirmDialog"
 import { useToast } from "./toast-context"
 
 interface HoldingsManagerProps {
+  portfolioId: string
   holdings: Holding[]
   setHoldings: React.Dispatch<React.SetStateAction<Holding[]>>
   total: number
@@ -21,6 +22,7 @@ interface HoldingsManagerProps {
 }
 
 export default function HoldingsManager({
+  portfolioId,
   holdings,
   setHoldings,
   total: _total,
@@ -67,14 +69,14 @@ export default function HoldingsManager({
   const syncAllPrices = useCallback(async () => {
     setSyncing(true)
     try {
-      const status = await api.triggerSync()
+      const status = await api.triggerSync(portfolioId)
       onSyncComplete(status)
-      const freshHoldings = await api.fetchHoldings()
+      const freshHoldings = await api.fetchHoldings(portfolioId)
       setHoldings(freshHoldings)
     } finally {
       setSyncing(false)
     }
-  }, [onSyncComplete, setHoldings])
+  }, [onSyncComplete, setHoldings, portfolioId])
 
   const saveEditLot = useCallback(
     (h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
@@ -568,6 +570,7 @@ export default function HoldingsManager({
 
       {sellingHolding && (
         <SellModal
+          portfolioId={portfolioId}
           holding={sellingHolding}
           onConfirm={handleSellConfirm}
           onClose={() => setSellingHolding(null)}

@@ -38,9 +38,9 @@ func NewNotifier(db *gorm.DB) *Notifier {
 	}
 }
 
-func (n *Notifier) loadUserSettings(userID string) map[string]string {
+func (n *Notifier) loadPortfolioSettings(portfolioID string) map[string]string {
 	var settings []models.Setting
-	_ = n.db.Where("user_id = ?", userID).Find(&settings).Error
+	_ = n.db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error
 	result := make(map[string]string, len(settings))
 	for i := range settings {
 		result[settings[i].Key] = settings[i].Value
@@ -48,12 +48,24 @@ func (n *Notifier) loadUserSettings(userID string) map[string]string {
 	return result
 }
 
-func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
-	settings := n.loadUserSettings(userID)
+func (n *Notifier) loadUserTelegramConfig(userID string) (token, chatID, enabled string) {
+	var settings []models.Setting
+	_ = n.db.Where("user_id = ? AND `key` IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')", userID).Find(&settings).Error
+	for _, s := range settings {
+		switch s.Key {
+		case "telegramBotToken":
+			token = s.Value
+		case "telegramChatID":
+			chatID = s.Value
+		case "telegramEnabled":
+			enabled = s.Value
+		}
+	}
+	return
+}
 
-	token := settings["telegramBotToken"]
-	chatID := settings["telegramChatID"]
-	enabled := settings["telegramEnabled"]
+func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
+	token, chatID, enabled := n.loadUserTelegramConfig(userID)
 
 	if enabled != "true" || token == "" || chatID == "" {
 		n.mu.Lock()
@@ -81,7 +93,7 @@ func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
 	return client, nil
 }
 
-func (n *Notifier) NotifyAfterSync(userID string, holdings []models.Holding, syncedSymbols map[string]float64) {
+func (n *Notifier) NotifyAfterSync(userID, portfolioID string, holdings []models.Holding, syncedSymbols map[string]float64) {
 	client, err := n.LoadTelegramConfig(userID)
 	if err != nil {
 		slog.Error("failed to load telegram config for notification", "userId", userID, "error", err)
@@ -91,13 +103,13 @@ func (n *Notifier) NotifyAfterSync(userID string, holdings []models.Holding, syn
 		return
 	}
 
-	n.checkPriceAlert(userID, client, holdings, syncedSymbols)
-	n.checkDriftAlert(userID, client)
-	n.checkSummary(userID, client, holdings)
+	n.checkPriceAlert(userID, portfolioID, client, holdings, syncedSymbols)
+	n.checkDriftAlert(userID, portfolioID, client)
+	n.checkSummary(userID, portfolioID, client, holdings)
 }
 
-func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
-	settings := n.loadUserSettings(userID)
+func (n *Notifier) checkPriceAlert(userID, portfolioID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
+	settings := n.loadPortfolioSettings(portfolioID)
 
 	if settings["telegramPriceAlert"] != "true" {
 		return
@@ -108,11 +120,12 @@ func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdi
 		_, _ = fmt.Sscanf(v, "%f", &threshold)
 	}
 
+	cacheKey := syncKey(userID, portfolioID)
 	n.mu.Lock()
-	if n.prevPrices[userID] == nil {
-		n.prevPrices[userID] = make(map[string]float64)
+	if n.prevPrices[cacheKey] == nil {
+		n.prevPrices[cacheKey] = make(map[string]float64)
 	}
-	oldPrices := n.prevPrices[userID]
+	oldPrices := n.prevPrices[cacheKey]
 
 	var alerts []string
 	for symbol, newPrice := range syncedPrices {
@@ -147,19 +160,20 @@ func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdi
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>价格波动提醒</b>\n\n" + strings.Join(alerts, "\n\n")
 		_ = client.SendMessage(msg)
-		slog.Info("sent price alert", "userId", userID, "count", len(alerts))
+		slog.Info("sent price alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
 	}
 }
 
-func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
-	settings := n.loadUserSettings(userID)
+func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.Client) {
+	settings := n.loadPortfolioSettings(portfolioID)
 
 	if settings["telegramDriftAlert"] != "true" {
 		return
 	}
 
+	cacheKey := syncKey(userID, portfolioID)
 	n.mu.RLock()
-	lastAlert, exists := n.lastDriftAlert[userID]
+	lastAlert, exists := n.lastDriftAlert[cacheKey]
 	n.mu.RUnlock()
 
 	if exists && time.Since(lastAlert) < 24*time.Hour {
@@ -172,7 +186,7 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 	}
 
 	var holdings []models.Holding
-	if err := n.db.Where("user_id = ?", userID).Find(&holdings).Error; err != nil {
+	if err := n.db.Where("portfolio_id = ?", portfolioID).Find(&holdings).Error; err != nil {
 		return
 	}
 
@@ -241,14 +255,14 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 		msg := "⚠️ <b>配比偏离提醒</b>\n\n当前资产配置:\n" + strings.Join(alerts, "\n")
 		_ = client.SendMessage(msg)
 		n.mu.Lock()
-		n.lastDriftAlert[userID] = time.Now()
+		n.lastDriftAlert[cacheKey] = time.Now()
 		n.mu.Unlock()
-		slog.Info("sent drift alert", "userId", userID, "count", len(alerts))
+		slog.Info("sent drift alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
 	}
 }
 
-func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings []models.Holding) {
-	settings := n.loadUserSettings(userID)
+func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Client, holdings []models.Holding) {
+	settings := n.loadPortfolioSettings(portfolioID)
 
 	if settings["telegramSummary"] != "true" {
 		return
@@ -259,8 +273,9 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 	shouldSend := false
 	now := time.Now()
 
+	cacheKey := syncKey(userID, portfolioID)
 	n.mu.RLock()
-	lastTime, exists := n.lastSummaryTime[userID]
+	lastTime, exists := n.lastSummaryTime[cacheKey]
 	n.mu.RUnlock()
 
 	switch interval {
@@ -326,7 +341,7 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 	_ = client.SendMessage(strings.Join(lines, "\n"))
 
 	n.mu.Lock()
-	n.lastSummaryTime[userID] = now
+	n.lastSummaryTime[cacheKey] = now
 	n.mu.Unlock()
-	slog.Info("sent portfolio summary", "userId", userID)
+	slog.Info("sent portfolio summary", "userId", userID, "portfolioId", portfolioID)
 }

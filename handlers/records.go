@@ -20,8 +20,14 @@ func ListRecords(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		var records []models.PortfolioRecord
-		if err := db.Where("user_id = ?", user.UserID).Order("timestamp DESC").Find(&records).Error; err != nil {
+		if err := db.Where("portfolio_id = ?", portfolioID).Order("timestamp DESC").Find(&records).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -37,8 +43,14 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		var holdings []models.Holding
-		if err := db.Where("user_id = ?", user.UserID).Find(&holdings).Error; err != nil {
+		if err := db.Where("portfolio_id = ?", portfolioID).Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -71,13 +83,14 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 		}
 
 		record := models.PortfolioRecord{
-			ID:        uuid.New().String(),
-			UserID:    user.UserID,
-			Timestamp: time.Now().UnixMilli(),
-			Assets:    assets,
-			Holdings:  snapshotHoldings,
-			Total:     total,
-			Principal: principal,
+			ID:          uuid.New().String(),
+			UserID:      user.UserID,
+			PortfolioID: portfolioID,
+			Timestamp:   time.Now().UnixMilli(),
+			Assets:      assets,
+			Holdings:    snapshotHoldings,
+			Total:       total,
+			Principal:   principal,
 		}
 
 		if err := db.Create(&record).Error; err != nil {
@@ -97,8 +110,14 @@ func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		id := c.Param("id")
-		result := db.Where("user_id = ?", user.UserID).Delete(&models.PortfolioRecord{}, "id = ?", id)
+		result := db.Where("portfolio_id = ?", portfolioID).Delete(&models.PortfolioRecord{}, "id = ?", id)
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return

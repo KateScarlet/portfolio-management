@@ -2,20 +2,27 @@ import { useState, useEffect, useCallback } from "react"
 import { AssetId, Holding, PortfolioRecord } from "./types"
 import * as api from "./api"
 
-export function usePortfolio() {
+export function usePortfolio(portfolioId: string | null) {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [history, setHistory] = useState<PortfolioRecord[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([api.fetchHoldings(), api.fetchRecords()])
+    if (!portfolioId) {
+      setHoldings([])
+      setHistory([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    Promise.all([api.fetchHoldings(portfolioId), api.fetchRecords(portfolioId)])
       .then(([h, r]) => {
         setHoldings(h)
         setHistory(r)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [portfolioId])
 
   const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
   holdings.forEach((h) => {
@@ -23,7 +30,8 @@ export function usePortfolio() {
   })
 
   const addHolding = useCallback(async (holding: Omit<Holding, "id">) => {
-    const result = await api.createHolding(holding)
+    if (!portfolioId) return
+    const result = await api.createHolding(portfolioId, holding)
     setHoldings((prev) => {
       const idx = prev.findIndex((h) => h.id === result.id)
       if (idx >= 0) {
@@ -33,43 +41,47 @@ export function usePortfolio() {
       }
       return [...prev, result]
     })
-  }, [])
+  }, [portfolioId])
 
   const updateHolding = useCallback(async (id: string, updates: Partial<Holding>) => {
+    if (!portfolioId) return
     try {
-      const result = await api.updateHolding(id, updates)
+      const result = await api.updateHolding(portfolioId, id, updates)
       setHoldings((prev) => prev.map((h) => (h.id === id ? result : h)))
     } catch (e) {
       console.error("Failed to update holding", e)
     }
-  }, [])
+  }, [portfolioId])
 
   const removeHolding = useCallback(async (id: string) => {
+    if (!portfolioId) return
     try {
-      await api.deleteHolding(id)
+      await api.deleteHolding(portfolioId, id)
       setHoldings((prev) => prev.filter((h) => h.id !== id))
     } catch (e) {
       console.error("Failed to delete holding", e)
     }
-  }, [])
+  }, [portfolioId])
 
   const saveRecord = useCallback(async () => {
+    if (!portfolioId) return
     try {
-      const result = await api.createRecord()
+      const result = await api.createRecord(portfolioId)
       setHistory((prev) => [result, ...prev])
     } catch (e) {
       console.error("Failed to save record", e)
     }
-  }, [])
+  }, [portfolioId])
 
   const deleteRecord = useCallback(async (id: string) => {
+    if (!portfolioId) return
     try {
-      await api.deleteRecord(id)
+      await api.deleteRecord(portfolioId, id)
       setHistory((prev) => prev.filter((r) => r.id !== id))
     } catch (e) {
       console.error("Failed to delete record", e)
     }
-  }, [])
+  }, [portfolioId])
 
   return {
     holdings,

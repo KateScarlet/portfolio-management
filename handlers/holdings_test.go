@@ -15,11 +15,7 @@ import (
 
 func setupHoldingsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db := setupTestDB(t)
-	if err := db.AutoMigrate(&models.PortfolioRecord{}); err != nil {
-		t.Fatal(err)
-	}
-	return db
+	return setupTestDB(t)
 }
 
 func newUserCtx(method, path string, body any) *app.RequestContext {
@@ -31,6 +27,7 @@ func newUserCtx(method, path string, body any) *app.RequestContext {
 		b, _ := json.Marshal(body)
 		c.Request.SetBodyRaw(b)
 	}
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}}
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
 		Username: "testuser",
@@ -85,9 +82,13 @@ func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	createTestHolding(t, db, 10, 100, 900)
 
+	otherPortfolioID := "other-portfolio-id"
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: "other-user", Name: "Other", IsDefault: true, CreatedAt: 1000})
+
 	c := app.NewContext(1)
-	c.Request.SetRequestURI("/api/holdings")
+	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID + "/holdings")
 	c.Request.Header.SetMethod("GET")
+	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID}}
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   "other-user",
 		Username: "other",
@@ -209,7 +210,7 @@ func TestCreateHolding_ValidationErrors(t *testing.T) {
 
 func TestCreateHolding_DeductFromCash(t *testing.T) {
 	db := setupHoldingsTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "10000", UserID: testUserID})
+	db.Create(&models.Setting{Key: "availableFunds", Value: "10000", UserID: testUserID, PortfolioID: testPortfolioID})
 
 	body := map[string]any{
 		"assetId":        "stocks",
@@ -239,7 +240,7 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 
 func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 	db := setupHoldingsTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "500", UserID: testUserID})
+	db.Create(&models.Setting{Key: "availableFunds", Value: "500", UserID: testUserID, PortfolioID: testPortfolioID})
 
 	body := map[string]any{
 		"assetId":        "stocks",
@@ -268,9 +269,10 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 		{ID: uuid.New().String(), Date: 1000, Cost: 5000, ValueAdded: 5000},
 	}
 	h := models.Holding{
-		ID:      id,
-		UserID:  testUserID,
-		AssetId: "bonds",
+		ID:          id,
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		AssetId:     "bonds",
 		Name:    "手工债券",
 		Value:   5000,
 		Cost:    5000,
@@ -279,8 +281,8 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 	db.Create(&h)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"value": 6000}`))
@@ -308,8 +310,8 @@ func TestUpdateHolding_BlockAssetIdChange(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"assetId": "bonds"}`))
@@ -336,8 +338,8 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 	body := map[string]any{"lots": newLots}
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)
@@ -368,8 +370,8 @@ func TestUpdateHolding_NotFound(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/holdings/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/nonexistent")
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"name": "new"}`))
@@ -393,8 +395,8 @@ func TestDeleteHolding_Success(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -419,8 +421,8 @@ func TestDeleteHolding_NotFound(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/holdings/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/nonexistent")
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -439,9 +441,12 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
+	otherPortfolioID := "other-portfolio-id"
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: "other-user", Name: "Other", IsDefault: true, CreatedAt: 1000})
+
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/"+otherPortfolioID+"/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   "other-user",

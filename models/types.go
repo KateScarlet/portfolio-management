@@ -69,10 +69,20 @@ func (a AssetMapColumn) Value() (driver.Value, error) {
 	return json.Marshal(a)
 }
 
+type Portfolio struct {
+	ID          string `gorm:"primaryKey" json:"id"`
+	UserID      string `gorm:"index;not null" json:"userId"`
+	Name        string `gorm:"size:100;not null" json:"name"`
+	Description string `gorm:"size:500;default:''" json:"description,omitempty"`
+	IsDefault   bool   `gorm:"default:false" json:"isDefault"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 type Holding struct {
-	ID        string     `gorm:"primaryKey" json:"id"`
-	UserID    string     `gorm:"index;not null" json:"userId"`
-	AssetId   string     `gorm:"size:20;not null" json:"assetId"`
+	ID          string     `gorm:"primaryKey" json:"id"`
+	UserID      string     `gorm:"index;not null" json:"userId"`
+	PortfolioID string     `gorm:"index;not null" json:"portfolioId"`
+	AssetId     string     `gorm:"size:20;not null" json:"assetId"`
 	Symbol    string     `gorm:"size:20;default:''" json:"symbol"`
 	Name      string     `gorm:"size:200;default:''" json:"name,omitempty"`
 	Shares    float64    `gorm:"default:0" json:"shares"`
@@ -123,9 +133,10 @@ func (h HoldingSnapshotColumn) Value() (driver.Value, error) {
 }
 
 type PortfolioRecord struct {
-	ID        string                `gorm:"primaryKey" json:"id"`
-	UserID    string                `gorm:"index;not null" json:"userId"`
-	Timestamp int64                 `gorm:"index;not null" json:"timestamp"`
+	ID          string                `gorm:"primaryKey" json:"id"`
+	UserID      string                `gorm:"index;not null" json:"userId"`
+	PortfolioID string                `gorm:"index;not null" json:"portfolioId"`
+	Timestamp   int64                 `gorm:"index;not null" json:"timestamp"`
 	Assets    AssetMapColumn        `gorm:"type:text;not null;default:'{}'" json:"assets"`
 	Holdings  HoldingSnapshotColumn `gorm:"type:text;not null;default:'[]'" json:"holdings"`
 	Total     float64               `gorm:"default:0" json:"total"`
@@ -133,9 +144,10 @@ type PortfolioRecord struct {
 }
 
 type Setting struct {
-	Key    string `gorm:"primaryKey;size:100" json:"key"`
-	Value  string `gorm:"not null" json:"value"`
-	UserID string `gorm:"primaryKey;size:50;default:''" json:"userId,omitempty"`
+	Key         string `gorm:"primaryKey;size:100" json:"key"`
+	Value       string `gorm:"not null" json:"value"`
+	UserID      string `gorm:"primaryKey;size:50;default:''" json:"userId,omitempty"`
+	PortfolioID string `gorm:"primaryKey;size:50;default:''" json:"portfolioId,omitempty"`
 }
 
 type User struct {

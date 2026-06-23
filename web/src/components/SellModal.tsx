@@ -5,12 +5,13 @@ import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface SellModalProps {
+  portfolioId: string
   holding: Holding
   onConfirm: (soldHolding: Holding) => void
   onClose: () => void
 }
 
-export default function SellModal({ holding, onConfirm, onClose }: SellModalProps) {
+export default function SellModal({ portfolioId, holding, onConfirm, onClose }: SellModalProps) {
   const [sellShares, setSellShares] = useState(
     holding.shares && holding.shares > 0 ? holding.shares.toString() : ""
   )
@@ -43,7 +44,7 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
       }
 
       try {
-        const result = await api.sellHolding(holding.id, sShares, sPrice, feeNum, 0)
+        const result = await api.sellHolding(portfolioId, holding.id, sShares, sPrice, feeNum, 0)
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {
@@ -62,7 +63,7 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
       }
 
       try {
-        const result = await api.sellHolding(holding.id, 0, 0, feeNum, sValue)
+        const result = await api.sellHolding(portfolioId, holding.id, 0, 0, feeNum, sValue)
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {
