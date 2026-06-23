@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"portfolio-management/db"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"gorm.io/gorm"
 )
 
 func SetupStatus() app.HandlerFunc {
@@ -17,7 +18,7 @@ func SetupStatus() app.HandlerFunc {
 	}
 }
 
-func SetupComplete(database *gorm.DB) app.HandlerFunc {
+func SetupComplete(h *server.Hertz) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			DatabaseType string `json:"databaseType"`
@@ -60,11 +61,22 @@ func SetupComplete(database *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		database, err := db.Init(cfg)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "初始化数据库失败: " + err.Error()})
+			return
+		}
+
 		if err := CreateUserForSetup(database, body.Username, body.Password, "admin"); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建管理员失败: " + err.Error()})
 			return
 		}
 
 		c.JSON(consts.StatusOK, map[string]bool{"success": true})
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			h.Shutdown(ctx)
+		}()
 	}
 }

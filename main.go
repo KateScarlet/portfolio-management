@@ -27,6 +27,26 @@ func main() {
 	})))
 
 	cfg := db.LoadConfig()
+	middleware.SetJWTSecret(cfg.JWTSecret)
+
+	h := server.Default(server.WithHostPorts(":3000"))
+
+	h.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
+	}))
+
+	h.GET("/api/setup/status", handlers.SetupStatus())
+	h.POST("/api/setup/complete", handlers.SetupComplete(h))
+
+	if db.IsSetupMode() {
+		serveFrontend(h)
+		h.Spin()
+		return
+	}
+
 	database, err := db.Init(cfg)
 	if err != nil {
 		slog.Error("failed to init database", "error", err)
@@ -44,18 +64,6 @@ func main() {
 	priceScheduler := scheduler.New(database)
 	notifier := scheduler.NewNotifier(database)
 	priceScheduler.SetNotifier(notifier)
-
-	h := server.Default(server.WithHostPorts(":3000"))
-
-	h.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		AllowCredentials: true,
-	}))
-
-	h.GET("/api/setup/status", handlers.SetupStatus())
-	h.POST("/api/setup/complete", handlers.SetupComplete(database))
 
 	h.POST("/api/auth/login", handlers.Login(database))
 	h.POST("/api/auth/logout", handlers.Logout())
@@ -113,7 +121,12 @@ func main() {
 	admin.POST("/users", handlers.Register(database))
 	admin.DELETE("/users/:id", handlers.DeleteUser(database))
 
-	// Serve embedded frontend files
+	serveFrontend(h)
+
+	h.Spin()
+}
+
+func serveFrontend(h *server.Hertz) {
 	subFS, err := fs.Sub(frontendFS, "web/dist")
 	if err != nil {
 		slog.Error("failed to create sub filesystem", "error", err)
@@ -126,18 +139,14 @@ func main() {
 			http.ServeFileFS(w, r, subFS, "index.html")
 			return
 		}
-		// Check if the requested file exists in the embedded FS
 		if _, err := fs.Stat(subFS, strings.TrimPrefix(path, "/")); err == nil {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		// SPA fallback: serve index.html for non-API routes
 		if !strings.HasPrefix(path, "/api/") {
 			http.ServeFileFS(w, r, subFS, "index.html")
 			return
 		}
 		http.NotFound(w, r)
 	})))
-
-	h.Spin()
 }
