@@ -56,6 +56,11 @@ export interface Settings {
   driftThreshold: number // 漂移阈值百分比，如 5 表示 5%
   syncInterval: number // 同步间隔（分钟），0 = 关闭
   colorScheme: ColorScheme // 红涨绿跌 or 绿涨红跌
+  // Target allocation
+  targetStocks: number
+  targetBonds: number
+  targetCash: number
+  targetGold: number
   // Telegram
   telegramBotToken: string
   telegramChatID: string
@@ -71,6 +76,10 @@ export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
   syncInterval: 60,
   colorScheme: "green-up",
+  targetStocks: 25,
+  targetBonds: 25,
+  targetCash: 25,
+  targetGold: 25,
   telegramBotToken: "",
   telegramChatID: "",
   telegramEnabled: false,

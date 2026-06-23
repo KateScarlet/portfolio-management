@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"
-import { Settings } from "../types"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { Settings, AssetId, ASSET_DEFINITIONS } from "../types"
 import { Settings as SettingsIcon, ArrowUp, ArrowDown } from "lucide-react"
 import * as api from "../api"
 
@@ -197,6 +197,17 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Target Allocation */}
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                  目标配比
+                </label>
+                <p className="text-xs text-[#6C757D] mb-3">
+                  拖动分隔线调整各资产类别目标占比，用于再平衡建议和偏离提醒。
+                </p>
+                <TargetAllocationBar draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
               </div>
 
               {/* Sync Interval */}
@@ -708,6 +719,138 @@ function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean;
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const ASSET_ORDER: AssetId[] = ["stocks", "bonds", "cash", "gold"]
+const ASSET_KEYS = ASSET_ORDER.map((id) => `target${id.charAt(0).toUpperCase() + id.slice(1)}` as keyof Settings)
+const MIN_SEG = 1
+
+function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (patch: Partial<Settings>) => void }) {
+  const barRef = useRef<HTMLDivElement>(null)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const dragRef = useRef<{
+    idx: number
+    startX: number
+    perPx: number
+    belowSum: number
+    aboveSum: number
+    currentPcts: number[]
+  } | null>(null)
+  const currentPctsRef = useRef(ASSET_KEYS.map((k) => draft[k] as number))
+
+  currentPctsRef.current = ASSET_KEYS.map((k) => draft[k] as number)
+
+  const handlePointerDown = useCallback(
+    (idx: number, e: React.PointerEvent) => {
+      const bar = barRef.current
+      if (!bar) return
+      const w = bar.getBoundingClientRect().width
+      if (w === 0) return
+
+      const pcts = currentPctsRef.current
+      const belowSum = pcts.slice(0, idx).reduce((s, v) => s + v, 0)
+      const aboveSum = pcts.slice(idx + 2).reduce((s, v) => s + v, 0)
+
+      dragRef.current = {
+        idx,
+        startX: e.clientX,
+        perPx: 100 / w,
+        belowSum,
+        aboveSum,
+        currentPcts: [...pcts],
+      }
+      setDragIdx(idx)
+      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (dragIdx === null) return
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      const delta = (e.clientX - d.startX) * d.perPx
+      const lo = MIN_SEG
+      const hi = 100 - d.belowSum - d.aboveSum - MIN_SEG
+      const newLeft = Math.round(Math.max(lo, Math.min(hi, d.currentPcts[d.idx] + delta)))
+      const newRight = 100 - d.belowSum - d.aboveSum - newLeft
+
+      const patch: Record<string, number> = {}
+      patch[ASSET_KEYS[d.idx]] = newLeft
+      patch[ASSET_KEYS[d.idx + 1]] = newRight
+      onChange(patch as Partial<Settings>)
+    }
+
+    const onUp = () => {
+      dragRef.current = null
+      setDragIdx(null)
+    }
+
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+    return () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+    }
+  }, [dragIdx, onChange])
+
+  return (
+    <div>
+      <div ref={barRef} className="relative flex h-10 rounded-lg overflow-hidden select-none">
+        {ASSET_ORDER.map((id, i) => {
+          const def = ASSET_DEFINITIONS[id]
+          const pct = currentPctsRef.current[i]
+          return (
+            <div
+              key={id}
+              className="relative flex items-center justify-center transition-[width] duration-75"
+              style={{ width: `${pct}%`, backgroundColor: def.color }}
+            >
+              {pct >= 10 && (
+                <span
+                  className={`text-[11px] font-medium leading-none whitespace-nowrap ${id === "cash" ? "text-[#495057]" : "text-white"}`}
+                >
+                  {def.name} {pct}%
+                </span>
+              )}
+              {i < 3 && (
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-1.5 z-10 flex items-center justify-center cursor-col-resize touch-none"
+                  onPointerDown={(e) => handlePointerDown(i, e)}
+                >
+                  <div
+                    className={`w-0.5 h-5 rounded-full transition-colors ${
+                      dragIdx === i ? "bg-white" : "bg-white/50"
+                    }`}
+                  />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center gap-4 mt-2">
+        {ASSET_ORDER.map((id, i) => {
+          const def = ASSET_DEFINITIONS[id]
+          const pct = currentPctsRef.current[i]
+          return (
+            <div key={id} className="flex items-center gap-1.5">
+              <div
+                className={`w-2 h-2 rounded-full shrink-0 ${id === "cash" ? "border border-[#ADB5BD]" : ""}`}
+                style={{ backgroundColor: def.color }}
+              />
+              <span className="text-[11px] text-[#6C757D]">
+                {def.name}
+                {pct < 10 ? ` ${pct}%` : ""}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

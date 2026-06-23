@@ -193,7 +193,31 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 		return
 	}
 
-	targetPct := 25.0
+	targetPcts := map[string]float64{
+		"stocks": 25.0,
+		"bonds":  25.0,
+		"cash":   25.0,
+		"gold":   25.0,
+	}
+	for id := range targetPcts {
+		if v := settings["target"+strings.ToUpper(id[:1])+id[1:]]; v != "" {
+			var pct float64
+			if _, err := fmt.Sscanf(v, "%f", &pct); err == nil {
+				targetPcts[id] = pct
+			}
+		}
+	}
+
+	var targetTotal float64
+	for _, v := range targetPcts {
+		targetTotal += v
+	}
+	if targetTotal > 0 && targetTotal != 100 {
+		for id := range targetPcts {
+			targetPcts[id] = targetPcts[id] / targetTotal * 100
+		}
+	}
+
 	var alerts []string
 	assetNames := map[string]string{
 		"stocks": "股票",
@@ -204,17 +228,17 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 
 	for id, value := range assets {
 		pct := value / total * 100
-		diff := pct - targetPct
+		diff := pct - targetPcts[id]
 		if diff > driftThreshold || diff < -driftThreshold {
 			alerts = append(alerts, fmt.Sprintf(
-				"<b>%s</b>: %.1f%% (偏离 %+.1f%%)",
-				assetNames[id], pct, diff,
+				"<b>%s</b>: %.1f%% (目标 %.0f%%, 偏离 %+.1f%%)",
+				assetNames[id], pct, targetPcts[id], diff,
 			))
 		}
 	}
 
 	if len(alerts) > 0 {
-		msg := "⚠️ <b>配比偏离提醒</b>\n\n当前资产配置 vs 目标 25%:\n" + strings.Join(alerts, "\n")
+		msg := "⚠️ <b>配比偏离提醒</b>\n\n当前资产配置:\n" + strings.Join(alerts, "\n")
 		_ = client.SendMessage(msg)
 		n.mu.Lock()
 		n.lastDriftAlert[userID] = time.Now()

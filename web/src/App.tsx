@@ -54,6 +54,10 @@ export default function App() {
             driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
             syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
             colorScheme: (s.colorScheme as ColorScheme) || DEFAULT_SETTINGS.colorScheme,
+            targetStocks: s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
+            targetBonds: s.targetBonds != null ? Number(s.targetBonds) : DEFAULT_SETTINGS.targetBonds,
+            targetCash: s.targetCash != null ? Number(s.targetCash) : DEFAULT_SETTINGS.targetCash,
+            targetGold: s.targetGold != null ? Number(s.targetGold) : DEFAULT_SETTINGS.targetGold,
             telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
             telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
             telegramEnabled: s.telegramEnabled === "true",
@@ -106,6 +110,10 @@ export default function App() {
         driftThreshold: String(newSettings.driftThreshold),
         syncInterval: String(newSettings.syncInterval),
         colorScheme: newSettings.colorScheme,
+        targetStocks: String(newSettings.targetStocks),
+        targetBonds: String(newSettings.targetBonds),
+        targetCash: String(newSettings.targetCash),
+        targetGold: String(newSettings.targetGold),
         telegramBotToken: newSettings.telegramBotToken,
         telegramChatID: newSettings.telegramChatID,
         telegramEnabled: String(newSettings.telegramEnabled),
@@ -257,6 +265,12 @@ export default function App() {
               total={total}
               driftThreshold={settings.driftThreshold}
               colorScheme={settings.colorScheme}
+              targetPcts={{
+                stocks: settings.targetStocks,
+                bonds: settings.targetBonds,
+                cash: settings.targetCash,
+                gold: settings.targetGold,
+              }}
             />
           </div>
         </div>

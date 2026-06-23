@@ -7,9 +7,10 @@ interface RebalancePanelProps {
   total: number
   driftThreshold: number
   colorScheme: ColorScheme
+  targetPcts: Record<AssetId, number>
 }
 
-export default function RebalancePanel({ assets, total, driftThreshold, colorScheme }: RebalancePanelProps) {
+export default function RebalancePanel({ assets, total, driftThreshold, colorScheme, targetPcts }: RebalancePanelProps) {
   if (total === 0) {
     return null
   }
@@ -17,7 +18,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
   const items = Object.keys(ASSET_DEFINITIONS).map((key) => {
     const id = key as AssetId
     const def = ASSET_DEFINITIONS[id]
-    const targetValue = total * (def.targetPct / 100)
+    const targetValue = total * (targetPcts[id] / 100)
     const currentValue = assets[id] || 0
     const difference = targetValue - currentValue
     const isBalanced = Math.abs(difference / total) < driftThreshold / 100 // Within drift tolerance
