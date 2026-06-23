@@ -57,7 +57,7 @@ export default function App() {
             targetStocks: s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
             targetBonds: s.targetBonds != null ? Number(s.targetBonds) : DEFAULT_SETTINGS.targetBonds,
             targetCash: s.targetCash != null ? Number(s.targetCash) : DEFAULT_SETTINGS.targetCash,
-            targetGold: s.targetGold != null ? Number(s.targetGold) : DEFAULT_SETTINGS.targetGold,
+            targetCommodities: s.targetCommodities != null ? Number(s.targetCommodities) : (s as any).targetGold != null ? Number((s as any).targetGold) : DEFAULT_SETTINGS.targetCommodities,
             telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
             telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
             telegramEnabled: s.telegramEnabled === "true",
@@ -113,7 +113,7 @@ export default function App() {
         targetStocks: String(newSettings.targetStocks),
         targetBonds: String(newSettings.targetBonds),
         targetCash: String(newSettings.targetCash),
-        targetGold: String(newSettings.targetGold),
+        targetCommodities: String(newSettings.targetCommodities),
         telegramBotToken: newSettings.telegramBotToken,
         telegramChatID: newSettings.telegramChatID,
         telegramEnabled: String(newSettings.telegramEnabled),
@@ -269,7 +269,7 @@ export default function App() {
                 stocks: settings.targetStocks,
                 bonds: settings.targetBonds,
                 cash: settings.targetCash,
-                gold: settings.targetGold,
+                commodities: settings.targetCommodities,
               }}
             />
           </div>

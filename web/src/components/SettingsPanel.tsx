@@ -723,7 +723,7 @@ function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean;
   )
 }
 
-const ASSET_ORDER: AssetId[] = ["stocks", "bonds", "cash", "gold"]
+const ASSET_ORDER: AssetId[] = ["stocks", "bonds", "cash", "commodities"]
 const ASSET_KEYS = ASSET_ORDER.map((id) => `target${id.charAt(0).toUpperCase() + id.slice(1)}` as keyof Settings)
 const MIN_SEG = 1
 

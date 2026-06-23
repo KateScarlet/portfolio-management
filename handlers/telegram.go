@@ -85,7 +85,7 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			var holdings []models.Holding
 			_ = db.Where("user_id = ?", user.UserID).Find(&holdings).Error
 
-			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
+			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 			var total, totalCost float64
 			for i := range holdings {
 				h := &holdings[i]
@@ -95,7 +95,7 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			}
 
 			assetNames := map[string]string{
-				"stocks": "股票", "bonds": "债券", "cash": "现金", "gold": "商品",
+				"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品",
 			}
 
 			now := time.Now()
@@ -111,7 +111,7 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			}
 			lines = append(lines, "")
 
-			for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
+			for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
 				pct := 0.0
 				if total > 0 {
 					pct = assets[id] / total * 100

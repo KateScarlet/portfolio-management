@@ -43,7 +43,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "gold": 0}
+		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 		var total, principal float64
 		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
 		for i := range holdings {

@@ -17,7 +17,7 @@ export function usePortfolio() {
       .finally(() => setLoading(false))
   }, [])
 
-  const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, gold: 0 }
+  const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
   holdings.forEach((h) => {
     assets[h.assetId] = (assets[h.assetId] || 0) + (h.value || 0)
   })

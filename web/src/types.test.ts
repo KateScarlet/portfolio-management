@@ -6,11 +6,11 @@ describe("ASSET_DEFINITIONS", () => {
     expect(ASSET_DEFINITIONS.stocks).toBeDefined()
     expect(ASSET_DEFINITIONS.bonds).toBeDefined()
     expect(ASSET_DEFINITIONS.cash).toBeDefined()
-    expect(ASSET_DEFINITIONS.gold).toBeDefined()
+    expect(ASSET_DEFINITIONS.commodities).toBeDefined()
   })
 
   it("each asset has required fields", () => {
-    const ids: AssetId[] = ["stocks", "bonds", "cash", "gold"]
+    const ids: AssetId[] = ["stocks", "bonds", "cash", "commodities"]
     for (const id of ids) {
       const def = ASSET_DEFINITIONS[id]
       expect(def.id).toBe(id)

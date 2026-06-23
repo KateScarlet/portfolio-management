@@ -87,7 +87,7 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
                       {formatCurrency(record.assets.bonds || 0)}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
-                      {formatCurrency(record.assets.gold || 0)}
+                      {formatCurrency(record.assets.commodities || 0)}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
                       {formatCurrency(record.assets.cash || 0)}

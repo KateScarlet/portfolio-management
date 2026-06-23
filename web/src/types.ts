@@ -1,4 +1,4 @@
-export type AssetId = "stocks" | "bonds" | "cash" | "gold"
+export type AssetId = "stocks" | "bonds" | "cash" | "commodities"
 
 export interface UserInfo {
   id: string
@@ -71,7 +71,7 @@ export interface Settings {
   targetStocks: number
   targetBonds: number
   targetCash: number
-  targetGold: number
+  targetCommodities: number
   // Telegram
   telegramBotToken: string
   telegramChatID: string
@@ -90,7 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetStocks: 25,
   targetBonds: 25,
   targetCash: 25,
-  targetGold: 25,
+  targetCommodities: 25,
   telegramBotToken: "",
   telegramChatID: "",
   telegramEnabled: false,
@@ -129,11 +129,11 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     color: "#E9ECEF", // silver/cash
     targetPct: 25,
   },
-  gold: {
-    id: "gold",
+  commodities: {
+    id: "commodities",
     name: "商品",
     description: "提供通货膨胀保护（如黄金, 能源, 农产品等）",
-    color: "#D4AF37", // gold
+    color: "#D4AF37",
     targetPct: 25,
   },
 }

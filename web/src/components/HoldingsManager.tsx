@@ -189,7 +189,7 @@ export default function HoldingsManager({
                             ? "STK"
                             : h.assetId === "bonds"
                               ? "BND"
-                              : h.assetId === "gold"
+                              : h.assetId === "commodities"
                                 ? "CMD"
                                 : "CSH"}
                         </div>

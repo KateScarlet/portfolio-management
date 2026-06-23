@@ -103,7 +103,7 @@ func TestAssetMapColumn_ValueNil(t *testing.T) {
 }
 
 func TestAssetMapColumn_ValueWithData(t *testing.T) {
-	a := AssetMapColumn{"stocks": 500, "gold": 300}
+	a := AssetMapColumn{"stocks": 500, "commodities": 300}
 	v, err := a.Value()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -116,7 +116,7 @@ func TestAssetMapColumn_ValueWithData(t *testing.T) {
 	if err := json.Unmarshal(bytes, &parsed); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if parsed["stocks"] != 500 || parsed["gold"] != 300 {
+	if parsed["stocks"] != 500 || parsed["commodities"] != 300 {
 		t.Fatalf("unexpected data: %+v", parsed)
 	}
 }

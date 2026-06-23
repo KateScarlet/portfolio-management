@@ -57,7 +57,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId is required"})
 			return
 		}
-		validAssets := map[string]bool{"stocks": true, "bonds": true, "cash": true, "gold": true}
+		validAssets := map[string]bool{"stocks": true, "bonds": true, "cash": true, "commodities": true}
 		if !validAssets[input.AssetId] {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid assetId"})
 			return

@@ -177,10 +177,10 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 	}
 
 	assets := map[string]float64{
-		"stocks": 0,
-		"bonds":  0,
-		"cash":   0,
-		"gold":   0,
+		"stocks":      0,
+		"bonds":       0,
+		"cash":        0,
+		"commodities": 0,
 	}
 	var total float64
 	for i := range holdings {
@@ -194,10 +194,10 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 	}
 
 	targetPcts := map[string]float64{
-		"stocks": 25.0,
-		"bonds":  25.0,
-		"cash":   25.0,
-		"gold":   25.0,
+		"stocks":      25.0,
+		"bonds":       25.0,
+		"cash":        25.0,
+		"commodities": 25.0,
 	}
 	for id := range targetPcts {
 		if v := settings["target"+strings.ToUpper(id[:1])+id[1:]]; v != "" {
@@ -220,10 +220,10 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 
 	var alerts []string
 	assetNames := map[string]string{
-		"stocks": "股票",
-		"bonds":  "债券",
-		"cash":   "现金",
-		"gold":   "商品",
+		"stocks":      "股票",
+		"bonds":       "债券",
+		"cash":        "现金",
+		"commodities": "商品",
 	}
 
 	for id, value := range assets {
@@ -281,10 +281,10 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 	}
 
 	assets := map[string]float64{
-		"stocks": 0,
-		"bonds":  0,
-		"cash":   0,
-		"gold":   0,
+		"stocks":      0,
+		"bonds":       0,
+		"cash":        0,
+		"commodities": 0,
 	}
 	var total, totalCost, totalBuyFees float64
 	for i := range holdings {
@@ -297,10 +297,10 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 	principal := totalCost + totalBuyFees
 
 	assetNames := map[string]string{
-		"stocks": "股票",
-		"bonds":  "债券",
-		"cash":   "现金",
-		"gold":   "商品",
+		"stocks":      "股票",
+		"bonds":       "债券",
+		"cash":        "现金",
+		"commodities": "商品",
 	}
 
 	lines := []string{
@@ -315,7 +315,7 @@ func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings
 	}
 	lines = append(lines, "")
 
-	for _, id := range []string{"stocks", "bonds", "cash", "gold"} {
+	for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
 		pct := 0.0
 		if total > 0 {
 			pct = assets[id] / total * 100

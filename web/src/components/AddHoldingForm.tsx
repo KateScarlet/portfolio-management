@@ -322,7 +322,7 @@ export default function AddHoldingForm({
               <input
                 type="text"
                 placeholder={
-                  assetId === "gold"
+                  assetId === "commodities"
                     ? "如: 实物黄金 50g"
                     : assetId === "cash"
                       ? "如: 货币基金"

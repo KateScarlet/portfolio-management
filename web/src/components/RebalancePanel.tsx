@@ -84,7 +84,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
                     className={`w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold ${item.id === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
                     style={{ backgroundColor: item.def.color }}
                   >
-                    {item.id === "stocks" ? "STK" : item.id === "bonds" ? "BND" : item.id === "gold" ? "CMD" : "CSH"}
+                    {item.id === "stocks" ? "STK" : item.id === "bonds" ? "BND" : item.id === "commodities" ? "CMD" : "CSH"}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
