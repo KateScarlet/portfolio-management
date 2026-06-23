@@ -13,12 +13,19 @@ import (
 	"gorm.io/gorm"
 )
 
+type cachedTelegram struct {
+	client *telegram.Client
+	token  string
+	chatID string
+}
+
 type Notifier struct {
 	db              *gorm.DB
 	mu              sync.RWMutex
 	prevPrices      map[string]map[string]float64
 	lastDriftAlert  map[string]time.Time
 	lastSummaryTime map[string]time.Time
+	telegramClients map[string]*cachedTelegram
 }
 
 func NewNotifier(db *gorm.DB) *Notifier {
@@ -27,6 +34,7 @@ func NewNotifier(db *gorm.DB) *Notifier {
 		prevPrices:      make(map[string]map[string]float64),
 		lastDriftAlert:  make(map[string]time.Time),
 		lastSummaryTime: make(map[string]time.Time),
+		telegramClients: make(map[string]*cachedTelegram),
 	}
 }
 
@@ -48,13 +56,27 @@ func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
 	enabled := settings["telegramEnabled"]
 
 	if enabled != "true" || token == "" || chatID == "" {
+		n.mu.Lock()
+		delete(n.telegramClients, userID)
+		n.mu.Unlock()
 		return nil, nil
+	}
+
+	n.mu.RLock()
+	cached, ok := n.telegramClients[userID]
+	n.mu.RUnlock()
+	if ok && cached.token == token && cached.chatID == chatID {
+		return cached.client, nil
 	}
 
 	client, err := telegram.NewClient(token, chatID)
 	if err != nil {
 		return nil, err
 	}
+
+	n.mu.Lock()
+	n.telegramClients[userID] = &cachedTelegram{client: client, token: token, chatID: chatID}
+	n.mu.Unlock()
 
 	return client, nil
 }
