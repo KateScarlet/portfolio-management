@@ -151,6 +151,9 @@ func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		} else if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询用户失败"})
 			return
+		} else if user.Username != username {
+			db.Model(&user).Update("username", username)
+			user.Username = username
 		}
 
 		tokenStr, err := generateToken(&user)
@@ -221,7 +224,9 @@ func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 
 func generateState() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("failed to generate state: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
 

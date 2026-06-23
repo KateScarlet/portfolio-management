@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"strconv"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -268,7 +269,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		// a consistent result. This prevents the holding's value field
 		// and lot-derived value from diverging.
 		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
-			newVal, _ := newValue.(float64)
+			newVal, _ := strconv.ParseFloat(fmt.Sprint(newValue), 64)
 			oldVal := holding.Value
 			if newVal != oldVal && len(holding.Lots) > 0 {
 				diff := newVal - oldVal

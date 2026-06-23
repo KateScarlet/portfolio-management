@@ -45,10 +45,10 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
       try {
         const result = await api.sellHolding(holding.id, sShares, sPrice, feeNum, 0)
         onConfirm(result.soldHolding)
+        onClose()
       } catch (e) {
         console.error("Failed to sell holding", e)
         showToast(e instanceof Error ? e.message : "卖出失败，请重试", "error")
-        return
       }
     } else {
       const sValue = parseFloat(sellPrice)
@@ -64,14 +64,12 @@ export default function SellModal({ holding, onConfirm, onClose }: SellModalProp
       try {
         const result = await api.sellHolding(holding.id, 0, 0, feeNum, sValue)
         onConfirm(result.soldHolding)
+        onClose()
       } catch (e) {
         console.error("Failed to sell holding", e)
         showToast(e instanceof Error ? e.message : "卖出失败，请重试", "error")
-        return
       }
     }
-
-    onClose()
   }
 
   return (

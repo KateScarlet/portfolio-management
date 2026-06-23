@@ -71,7 +71,9 @@ func LoadConfig() *Config {
 
 func generateJWTSecret() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("failed to generate JWT secret: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
 

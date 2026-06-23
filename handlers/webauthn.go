@@ -76,7 +76,9 @@ func deleteSession(database *gorm.DB, id string) {
 
 func generateSessionID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("failed to generate session ID: " + err.Error())
+	}
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 

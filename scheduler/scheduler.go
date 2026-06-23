@@ -105,22 +105,19 @@ func (s *PriceScheduler) syncAllUsers() {
 			continue
 		}
 
-		s.mu.RLock()
+		s.mu.Lock()
 		state, exists := s.users[userID]
-		s.mu.RUnlock()
-
 		if !exists {
-			s.mu.Lock()
 			state = &userSyncState{
 				interval: time.Duration(interval) * time.Minute,
 			}
 			s.users[userID] = state
-			s.mu.Unlock()
 		} else {
 			state.mu.Lock()
 			state.interval = time.Duration(interval) * time.Minute
 			state.mu.Unlock()
 		}
+		s.mu.Unlock()
 
 		state.mu.Lock()
 		if time.Since(state.lastSyncAt) >= state.interval && !state.syncing {
@@ -259,16 +256,13 @@ func (s *PriceScheduler) GetStatusForUser(userID string) SyncStatus {
 }
 
 func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
-	s.mu.RLock()
+	s.mu.Lock()
 	state, exists := s.users[userID]
-	s.mu.RUnlock()
-
 	if !exists {
-		s.mu.Lock()
 		state = &userSyncState{}
 		s.users[userID] = state
-		s.mu.Unlock()
 	}
+	s.mu.Unlock()
 
 	state.mu.Lock()
 	if state.syncing {
@@ -284,16 +278,13 @@ func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
 
 // TriggerSyncForUserSync runs sync synchronously and returns the final status.
 func (s *PriceScheduler) TriggerSyncForUserSync(userID string) (SyncStatus, bool) {
-	s.mu.RLock()
+	s.mu.Lock()
 	state, exists := s.users[userID]
-	s.mu.RUnlock()
-
 	if !exists {
-		s.mu.Lock()
 		state = &userSyncState{}
 		s.users[userID] = state
-		s.mu.Unlock()
 	}
+	s.mu.Unlock()
 
 	state.mu.Lock()
 	if state.syncing {

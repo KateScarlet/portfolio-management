@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -172,13 +173,34 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		result := db.Delete(&models.User{}, "id = ?", id)
-		if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
-			return
-		}
-		if result.RowsAffected == 0 {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("user_id = ?", id).Delete(&models.Holding{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.WebAuthnCredential{}).Error; err != nil {
+				return err
+			}
+			result := tx.Delete(&models.User{}, "id = ?", id)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return fmt.Errorf("user not found")
+			}
+			return nil
+		})
+		if err != nil {
+			if err.Error() == "user not found" {
+				c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
 			return
 		}
 
