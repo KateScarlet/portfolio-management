@@ -136,14 +136,21 @@ func serveFrontend(h *server.Hertz) {
 	h.GET("/*filepath", adaptor.HertzHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if path == "/" || path == "" {
+			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFileFS(w, r, subFS, "index.html")
 			return
+		}
+		if strings.HasPrefix(path, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		if _, err := fs.Stat(subFS, strings.TrimPrefix(path, "/")); err == nil {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 		if !strings.HasPrefix(path, "/api/") {
+			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFileFS(w, r, subFS, "index.html")
 			return
 		}
