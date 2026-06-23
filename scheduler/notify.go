@@ -30,13 +30,22 @@ func NewNotifier(db *gorm.DB) *Notifier {
 	}
 }
 
-func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
-	var token, chatID string
-	var enabled string
+func (n *Notifier) loadUserSettings(userID string) map[string]string {
+	var settings []models.Setting
+	_ = n.db.Where("user_id = ?", userID).Find(&settings).Error
+	result := make(map[string]string, len(settings))
+	for i := range settings {
+		result[settings[i].Key] = settings[i].Value
+	}
+	return result
+}
 
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramBotToken", userID).Select("value").Row().Scan(&token)
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramChatID", userID).Select("value").Row().Scan(&chatID)
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramEnabled", userID).Select("value").Row().Scan(&enabled)
+func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
+	settings := n.loadUserSettings(userID)
+
+	token := settings["telegramBotToken"]
+	chatID := settings["telegramChatID"]
+	enabled := settings["telegramEnabled"]
 
 	if enabled != "true" || token == "" || chatID == "" {
 		return nil, nil
@@ -66,17 +75,15 @@ func (n *Notifier) NotifyAfterSync(userID string, holdings []models.Holding, syn
 }
 
 func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
-	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramPriceAlert", userID).Select("value").Row().Scan(&enabled)
-	if enabled != "true" {
+	settings := n.loadUserSettings(userID)
+
+	if settings["telegramPriceAlert"] != "true" {
 		return
 	}
 
-	var thresholdStr string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramPriceThreshold", userID).Select("value").Row().Scan(&thresholdStr)
 	threshold := 5.0
-	if thresholdStr != "" {
-		_, _ = fmt.Sscanf(thresholdStr, "%f", &threshold)
+	if v := settings["telegramPriceThreshold"]; v != "" {
+		_, _ = fmt.Sscanf(v, "%f", &threshold)
 	}
 
 	n.mu.Lock()
@@ -123,9 +130,9 @@ func (n *Notifier) checkPriceAlert(userID string, client *telegram.Client, holdi
 }
 
 func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
-	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramDriftAlert", userID).Select("value").Row().Scan(&enabled)
-	if enabled != "true" {
+	settings := n.loadUserSettings(userID)
+
+	if settings["telegramDriftAlert"] != "true" {
 		return
 	}
 
@@ -137,11 +144,9 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 		return
 	}
 
-	var driftThresholdStr string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "driftThreshold", userID).Select("value").Row().Scan(&driftThresholdStr)
 	driftThreshold := 5.0
-	if driftThresholdStr != "" {
-		_, _ = fmt.Sscanf(driftThresholdStr, "%f", &driftThreshold)
+	if v := settings["driftThreshold"]; v != "" {
+		_, _ = fmt.Sscanf(v, "%f", &driftThreshold)
 	}
 
 	var holdings []models.Holding
@@ -197,14 +202,13 @@ func (n *Notifier) checkDriftAlert(userID string, client *telegram.Client) {
 }
 
 func (n *Notifier) checkSummary(userID string, client *telegram.Client, holdings []models.Holding) {
-	var enabled string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramSummary", userID).Select("value").Row().Scan(&enabled)
-	if enabled != "true" {
+	settings := n.loadUserSettings(userID)
+
+	if settings["telegramSummary"] != "true" {
 		return
 	}
 
-	var interval string
-	_ = n.db.Model(&models.Setting{}).Where("key = ? AND user_id = ?", "telegramSummaryInterval", userID).Select("value").Row().Scan(&interval)
+	interval := settings["telegramSummaryInterval"]
 
 	shouldSend := false
 	now := time.Now()
