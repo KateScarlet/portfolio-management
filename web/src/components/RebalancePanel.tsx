@@ -18,23 +18,30 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
   const items = Object.keys(ASSET_DEFINITIONS).map((key) => {
     const id = key as AssetId
     const def = ASSET_DEFINITIONS[id]
-    const targetValue = total * (targetPcts[id] / 100)
+    const targetPct = targetPcts[id]
     const currentValue = assets[id] || 0
+    const currentPct = total > 0 ? currentValue / total : 0
+    const targetValue = total * (targetPct / 100)
     const difference = targetValue - currentValue
-    const isBalanced = Math.abs(difference / total) < driftThreshold / 100 // Within drift tolerance
+    const driftPct = (currentPct * 100) - targetPct
+    const isBalanced = Math.abs(driftPct) < driftThreshold
 
     return {
       id,
       def,
-      targetValue,
+      targetPct,
+      currentPct,
       currentValue,
+      targetValue,
       difference,
+      driftPct,
       isBalanced,
       action: difference > 0 ? "buy" : difference < 0 ? "sell" : "keep",
     }
   })
 
-  const allBalanced = items.every((i) => i.isBalanced)
+  const needsAction = items.filter((i) => !i.isBalanced)
+  const allBalanced = needsAction.length === 0
 
   return (
     <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col overflow-hidden h-full">
@@ -45,96 +52,95 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
         </span>
       </div>
 
-      <div className="p-6 bg-white space-y-4">
+      <div className="p-6 bg-white flex flex-col gap-3 overflow-auto">
         {allBalanced && (
-          <div className="p-4 bg-white border border-[#E9ECEF] rounded-lg flex items-center gap-4 mb-2">
-            <div className="w-10 h-10 rounded-full bg-[#F8F9FA] flex items-center justify-center shrink-0">
-              <svg
-                className="w-5 h-5 text-[#1A1A1A]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path>
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#1A1A1A]">资产比例健康</p>
-              <p className="text-xs text-[#6C757D]">当前配置处于完美平衡状态，无需进行任何操作。</p>
-            </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-[#F8F9FA] border border-[#E9ECEF] mb-1">
+            <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-[#6C757D]">资产比例健康，无需调整</p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map((item) => (
+        {items.map((item) => {
+          const currentWidth = Math.min(item.currentPct * 100, 100)
+          const targetWidth = Math.min(item.targetPct, 100)
+          const isOver = item.driftPct > 0
+
+          return (
             <div
               key={item.id}
-              className="p-4 rounded-xl border border-[#E9ECEF] hover:bg-[#F8F9FA] transition-colors flex flex-col justify-between gap-4"
+              className={`p-4 rounded-xl border transition-colors ${
+                item.isBalanced
+                  ? "border-[#E9ECEF] hover:bg-[#F8F9FA]"
+                  : item.action === "buy"
+                    ? "border-[#1A1A1A]/10 bg-[#F8F9FA]"
+                    : "border-orange-200 bg-orange-50/30"
+              }`}
             >
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-10 h-10 rounded flex items-center justify-center text-[10px] font-bold ${item.id === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
-                  style={{ backgroundColor: item.def.color }}
-                >
-                  {item.id === "stocks"
-                    ? "STK"
-                    : item.id === "bonds"
-                      ? "BND"
-                      : item.id === "gold"
-                        ? "CMD"
-                        : "CSH"}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
-                  <div className="text-xs text-[#ADB5BD] mt-0.5 flex flex-wrap items-center gap-2">
-                    <span className="font-mono">{formatCurrency(item.currentValue)}</span>
-                    <svg
-                      className="w-3 h-3 text-[#ADB5BD]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M14 5l7 7m0 0l-7 7m7-7H3"
-                      ></path>
-                    </svg>
-                    <span className="font-mono font-medium text-[#6C757D]">
-                      {formatCurrency(item.targetValue)}
-                    </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold ${item.id === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
+                    style={{ backgroundColor: item.def.color }}
+                  >
+                    {item.id === "stocks" ? "STK" : item.id === "bonds" ? "BND" : item.id === "gold" ? "CMD" : "CSH"}
                   </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
+                    <p className="text-[11px] text-[#ADB5BD] font-mono">{formatCurrency(item.currentValue)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {!item.isBalanced && (
+                    <span className={`text-[11px] font-mono font-medium ${isOver ? getProfitColor(false, colorScheme) : "text-[#1A1A1A]"}`}>
+                      {isOver ? "+" : ""}{item.driftPct.toFixed(1)}%
+                    </span>
+                  )}
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium tracking-wide
+                      ${item.action === "buy"
+                        ? "bg-[#1A1A1A] text-white"
+                        : item.action === "sell"
+                          ? `bg-white border border-orange-200 ${getProfitColor(false, colorScheme)}`
+                          : "bg-[#F8F9FA] text-[#ADB5BD] border border-[#E9ECEF]"
+                      }`}
+                  >
+                    {item.action === "buy" ? "补仓" : item.action === "sell" ? "减仓" : "保持"}
+                    {item.action !== "keep" && (
+                      <span className="font-mono">{formatCurrency(Math.abs(item.difference))}</span>
+                    )}
+                  </span>
                 </div>
               </div>
 
-              <div
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full font-medium text-[11px] w-full border tracking-wide uppercase
-                ${
-                  item.action === "buy"
-                    ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                    : item.action === "sell"
-                      ? `bg-white ${getProfitColor(false, colorScheme)} border-orange-200`
-                      : "bg-[#F8F9FA] text-[#6C757D] border-[#E9ECEF]"
-                }`}
-              >
-                <span>
-                  {item.action === "buy"
-                    ? "补仓 · "
-                    : item.action === "sell"
-                      ? "减仓 · "
-                      : "保持 · "}
-                  {item.action !== "keep" ? formatCurrency(Math.abs(item.difference)) : "平衡"}
+              <div className="relative h-1.5 bg-[#F1F3F5] rounded-full overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${currentWidth}%`,
+                    backgroundColor: item.def.color === "#E9ECEF" ? "#ADB5BD" : item.def.color,
+                    opacity: 0.7,
+                  }}
+                />
+                <div
+                  className="absolute inset-y-0 w-0.5 bg-[#1A1A1A]/40 transition-all duration-500"
+                  style={{ left: `${targetWidth}%` }}
+                />
+              </div>
+
+              <div className="flex justify-between mt-1.5">
+                <span className="text-[10px] text-[#ADB5BD] font-mono">
+                  当前 {(item.currentPct * 100).toFixed(1)}%
+                </span>
+                <span className="text-[10px] text-[#6C757D] font-mono">
+                  目标 {item.targetPct}%
                 </span>
               </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
     </div>
   )
