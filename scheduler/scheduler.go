@@ -120,12 +120,11 @@ func (s *PriceScheduler) syncAllUsers() {
 		s.mu.Unlock()
 
 		state.mu.Lock()
-		if time.Since(state.lastSyncAt) >= state.interval && !state.syncing {
-			state.syncing = true
-			state.mu.Unlock()
+		shouldSync := time.Since(state.lastSyncAt) >= state.interval && !state.syncing
+		state.mu.Unlock()
+
+		if shouldSync {
 			go s.syncUser(userID, state)
-		} else {
-			state.mu.Unlock()
 		}
 	}
 }
@@ -143,6 +142,14 @@ const (
 )
 
 func (s *PriceScheduler) syncUser(userID string, state *userSyncState) {
+	state.mu.Lock()
+	if state.syncing {
+		state.mu.Unlock()
+		return
+	}
+	state.syncing = true
+	state.mu.Unlock()
+
 	defer func() {
 		state.mu.Lock()
 		state.syncing = false
@@ -264,14 +271,6 @@ func (s *PriceScheduler) TriggerSyncForUser(userID string) bool {
 	}
 	s.mu.Unlock()
 
-	state.mu.Lock()
-	if state.syncing {
-		state.mu.Unlock()
-		return false
-	}
-	state.syncing = true
-	state.mu.Unlock()
-
 	go s.syncUser(userID, state)
 	return true
 }
@@ -285,18 +284,6 @@ func (s *PriceScheduler) TriggerSyncForUserSync(userID string) (SyncStatus, bool
 		s.users[userID] = state
 	}
 	s.mu.Unlock()
-
-	state.mu.Lock()
-	if state.syncing {
-		state.mu.Unlock()
-		return SyncStatus{
-			LastSyncAt:  state.lastSyncAt,
-			LastSyncErr: state.lastSyncErr,
-			Syncing:     true,
-		}, false
-	}
-	state.syncing = true
-	state.mu.Unlock()
 
 	s.syncUser(userID, state)
 
