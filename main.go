@@ -32,8 +32,12 @@ func main() {
 		slog.Error("failed to init database", "error", err)
 		panic("Failed to init database: " + err.Error())
 	}
-
-	middleware.SetJWTSecret(cfg.JWTSecret)
+	sqlDB, err := database.DB()
+	if err != nil {
+		slog.Error("failed to get sqlDB", "error", err)
+		panic("Failed to get sqlDB: " + err.Error())
+	}
+	defer sqlDB.Close()
 
 	yahoo.Init()
 
