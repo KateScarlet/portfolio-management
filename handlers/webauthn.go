@@ -204,7 +204,7 @@ func WebAuthnRegisterStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			CredName:    reqBody.Name,
 		})
 
-		c.SetCookie("webauthn_session", sessionID, 300, "/", "", 2, false, true)
+		setAuthCookie(c, "webauthn_session", sessionID, 300, cfg)
 
 		creation := credentialOptions.Response
 		slog.Info("webauthn register start", "sessionID", sessionID)
@@ -318,7 +318,7 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		c.SetCookie("webauthn_session", "", -1, "/", "", 2, false, true)
+		setAuthCookie(c, "webauthn_session", "", -1, cfg)
 		c.JSON(consts.StatusOK, map[string]string{"success": "true"})
 	}
 }
@@ -344,7 +344,7 @@ func WebAuthnLoginStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 		sessionID := generateSessionID()
 		saveSession(gormDB, sessionID, sessionData)
-		c.SetCookie("webauthn_session", sessionID, 300, "/", "", 2, false, true)
+		setAuthCookie(c, "webauthn_session", sessionID, 300, cfg)
 
 		authOptions := assertion.Response
 		c.JSON(consts.StatusOK, map[string]any{
@@ -431,8 +431,8 @@ func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		c.SetCookie("webauthn_session", "", -1, "/", "", 2, false, true)
-		c.SetCookie("auth_token", token, cookieMaxAge, "/", "", 2, false, true)
+		setAuthCookie(c, "webauthn_session", "", -1, cfg)
+		setAuthCookie(c, "auth_token", token, cookieMaxAge, cfg)
 		c.JSON(consts.StatusOK, map[string]any{
 			"user": map[string]any{
 				"id":       dbUser.ID,

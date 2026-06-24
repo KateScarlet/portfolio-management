@@ -1,16 +1,17 @@
 import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
-import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {
   history: PortfolioRecord[]
   onDeleteRecord: (id: string) => void
   colorScheme: ColorScheme
+  displayCurrency: string
 }
 
-export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: HistoryPanelProps) {
+export default function HistoryPanel({ history, onDeleteRecord, colorScheme, displayCurrency }: HistoryPanelProps) {
   const [deletingRecord, setDeletingRecord] = useState<PortfolioRecord | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -60,16 +61,16 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
                       {format(record.timestamp, "MM/dd, HH:mm")}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm font-medium">
-                      {formatCurrency(record.total)}
+                      {formatCurrencyByCode(record.total, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm text-[#495057]">
-                      {principal > 0 ? formatCurrency(principal) : "-"}
+                      {principal > 0 ? formatCurrencyByCode(principal, displayCurrency) : "-"}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm">
                       {principal > 0 ? (
                         <span className={getProfitColor(isPositive, colorScheme)}>
                           {isPositive ? "+" : ""}
-                          {formatCurrency(profit)}
+                          {formatCurrencyByCode(profit, displayCurrency)}
                           <br />
                           <span className="text-[10px] opacity-80">
                             {isPositive ? "+" : ""}
@@ -81,16 +82,16 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
                       )}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
-                      {formatCurrency(record.assets.stocks || 0)}
+                      {formatCurrencyByCode(record.assets.stocks || 0, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
-                      {formatCurrency(record.assets.bonds || 0)}
+                      {formatCurrencyByCode(record.assets.bonds || 0, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
-                      {formatCurrency(record.assets.commodities || 0)}
+                      {formatCurrencyByCode(record.assets.commodities || 0, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#ADB5BD]">
-                      {formatCurrency(record.assets.cash || 0)}
+                      {formatCurrencyByCode(record.assets.cash || 0, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button

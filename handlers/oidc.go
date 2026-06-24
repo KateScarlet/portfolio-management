@@ -43,7 +43,7 @@ func OIDCLogin(cfg *db.Config) app.HandlerFunc {
 		}
 
 		state := generateState()
-		c.SetCookie("oidc_state", state, 600, "/", "", 0, false, true)
+		setAuthCookie(c, "oidc_state", state, 600, cfg)
 
 		oauth2Config, err := newOAuth2Config(ctx, cfg)
 		if err != nil {
@@ -63,7 +63,7 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		state := string(c.Cookie("oidc_state"))
-		c.SetCookie("oidc_state", "", -1, "/", "", 0, false, true)
+		setAuthCookie(c, "oidc_state", "", -1, cfg)
 
 		queryState := c.Query("state")
 		if state == "" || state != queryState {
@@ -143,10 +143,10 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				Role:        "user",
 				SSOProvider: "oidc",
 				SSOId:       sub,
-				CreatedAt:   time.Now().Unix(),
+				CreatedAt:   time.Now().UnixMilli(),
 			}
 			if err := gormDB.Create(&user).Error; err != nil {
-				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败: " + err.Error()})
+				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败，用户名 '" + username + "' 可能已被占用: " + err.Error()})
 				return
 			}
 		} else if err != nil {
@@ -163,7 +163,7 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		c.SetCookie("auth_token", tokenStr, cookieMaxAge, "/", "", 0, false, true)
+		setAuthCookie(c, "auth_token", tokenStr, cookieMaxAge, cfg)
 		c.Redirect(consts.StatusFound, []byte("/"))
 	}
 }

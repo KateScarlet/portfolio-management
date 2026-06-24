@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"portfolio-management/yahoo"
@@ -24,7 +25,7 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) {
+func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) error {
 	for i := range holdings {
 		h := &holdings[i]
 		if h.Currency == "" || h.Currency == targetCurrency {
@@ -33,15 +34,20 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) {
 		pair := h.Currency + targetCurrency
 		rate, err := yahoo.FetchExchangeRate(pair)
 		if err != nil {
-			continue
+			return fmt.Errorf("获取 %s 汇率失败: %w", pair, err)
 		}
 		h.Value *= rate
 		h.Cost *= rate
+		h.CostPrice *= rate
 		for j := range h.Lots {
 			h.Lots[j].Fee *= rate
 			h.Lots[j].Cost *= rate
+			h.Lots[j].CostPrice *= rate
+			h.Lots[j].ValueAdded *= rate
 		}
+		h.Currency = targetCurrency
 	}
+	return nil
 }
 
 func ListHoldings(db *gorm.DB) app.HandlerFunc {
@@ -65,7 +71,10 @@ func ListHoldings(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if displayCurrency := c.Query("currency"); displayCurrency != "" {
-			convertHoldingsCurrency(holdings, displayCurrency)
+			if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
 		}
 
 		c.JSON(consts.StatusOK, holdings)
@@ -308,6 +317,22 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 						if lots[i].ID == "" {
 							lots[i].ID = uuid.New().String()
 						}
+						if lots[i].Shares < 0 {
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot shares cannot be negative"})
+							return
+						}
+						if lots[i].Cost < 0 {
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot cost cannot be negative"})
+							return
+						}
+						if lots[i].Fee < 0 {
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot fee cannot be negative"})
+							return
+						}
+						if lots[i].Type != "" && lots[i].Type != "buy" && lots[i].Type != "sell" {
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot type must be 'buy' or 'sell'"})
+							return
+						}
 					}
 					holding.Lots = lots
 					priceBefore := holding.Price
@@ -327,9 +352,13 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
-			newVal, _ := strconv.ParseFloat(fmt.Sprint(newValue), 64)
+			newVal, err := strconv.ParseFloat(fmt.Sprint(newValue), 64)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid value"})
+				return
+			}
 			oldVal := holding.Value
-			if newVal != oldVal && len(holding.Lots) > 0 {
+			if math.Abs(newVal-oldVal) > 1e-9 && len(holding.Lots) > 0 {
 				diff := newVal - oldVal
 				lastBuyIdx := -1
 				for i := len(holding.Lots) - 1; i >= 0; i-- {
@@ -338,11 +367,16 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 						break
 					}
 				}
-				if lastBuyIdx >= 0 {
-					holding.Lots[lastBuyIdx].ValueAdded += diff
+				if lastBuyIdx < 0 {
+					c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有买入记录，无法更新价值"})
+					return
 				}
-				holding.RecalcFromLots()
-				if err := db.Save(&holding).Error; err != nil {
+				err := db.Transaction(func(tx *gorm.DB) error {
+					holding.Lots[lastBuyIdx].ValueAdded += diff
+					holding.RecalcFromLots()
+					return tx.Save(&holding).Error
+				})
+				if err != nil {
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return
 				}

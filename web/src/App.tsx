@@ -43,7 +43,8 @@ export default function App() {
   } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency)
 
   const totalFundsCNY = availableFunds.reduce((sum, f) => {
-    return sum + f.amount * (exchangeRates[f.currency] || 1)
+    const rate = exchangeRates[f.currency]
+    return rate ? sum + f.amount * rate : sum
   }, 0)
 
   useEffect(() => {
@@ -342,7 +343,7 @@ export default function App() {
       <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} totalAssets={totalAssets} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} portfolios={portfolios} currentPortfolioId={currentPortfolio.id} onRefreshFunds={handleRefreshAvailableFunds} />
+            <Dashboard assets={assets} total={total} totalAssets={totalAssets} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} exchangeRates={exchangeRates} portfolios={portfolios} currentPortfolioId={currentPortfolio.id} onRefreshFunds={handleRefreshAvailableFunds} displayCurrency={settings.displayCurrency} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
@@ -356,6 +357,7 @@ export default function App() {
                 cash: settings.targetCash,
                 commodities: settings.targetCommodities,
               }}
+              displayCurrency={settings.displayCurrency}
             />
           </div>
         </div>
@@ -374,7 +376,7 @@ export default function App() {
             onRefreshAvailableFunds={handleRefreshAvailableFunds}
             onSyncComplete={handleSyncComplete}
           />
-          <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} />
+          <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} displayCurrency={settings.displayCurrency} />
         </div>
       </main>
 

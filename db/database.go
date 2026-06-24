@@ -20,8 +20,9 @@ const ConfigDir = "config"
 const ConfigFile = "config/config.yaml"
 
 type Config struct {
-	JWTSecret string `mapstructure:"jwtSecret"` //nolint:gosec // Config field, not exposed
-	Database  struct {
+	JWTSecret    string `mapstructure:"jwtSecret"` //nolint:gosec // Config field, not exposed
+	CookieSecure bool   `mapstructure:"cookieSecure"`
+	Database     struct {
 		Type string `mapstructure:"type"`
 		DSN  string `mapstructure:"dsn"`
 	} `mapstructure:"database"`

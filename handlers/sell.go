@@ -89,10 +89,19 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			}
 			realizedValue = input.Shares*input.Price - input.Fee
 			if holding.Shares > 0 {
-				costReduction = (holding.Cost / holding.Shares) * input.Shares
+				if input.Shares >= holding.Shares {
+					costReduction = holding.Cost
+				} else {
+					costReduction = (holding.Cost / holding.Shares) * input.Shares
+				}
 			}
 		case input.Value > 0:
 			// Manual holding sell: value-based (shares=0)
+			if holding.Symbol != "" {
+				tx.Rollback()
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "股票类持仓必须使用股数卖出，不能使用金额卖出"})
+				return
+			}
 			if input.Value > holding.Value {
 				tx.Rollback()
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value exceed holding"})
@@ -100,7 +109,13 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			}
 			realizedValue = input.Value - input.Fee
 			if holding.Value > 0 {
-				costReduction = (holding.Cost / holding.Value) * input.Value
+				if input.Value >= holding.Value {
+					costReduction = holding.Cost
+				} else {
+					costReduction = (holding.Cost / holding.Value) * input.Value
+				}
+			} else if holding.Cost > 0 {
+				costReduction = holding.Cost
 			}
 		default:
 			tx.Rollback()

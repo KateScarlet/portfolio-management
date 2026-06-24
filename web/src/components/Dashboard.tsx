@@ -2,7 +2,6 @@ import React, { useState } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
 import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
-import { useExchangeRates } from "../useExchangeRates"
 import FundOperationDialog from "./FundOperationDialog"
 
 type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
@@ -15,14 +14,15 @@ interface DashboardProps {
   totalFees: number
   colorScheme: ColorScheme
   availableFunds: AvailableFund[]
+  exchangeRates: Record<string, number>
   portfolios: Portfolio[]
   currentPortfolioId: string
   onRefreshFunds: () => void
+  displayCurrency: string
 }
 
-export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, portfolios, currentPortfolioId, onRefreshFunds }: DashboardProps) {
+export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, exchangeRates, portfolios, currentPortfolioId, onRefreshFunds, displayCurrency }: DashboardProps) {
   const [showDetails, setShowDetails] = useState(false)
-  const exchangeRates = useExchangeRates(availableFunds)
   const [fundOperation, setFundOperation] = useState<{ type: OperationType; currency?: string } | null>(null)
 
   const chartData = Object.keys(assets)
@@ -42,7 +42,8 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
   const isPositive = profit >= 0
 
   const totalCNY = availableFunds.reduce((sum, f) => {
-    return sum + f.amount * (exchangeRates[f.currency] || 1)
+    const rate = exchangeRates[f.currency]
+    return rate ? sum + f.amount * rate : sum
   }, 0)
 
   return (
@@ -54,17 +55,17 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
 
         <div className="flex items-center gap-2 text-xs text-[#ADB5BD]">
           <span>
-            累计投入成本: <span className="font-mono">{formatCurrency(principal)}</span>
+            累计投入成本: <span className="font-mono">{formatCurrencyByCode(principal, displayCurrency)}</span>
           </span>
           {totalFees > 0 && (
             <span className="ml-2">
-              累计手续费: <span className="font-mono">{formatCurrency(totalFees)}</span>
+              累计手续费: <span className="font-mono">{formatCurrencyByCode(totalFees, displayCurrency)}</span>
             </span>
           )}
         </div>
       </div>
 
-      <h2 className="text-4xl font-light mb-2 text-[#1A1A1A]">{formatCurrency(total)}</h2>
+      <h2 className="text-4xl font-light mb-2 text-[#1A1A1A]">{formatCurrencyByCode(total, displayCurrency)}</h2>
 
       <div
         className={`flex items-center gap-2 mb-8 ${getProfitColor(isPositive, colorScheme)} font-mono`}
@@ -91,7 +92,7 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
         <span className="text-sm font-medium">
           {isPositive ? "+" : ""}
           {formatPercent(returnRate)} ({isPositive ? "+" : ""}
-          {formatCurrency(profit)})
+          {formatCurrencyByCode(profit, displayCurrency)})
         </span>
       </div>
 
@@ -114,7 +115,7 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) => formatCurrency(Number(value))}
+                formatter={(value) => formatCurrencyByCode(Number(value), displayCurrency)}
                 contentStyle={{
                   borderRadius: "0.5rem",
                   border: "1px solid #E9ECEF",

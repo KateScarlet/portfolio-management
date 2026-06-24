@@ -44,14 +44,21 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 			Portfolios: make([]PortfolioSummaryItem, 0, len(portfolios)),
 		}
 
+		displayCurrency := c.Query("currency")
+		if displayCurrency == "" {
+			displayCurrency = "CNY"
+		}
+
 		for _, p := range portfolios {
 			var holdings []models.Holding
 			if err := db.Where("portfolio_id = ?", p.ID).Find(&holdings).Error; err != nil {
-				continue
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
 			}
 
-			if displayCurrency := c.Query("currency"); displayCurrency != "" {
-				convertHoldingsCurrency(holdings, displayCurrency)
+			if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
 			}
 
 			assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}

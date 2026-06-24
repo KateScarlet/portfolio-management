@@ -7,9 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"gorm.io/gorm"
 )
 
-func GetSyncStatus(s *scheduler.PriceScheduler) app.HandlerFunc {
+func GetSyncStatus(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
 		if user == nil {
@@ -18,11 +19,16 @@ func GetSyncStatus(s *scheduler.PriceScheduler) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		c.JSON(consts.StatusOK, s.GetStatusForPortfolio(user.UserID, portfolioID))
 	}
 }
 
-func TriggerSync(s *scheduler.PriceScheduler) app.HandlerFunc {
+func TriggerSync(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
 		if user == nil {
@@ -31,6 +37,11 @@ func TriggerSync(s *scheduler.PriceScheduler) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
+		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
 		status, ok := s.TriggerSyncForPortfolioSync(user.UserID, portfolioID)
 		if !ok {
 			c.JSON(consts.StatusConflict, status)

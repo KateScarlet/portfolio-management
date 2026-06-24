@@ -1,6 +1,6 @@
 import React from "react"
 import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
-import { formatCurrency, getProfitColor } from "../utils"
+import { formatCurrencyByCode, getProfitColor } from "../utils"
 
 interface RebalancePanelProps {
   assets: Record<AssetId, number>
@@ -8,9 +8,10 @@ interface RebalancePanelProps {
   driftThreshold: number
   colorScheme: ColorScheme
   targetPcts: Record<AssetId, number>
+  displayCurrency: string
 }
 
-export default function RebalancePanel({ assets, total, driftThreshold, colorScheme, targetPcts }: RebalancePanelProps) {
+export default function RebalancePanel({ assets, total, driftThreshold, colorScheme, targetPcts, displayCurrency }: RebalancePanelProps) {
   if (total === 0) {
     return null
   }
@@ -88,7 +89,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
                   </div>
                   <div>
                     <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
-                    <p className="text-[11px] text-[#ADB5BD] font-mono">{formatCurrency(item.currentValue)}</p>
+                    <p className="text-[11px] text-[#ADB5BD] font-mono">{formatCurrencyByCode(item.currentValue, displayCurrency)}</p>
                   </div>
                 </div>
 
@@ -109,7 +110,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
                   >
                     {item.action === "buy" ? "补仓" : item.action === "sell" ? "减仓" : "保持"}
                     {item.action !== "keep" && (
-                      <span className="font-mono">{formatCurrency(Math.abs(item.difference))}</span>
+                      <span className="font-mono">{formatCurrencyByCode(Math.abs(item.difference), displayCurrency)}</span>
                     )}
                   </span>
                 </div>

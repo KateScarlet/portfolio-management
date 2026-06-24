@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"portfolio-management/db"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -19,7 +20,15 @@ const cookieMaxAge = 7 * 24 * 3600
 
 var ErrUserNotFound = errors.New("user not found")
 
-func Login(db *gorm.DB) app.HandlerFunc {
+func setAuthCookie(c *app.RequestContext, name, value string, maxAge int, cfg *db.Config) {
+	secure := false
+	if cfg != nil {
+		secure = cfg.CookieSecure
+	}
+	c.SetCookie(name, value, maxAge, "/", "", 2, secure, true)
+}
+
+func Login(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Username string `json:"username"`
@@ -52,7 +61,7 @@ func Login(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		c.SetCookie("auth_token", token, cookieMaxAge, "/", "", 0, false, true)
+		setAuthCookie(c, "auth_token", token, cookieMaxAge, cfg)
 		c.JSON(consts.StatusOK, map[string]any{
 			"user": map[string]any{
 				"id":       user.ID,
@@ -63,9 +72,9 @@ func Login(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func Logout() app.HandlerFunc {
+func Logout(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		c.SetCookie("auth_token", "", -1, "/", "", 0, false, true)
+		setAuthCookie(c, "auth_token", "", -1, cfg)
 		c.JSON(consts.StatusOK, map[string]bool{"success": true})
 	}
 }
@@ -129,7 +138,7 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			Username:  body.Username,
 			Password:  string(hashedPassword),
 			Role:      body.Role,
-			CreatedAt: time.Now().Unix(),
+			CreatedAt: time.Now().UnixMilli(),
 		}
 
 		if err := db.Create(&user).Error; err != nil {
@@ -137,7 +146,10 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		ensureDefaultPortfolio(db, user.ID)
+		if err := ensureDefaultPortfolio(db, user.ID); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认组合失败"})
+			return
+		}
 
 		c.JSON(consts.StatusOK, map[string]any{
 			"id":       user.ID,
@@ -184,16 +196,16 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			if err := tx.Where("user_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
 				return err
 			}
-		if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
+			if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("user_id = ?", id).Delete(&models.WebAuthnCredential{}).Error; err != nil {
@@ -239,15 +251,14 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		return err
 	}
 
-	ensureDefaultPortfolio(db, user.ID)
-	return nil
+	return ensureDefaultPortfolio(db, user.ID)
 }
 
-func ensureDefaultPortfolio(db *gorm.DB, userID string) {
+func ensureDefaultPortfolio(db *gorm.DB, userID string) error {
 	var count int64
 	db.Model(&models.Portfolio{}).Where("user_id = ?", userID).Count(&count)
 	if count > 0 {
-		return
+		return nil
 	}
 	portfolio := models.Portfolio{
 		ID:        uuid.New().String(),
@@ -257,11 +268,12 @@ func ensureDefaultPortfolio(db *gorm.DB, userID string) {
 		CreatedAt: time.Now().UnixMilli(),
 	}
 	if err := db.Create(&portfolio).Error; err != nil {
-		return
+		return err
 	}
 	db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
 	db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
 	db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
+	return nil
 }
 
 func generateToken(user *models.User) (string, error) {

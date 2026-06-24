@@ -59,7 +59,10 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 		if displayCurrency == "" {
 			displayCurrency = "CNY"
 		}
-		convertHoldingsCurrency(holdings, displayCurrency)
+		if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 
 		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 		var total, principal float64

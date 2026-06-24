@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"math"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -176,10 +177,10 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			Currency         string  `json:"currency"`
-			Amount           float64 `json:"amount"`
-			TargetPortfolioID string `json:"targetPortfolioId"`
-			Note             string  `json:"note"`
+			Currency          string  `json:"currency"`
+			Amount            float64 `json:"amount"`
+			TargetPortfolioID string  `json:"targetPortfolioId"`
+			Note              string  `json:"note"`
 		}
 		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -216,15 +217,15 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 
 			now := time.Now().UnixMilli()
 			if err := tx.Create(&models.FundTransaction{
-				ID:               uuid.New().String(),
-				UserID:           user.UserID,
-				PortfolioID:      portfolioID,
-				Type:             "transfer",
-				Amount:           body.Amount,
-				Currency:         body.Currency,
+				ID:                uuid.New().String(),
+				UserID:            user.UserID,
+				PortfolioID:       portfolioID,
+				Type:              "transfer_out",
+				Amount:            body.Amount,
+				Currency:          body.Currency,
 				TargetPortfolioID: body.TargetPortfolioID,
-				Note:             body.Note,
-				CreatedAt:        now,
+				Note:              body.Note,
+				CreatedAt:         now,
 			}).Error; err != nil {
 				return err
 			}
@@ -294,6 +295,15 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "toAmount must be positive"})
 			return
 		}
+		if body.ExchangeRate <= 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "exchangeRate must be positive"})
+			return
+		}
+		expectedTo := body.FromAmount * body.ExchangeRate
+		if math.Abs(expectedTo-body.ToAmount) > 0.01 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "汇率与金额不一致"})
+			return
+		}
 
 		err := db.Transaction(func(tx *gorm.DB) error {
 			if err := deductAvailableFund(tx, user.UserID, portfolioID, body.FromCurrency, body.FromAmount); err != nil {
@@ -330,37 +340,46 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 }
 
 func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount float64) error {
-	var af models.AvailableFund
-	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
-	switch err {
-	case nil:
-		return tx.Model(&af).Update("amount", af.Amount+amount).Error
-	case gorm.ErrRecordNotFound:
-		return tx.Create(&models.AvailableFund{
-			ID:          uuid.New().String(),
-			UserID:      userID,
-			PortfolioID: portfolioID,
-			Currency:    currency,
-			Amount:      amount,
-		}).Error
-	default:
-		return err
+	result := tx.Model(&models.AvailableFund{}).
+		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
+		Update("amount", gorm.Expr("amount + ?", amount))
+	if result.Error != nil {
+		return result.Error
 	}
+	if result.RowsAffected > 0 {
+		return nil
+	}
+	return tx.Create(&models.AvailableFund{
+		ID:          uuid.New().String(),
+		UserID:      userID,
+		PortfolioID: portfolioID,
+		Currency:    currency,
+		Amount:      amount,
+	}).Error
 }
 
 func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount float64) error {
-	var af models.AvailableFund
-	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
-	if err == gorm.ErrRecordNotFound {
-		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 余额为 0"}
+	result := tx.Model(&models.AvailableFund{}).
+		Where("user_id = ? AND portfolio_id = ? AND currency = ? AND amount >= ?", userID, portfolioID, currency, amount).
+		Update("amount", gorm.Expr("amount - ?", amount))
+	if result.Error != nil {
+		return result.Error
 	}
-	if err != nil {
+	if result.RowsAffected > 0 {
+		return nil
+	}
+	var count int64
+	if err := tx.Model(&models.AvailableFund{}).
+		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
+		Count(&count).Error; err != nil {
 		return err
 	}
-	if af.Amount < amount {
-		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + formatFloat(af.Amount) + ", 需要 " + formatFloat(amount)}
+	if count == 0 {
+		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 余额为 0"}
 	}
-	return tx.Model(&af).Update("amount", af.Amount-amount).Error
+	var af models.AvailableFund
+	tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af)
+	return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + formatFloat(af.Amount) + ", 需要 " + formatFloat(amount)}
 }
 
 func formatFloat(f float64) string {

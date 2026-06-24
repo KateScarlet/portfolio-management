@@ -28,7 +28,17 @@ func Init() {
 	client = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
-		SetTimeout(30 * time.Second)
+		SetTimeout(30 * time.Second).
+		SetRetryCount(3).
+		SetRetryWaitTime(1 * time.Second).
+		SetRetryMaxWaitTime(5 * time.Second).
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			if err != nil {
+				return true
+			}
+			status := r.StatusCode()
+			return status == 429 || status >= 500
+		})
 }
 
 type cachedRate struct {

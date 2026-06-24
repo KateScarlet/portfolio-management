@@ -313,6 +313,20 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 		return
 	}
 
+	for i := range holdings {
+		h := &holdings[i]
+		if h.Currency != "" && h.Currency != "CNY" {
+			pair := h.Currency + "CNY"
+			rate, err := yahoo.FetchExchangeRate(pair)
+			if err != nil {
+				slog.Error("failed to fetch exchange rate for summary", "pair", pair, "error", err)
+				continue
+			}
+			h.Value *= rate
+			h.Cost *= rate
+		}
+	}
+
 	assets := map[string]float64{
 		"stocks":      0,
 		"bonds":       0,

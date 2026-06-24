@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"math"
 )
 
 type HoldingLot struct {
@@ -161,19 +162,19 @@ type AvailableFund struct {
 }
 
 type FundTransaction struct {
-	ID               string  `gorm:"primaryKey" json:"id"`
-	UserID           string  `gorm:"index;not null" json:"userId"`
-	PortfolioID      string  `gorm:"index;not null" json:"portfolioId"`
-	Type             string  `gorm:"size:20;not null" json:"type"`
-	Amount           float64 `gorm:"not null" json:"amount"`
-	Currency         string  `gorm:"size:10;not null" json:"currency"`
-	TargetPortfolioID string `gorm:"size:50;default:''" json:"targetPortfolioId,omitempty"`
-	TargetAmount     float64 `gorm:"default:0" json:"targetAmount,omitempty"`
-	TargetCurrency   string  `gorm:"size:10;default:''" json:"targetCurrency,omitempty"`
-	ExchangeRate     float64 `gorm:"default:0" json:"exchangeRate,omitempty"`
-	HoldingID        string  `gorm:"size:50;default:''" json:"holdingId,omitempty"`
-	Note             string  `gorm:"size:500;default:''" json:"note,omitempty"`
-	CreatedAt        int64   `json:"createdAt"`
+	ID                string  `gorm:"primaryKey" json:"id"`
+	UserID            string  `gorm:"index;not null" json:"userId"`
+	PortfolioID       string  `gorm:"index;not null" json:"portfolioId"`
+	Type              string  `gorm:"size:20;not null" json:"type"`
+	Amount            float64 `gorm:"not null" json:"amount"`
+	Currency          string  `gorm:"size:10;not null" json:"currency"`
+	TargetPortfolioID string  `gorm:"size:50;default:''" json:"targetPortfolioId,omitempty"`
+	TargetAmount      float64 `gorm:"default:0" json:"targetAmount,omitempty"`
+	TargetCurrency    string  `gorm:"size:10;default:''" json:"targetCurrency,omitempty"`
+	ExchangeRate      float64 `gorm:"default:0" json:"exchangeRate,omitempty"`
+	HoldingID         string  `gorm:"size:50;default:''" json:"holdingId,omitempty"`
+	Note              string  `gorm:"size:500;default:''" json:"note,omitempty"`
+	CreatedAt         int64   `json:"createdAt"`
 }
 
 type User struct {
@@ -236,6 +237,9 @@ func (h *Holding) RecalcFromLots() {
 	if h.Symbol != "" {
 		h.Shares = totalBuyShares - totalSellShares
 		h.Cost = totalBuyCost - totalSellCost
+		if math.Abs(h.Shares) < 1e-9 {
+			h.Shares = 0
+		}
 		if h.Shares > 0 {
 			h.CostPrice = h.Cost / h.Shares
 		} else {
@@ -246,6 +250,9 @@ func (h *Holding) RecalcFromLots() {
 		h.Shares = totalBuyShares - totalSellShares
 		h.Value = totalBuyValue - totalSellValue
 		h.Cost = totalBuyCost - totalSellCost
+		if math.Abs(h.Shares) < 1e-9 {
+			h.Shares = 0
+		}
 		if h.Shares > 0 {
 			h.CostPrice = h.Cost / h.Shares
 		} else {

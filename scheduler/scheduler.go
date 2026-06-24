@@ -216,7 +216,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 
 		updates := map[string]any{
 			"price": r.result.Price,
-			"value": r.holding.Shares * r.result.Price,
+			"value": gorm.Expr("shares * ?", r.result.Price),
 		}
 		if err := s.db.Model(&models.Holding{}).Where("id = ? AND portfolio_id = ?", r.holding.ID, portfolioID).Updates(updates).Error; err != nil {
 			slog.Error("failed to update holding", "userId", userID, "portfolioId", portfolioID, "id", r.holding.ID, "error", err)

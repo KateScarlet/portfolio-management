@@ -146,16 +146,16 @@ func DeletePortfolio(db *gorm.DB) app.HandlerFunc {
 			if err := tx.Where("portfolio_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
 				return err
 			}
-		if err := tx.Where("portfolio_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("portfolio_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("portfolio_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(&portfolio).Error; err != nil {
+			if err := tx.Where("portfolio_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("portfolio_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("portfolio_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Delete(&portfolio).Error; err != nil {
 				return err
 			}
 			return nil

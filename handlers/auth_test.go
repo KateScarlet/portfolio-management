@@ -135,7 +135,7 @@ func TestLogin_Success(t *testing.T) {
 		"password": "password123",
 	})
 
-	Login(db)(context.Background(), c)
+	Login(db, nil)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
@@ -163,7 +163,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 		"password": "wrongpassword",
 	})
 
-	Login(db)(context.Background(), c)
+	Login(db, nil)(context.Background(), c)
 
 	if c.Response.StatusCode() != 401 {
 		t.Errorf("expected 401, got %d", c.Response.StatusCode())
@@ -178,7 +178,7 @@ func TestLogin_NonexistentUser(t *testing.T) {
 		"password": "password123",
 	})
 
-	Login(db)(context.Background(), c)
+	Login(db, nil)(context.Background(), c)
 
 	if c.Response.StatusCode() != 401 {
 		t.Errorf("expected 401, got %d", c.Response.StatusCode())
@@ -193,7 +193,7 @@ func TestLogin_EmptyCredentials(t *testing.T) {
 		"password": "",
 	})
 
-	Login(db)(context.Background(), c)
+	Login(db, nil)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
 		t.Errorf("expected 400, got %d", c.Response.StatusCode())
