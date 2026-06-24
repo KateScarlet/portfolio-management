@@ -15,17 +15,11 @@ require (
 	github.com/spf13/viper v1.21.0
 	golang.org/x/crypto v0.53.0
 	golang.org/x/oauth2 v0.36.0
-	gonum.org/v1/plot v0.17.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
 
 require (
-	codeberg.org/go-fonts/liberation v0.5.0 // indirect
-	codeberg.org/go-latex/latex v0.2.0 // indirect
-	codeberg.org/go-pdf/fpdf v0.11.1 // indirect
-	git.sr.ht/~sbinet/gg v0.7.0 // indirect
-	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -38,7 +32,6 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.2.6 // indirect
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -67,7 +60,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
-	golang.org/x/image v0.30.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect

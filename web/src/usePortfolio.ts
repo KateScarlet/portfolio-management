@@ -8,20 +8,26 @@ export function usePortfolio(portfolioId: string | null) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     if (!portfolioId) {
-      setHoldings([])
-      setHistory([])
-      setLoading(false)
       return
     }
-    setLoading(true)
-    Promise.all([api.fetchHoldings(portfolioId), api.fetchRecords(portfolioId)])
-      .then(([h, r]) => {
-        setHoldings(h)
-        setHistory(r)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    const fetch = async () => {
+      setLoading(true)
+      try {
+        const [h, r] = await Promise.all([api.fetchHoldings(portfolioId), api.fetchRecords(portfolioId)])
+        if (!cancelled) {
+          setHoldings(h)
+          setHistory(r)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetch()
+    return () => { cancelled = true }
   }, [portfolioId])
 
   const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }

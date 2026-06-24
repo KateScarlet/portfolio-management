@@ -24,8 +24,8 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
       setNewName("")
       setNewDesc("")
       onRefresh()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "未知错误")
     }
   }
 
@@ -36,8 +36,8 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
       await api.updatePortfolio(id, { name: editName.trim(), description: editDesc.trim() || undefined })
       setEditingId(null)
       onRefresh()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "未知错误")
     }
   }
 
@@ -47,8 +47,8 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
     try {
       await api.deletePortfolio(id)
       onRefresh()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "未知错误")
     }
   }
 

@@ -738,9 +738,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
     aboveSum: number
     currentPcts: number[]
   } | null>(null)
-  const currentPctsRef = useRef(ASSET_KEYS.map((k) => draft[k] as number))
-
-  currentPctsRef.current = ASSET_KEYS.map((k) => draft[k] as number)
+  const currentPcts = ASSET_KEYS.map((k) => draft[k] as number)
 
   const handlePointerDown = useCallback(
     (idx: number, e: React.PointerEvent) => {
@@ -749,7 +747,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
       const w = bar.getBoundingClientRect().width
       if (w === 0) return
 
-      const pcts = currentPctsRef.current
+      const pcts = currentPcts
       const belowSum = pcts.slice(0, idx).reduce((s, v) => s + v, 0)
       const aboveSum = pcts.slice(idx + 2).reduce((s, v) => s + v, 0)
 
@@ -764,7 +762,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
       setDragIdx(idx)
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     },
-    [],
+    [currentPcts],
   )
 
   useEffect(() => {
@@ -803,7 +801,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
       <div ref={barRef} className="relative flex h-10 rounded-lg overflow-hidden select-none">
         {ASSET_ORDER.map((id, i) => {
           const def = ASSET_DEFINITIONS[id]
-          const pct = currentPctsRef.current[i]
+          const pct = currentPcts[i]
           return (
             <div
               key={id}
@@ -836,7 +834,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
       <div className="flex items-center gap-4 mt-2">
         {ASSET_ORDER.map((id, i) => {
           const def = ASSET_DEFINITIONS[id]
-          const pct = currentPctsRef.current[i]
+          const pct = currentPcts[i]
           return (
             <div key={id} className="flex items-center gap-1.5">
               <div

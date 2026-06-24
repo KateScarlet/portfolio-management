@@ -74,10 +74,29 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      loadPortfolios()
+    if (!user) return
+    let cancelled = false
+    const fetchPortfolios = async () => {
+      try {
+        let ps = await api.fetchPortfolios()
+        if (ps.length === 0) {
+          const created = await api.createPortfolio("默认组合")
+          ps = [created]
+        }
+        if (!cancelled) {
+          setPortfolios(ps)
+          setCurrentPortfolio((prev) => {
+            const existing = prev ? ps.find((p) => p.id === prev.id) : null
+            return existing || ps[0]
+          })
+        }
+      } catch (e) {
+        console.error("Failed to load portfolios", e)
+      }
     }
-  }, [user, loadPortfolios])
+    fetchPortfolios()
+    return () => { cancelled = true }
+  }, [user])
 
   useEffect(() => {
     if (!currentPortfolio) return
