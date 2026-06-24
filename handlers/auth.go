@@ -184,32 +184,38 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			if err := tx.Where("user_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
+		if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("user_id = ?", id).Delete(&models.WebAuthnCredential{}).Error; err != nil {
 				return err
 			}
-		result := tx.Delete(&models.User{}, "id = ?", id)
-		if result.Error != nil {
-			return result.Error
+			result := tx.Delete(&models.User{}, "id = ?", id)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return ErrUserNotFound
+			}
+			return nil
+		})
+		if err != nil {
+			if errors.Is(err, ErrUserNotFound) {
+				c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
+			return
 		}
-		if result.RowsAffected == 0 {
-			return ErrUserNotFound
-		}
-		return nil
-	})
-	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
-		} else {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-		}
-		return
-	}
 
 		c.JSON(consts.StatusOK, map[string]bool{"success": true})
 	}

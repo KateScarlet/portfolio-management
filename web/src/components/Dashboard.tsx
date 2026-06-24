@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
-import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme } from "../types"
+import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
 import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
-import * as api from "../api"
+import { useExchangeRates } from "../useExchangeRates"
+import FundOperationDialog from "./FundOperationDialog"
+
+type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
 
 interface DashboardProps {
   assets: Record<AssetId, number>
@@ -12,17 +15,15 @@ interface DashboardProps {
   totalFees: number
   colorScheme: ColorScheme
   availableFunds: AvailableFund[]
-  onUpdateAvailableFunds: (currency: string, amount: number) => void
+  portfolios: Portfolio[]
+  currentPortfolioId: string
+  onRefreshFunds: () => void
 }
 
-const SUPPORTED_CURRENCIES = ["CNY", "USD", "HKD", "EUR", "GBP", "JPY"]
-
-export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, onUpdateAvailableFunds }: DashboardProps) {
-  const [isEditingFunds, setIsEditingFunds] = useState(false)
-  const [editingCurrency, setEditingCurrency] = useState("")
-  const [tempAmount, setTempAmount] = useState("")
+export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, portfolios, currentPortfolioId, onRefreshFunds }: DashboardProps) {
   const [showDetails, setShowDetails] = useState(false)
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ CNY: 1 })
+  const exchangeRates = useExchangeRates(availableFunds)
+  const [fundOperation, setFundOperation] = useState<{ type: OperationType; currency?: string } | null>(null)
 
   const chartData = Object.keys(assets)
     .map((key) => {
@@ -40,46 +41,9 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
   const returnRate = principal > 0 ? profit / principal : 0
   const isPositive = profit >= 0
 
-  useEffect(() => {
-    const currencies = availableFunds.filter((f) => f.currency !== "CNY").map((f) => f.currency)
-    const unique = [...new Set(currencies)]
-    if (unique.length === 0) return
-    Promise.all(
-      unique.map(async (cur) => {
-        try {
-          const res = await api.fetchExchangeRate(`${cur}CNY`)
-          return { currency: cur, rate: res.rate }
-        } catch {
-          return { currency: cur, rate: 1 }
-        }
-      })
-    ).then((results) => {
-      const rates: Record<string, number> = { CNY: 1 }
-      results.forEach((r) => { rates[r.currency] = r.rate })
-      setExchangeRates(rates)
-    })
-  }, [availableFunds])
-
   const totalCNY = availableFunds.reduce((sum, f) => {
     return sum + f.amount * (exchangeRates[f.currency] || 1)
   }, 0)
-
-  const startEdit = useCallback((currency: string, amount: number) => {
-    setEditingCurrency(currency)
-    setTempAmount(amount.toString())
-    setIsEditingFunds(true)
-  }, [])
-
-  const saveEdit = useCallback(() => {
-    const num = parseFloat(tempAmount)
-    if (!isNaN(num) && num >= 0) {
-      onUpdateAvailableFunds(editingCurrency, num)
-      setIsEditingFunds(false)
-    }
-  }, [editingCurrency, tempAmount, onUpdateAvailableFunds])
-
-  const usedCurrencies = availableFunds.map((f) => f.currency)
-  const availableNewCurrencies = SUPPORTED_CURRENCIES.filter((c) => !usedCurrencies.includes(c))
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col h-full">
@@ -215,101 +179,71 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
           <div className="mt-3 space-y-2">
             {availableFunds.map((f) => (
               <div key={f.currency} className="flex items-center justify-between pl-2">
-                {isEditingFunds && editingCurrency === f.currency ? (
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="text-xs text-[#6C757D] w-10">{f.currency}</span>
-                    <input
-                      type="number"
-                      value={tempAmount}
-                      onChange={(e) => setTempAmount(e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit()
-                        else if (e.key === "Escape") setIsEditingFunds(false)
-                      }}
-                    />
-                    <button onClick={saveEdit} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">
-                      保存
+                <span className="text-xs text-[#6C757D]">{f.currency}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-[#1A1A1A]">
+                    {formatCurrencyByCode(f.amount, f.currency)}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setFundOperation({ type: "transfer_in", currency: f.currency })}
+                      className="text-[10px] text-green-600 hover:text-green-800 transition-colors"
+                      title="转入"
+                    >
+                      转入
                     </button>
-                    <button onClick={() => setIsEditingFunds(false)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]">
-                      取消
+                    <button
+                      onClick={() => setFundOperation({ type: "transfer_out", currency: f.currency })}
+                      className="text-[10px] text-red-600 hover:text-red-800 transition-colors"
+                      title="转出"
+                    >
+                      转出
                     </button>
                   </div>
-                ) : (
-                  <>
-                    <span className="text-xs text-[#6C757D]">{f.currency}</span>
-                    <button
-                      onClick={() => startEdit(f.currency, f.amount)}
-                      className="text-xs font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
-                      title="点击编辑"
-                    >
-                      {formatCurrencyByCode(f.amount, f.currency)}
-                    </button>
-                  </>
-                )}
+                </div>
               </div>
             ))}
 
             {availableFunds.length === 0 && (
               <div className="flex items-center justify-between pl-2">
-                {isEditingFunds && editingCurrency === "CNY" ? (
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="text-xs text-[#6C757D] w-10">CNY</span>
-                    <input
-                      type="number"
-                      value={tempAmount}
-                      onChange={(e) => setTempAmount(e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit()
-                        else if (e.key === "Escape") setIsEditingFunds(false)
-                      }}
-                    />
-                    <button onClick={saveEdit} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">
-                      保存
-                    </button>
-                    <button onClick={() => setIsEditingFunds(false)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]">
-                      取消
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="text-xs text-[#6C757D]">CNY</span>
-                    <button
-                      onClick={() => startEdit("CNY", 0)}
-                      className="text-xs font-mono text-[#ADB5BD] hover:text-blue-600 transition-colors cursor-pointer"
-                      title="点击设置"
-                    >
-                      ¥0.00
-                    </button>
-                  </>
-                )}
+                <span className="text-xs text-[#6C757D]">暂无可用资金</span>
+                <button
+                  onClick={() => setFundOperation({ type: "transfer_in", currency: "CNY" })}
+                  className="text-[10px] text-green-600 hover:text-green-800 transition-colors"
+                >
+                  转入
+                </button>
               </div>
             )}
 
-            {availableNewCurrencies.length > 0 && (
-              <div className="pl-2 pt-1">
-                <select
-                  className="text-[10px] text-[#ADB5BD] border border-[#E9ECEF] rounded px-1 py-0.5 focus:outline-none"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      startEdit(e.target.value, 0)
-                    }
-                  }}
-                >
-                  <option value="">+ 添加币种</option>
-                  {availableNewCurrencies.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex gap-2 pl-2 pt-2 border-t border-[#F1F3F5]">
+              <button
+                onClick={() => setFundOperation({ type: "transfer" })}
+                className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+              >
+                划转
+              </button>
+              <button
+                onClick={() => setFundOperation({ type: "convert" })}
+                className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+              >
+                货币转换
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {fundOperation && (
+        <FundOperationDialog
+          type={fundOperation.type}
+          portfolios={portfolios}
+          currentPortfolioId={currentPortfolioId}
+          currentCurrency={fundOperation.currency}
+          onClose={() => setFundOperation(null)}
+          onSuccess={onRefreshFunds}
+        />
+      )}
     </div>
   )
 }

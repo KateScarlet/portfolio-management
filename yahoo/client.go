@@ -114,6 +114,10 @@ func ConvertSymbol(symbol string) string {
 		if strings.HasPrefix(s, "159") {
 			return s + ".SZ"
 		}
+		// Shenzhen convertible bonds: 127xxx, 128xxx
+		if strings.HasPrefix(s, "127") || strings.HasPrefix(s, "128") {
+			return s + ".SZ"
+		}
 		// All other 6-digit codes (1xxxxx, 4xxxxx, 7xxxxx, 8xxxxx, 9xxxxx)
 		// default to Shanghai, which has more bond/convertible listings
 		return s + ".SS"

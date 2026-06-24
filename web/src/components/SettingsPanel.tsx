@@ -23,6 +23,15 @@ const SUMMARY_INTERVALS = [
   { value: "weekly", label: "每周" },
 ]
 
+const DISPLAY_CURRENCIES = [
+  { value: "CNY", label: "CNY ¥" },
+  { value: "USD", label: "USD $" },
+  { value: "HKD", label: "HKD $" },
+  { value: "EUR", label: "EUR €" },
+  { value: "JPY", label: "JPY ¥" },
+  { value: "GBP", label: "GBP £" },
+]
+
 export default function SettingsPanel({ settings, onSave, userRole }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [draft, setDraft] = useState(settings)
@@ -262,6 +271,31 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                     <ArrowUp className="w-3 h-3 text-red-600" />
                     <ArrowDown className="w-3 h-3 text-emerald-600" />
                   </button>
+                </div>
+              </div>
+
+              {/* Display Currency */}
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                  显示币种
+                </label>
+                <p className="text-xs text-[#6C757D] mb-3">
+                  所有资产将按此币种汇总显示，汇率自动转换。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DISPLAY_CURRENCIES.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setDraft({ ...draft, displayCurrency: c.value })}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        draft.displayCurrency === c.value
+                          ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                          : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 

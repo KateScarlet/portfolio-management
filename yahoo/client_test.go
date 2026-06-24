@@ -22,6 +22,10 @@ func TestConvertSymbol(t *testing.T) {
 		{"159915", "159915.SZ"},
 		{"204001", "204001.SZ"},
 		{"300750", "300750.SZ"},
+		// Shenzhen convertible bonds (127xxx, 128xxx -> xxxxxx.SZ)
+		{"127001", "127001.SZ"},
+		{"127080", "127080.SZ"},
+		{"128144", "128144.SZ"},
 		// SH tag format (SHxxxxxx -> xxxxxx.SS, case-insensitive)
 		{"SH600519", "600519.SS"},
 		{"SH510300", "510300.SS"},

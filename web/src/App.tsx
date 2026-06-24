@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { usePortfolio } from "./usePortfolio"
+import { useExchangeRates } from "./useExchangeRates"
 import { Settings, SyncStatus, UserInfo, Portfolio, PortfolioSummary, DEFAULT_SETTINGS, ColorScheme, Holding, AvailableFund } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
@@ -23,6 +24,10 @@ export default function App() {
   const [showPortfolioManager, setShowPortfolioManager] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+  const [availableFunds, setAvailableFunds] = useState<AvailableFund[]>([])
+  const exchangeRates = useExchangeRates(availableFunds)
 
   const {
     holdings,
@@ -35,32 +40,7 @@ export default function App() {
     removeHolding,
     saveRecord,
     deleteRecord,
-  } = usePortfolio(currentPortfolio?.id || null)
-
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
-  const [availableFunds, setAvailableFunds] = useState<AvailableFund[]>([])
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ CNY: 1 })
-
-  useEffect(() => {
-    const currencies = availableFunds.filter((f) => f.currency !== "CNY").map((f) => f.currency)
-    const unique = [...new Set(currencies)]
-    if (unique.length === 0) return
-    Promise.all(
-      unique.map(async (cur) => {
-        try {
-          const res = await api.fetchExchangeRate(`${cur}CNY`)
-          return { currency: cur, rate: res.rate }
-        } catch {
-          return { currency: cur, rate: 1 }
-        }
-      })
-    ).then((results) => {
-      const rates: Record<string, number> = { CNY: 1 }
-      results.forEach((r) => { rates[r.currency] = r.rate })
-      setExchangeRates(rates)
-    })
-  }, [availableFunds])
+  } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency)
 
   const totalFundsCNY = availableFunds.reduce((sum, f) => {
     return sum + f.amount * (exchangeRates[f.currency] || 1)
@@ -143,6 +123,7 @@ export default function App() {
           telegramSummary: s.telegramSummary !== "false",
           telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
           telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
+          displayCurrency: s.displayCurrency || DEFAULT_SETTINGS.displayCurrency,
         })
       })
       .catch(console.error)
@@ -200,21 +181,11 @@ export default function App() {
         telegramSummary: String(newSettings.telegramSummary),
         telegramPriceThreshold: String(newSettings.telegramPriceThreshold),
         telegramSummaryInterval: newSettings.telegramSummaryInterval,
+        displayCurrency: newSettings.displayCurrency,
       })
       setSettings(newSettings)
     } catch (e) {
       console.error("Failed to save settings", e)
-    }
-  }, [currentPortfolio])
-
-  const handleUpdateAvailableFunds = useCallback(async (currency: string, amount: number) => {
-    if (!currentPortfolio) return
-    try {
-      await api.updateAvailableFunds(currentPortfolio.id, currency, amount)
-      const funds = await api.fetchAvailableFunds(currentPortfolio.id)
-      setAvailableFunds(funds)
-    } catch (e) {
-      console.error("Failed to update available funds", e)
     }
   }, [currentPortfolio])
 
@@ -371,7 +342,7 @@ export default function App() {
       <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} totalAssets={totalAssets} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} onUpdateAvailableFunds={handleUpdateAvailableFunds} />
+            <Dashboard assets={assets} total={total} totalAssets={totalAssets} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} portfolios={portfolios} currentPortfolioId={currentPortfolio.id} onRefreshFunds={handleRefreshAvailableFunds} />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel

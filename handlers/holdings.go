@@ -37,6 +37,10 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) {
 		}
 		h.Value *= rate
 		h.Cost *= rate
+		for j := range h.Lots {
+			h.Lots[j].Fee *= rate
+			h.Lots[j].Cost *= rate
+		}
 	}
 }
 
@@ -191,9 +195,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 						return err
 					}
 
-				if fundsAmount < addedCost {
-					return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %.2f, 需要 %.2f", holdingCurrency, fundsAmount, addedCost)}
-				}
+					if fundsAmount < addedCost {
+						return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %.2f, 需要 %.2f", holdingCurrency, fundsAmount, addedCost)}
+					}
 
 					newAmount := fundsAmount - addedCost
 					if err == nil {
@@ -212,6 +216,19 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 								return err
 							}
 						}
+					}
+
+					if err := tx.Create(&models.FundTransaction{
+						ID:          uuid.New().String(),
+						UserID:      user.UserID,
+						PortfolioID: portfolioID,
+						Type:        "buy",
+						Amount:      addedCost,
+						Currency:    holdingCurrency,
+						HoldingID:   result.ID,
+						CreatedAt:   time.Now().UnixMilli(),
+					}).Error; err != nil {
+						return err
 					}
 				}
 			}

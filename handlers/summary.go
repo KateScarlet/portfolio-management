@@ -50,6 +50,10 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 				continue
 			}
 
+			if displayCurrency := c.Query("currency"); displayCurrency != "" {
+				convertHoldingsCurrency(holdings, displayCurrency)
+			}
+
 			assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 			var total, principal float64
 			for i := range holdings {

@@ -122,7 +122,11 @@ func main() {
 	pf.PUT("/settings", handlers.BatchUpdateSettings(database, priceScheduler))
 	pf.PUT("/settings/:key", handlers.UpdateSetting(database, priceScheduler))
 	pf.GET("/funds", handlers.GetAvailableFunds(database))
-	pf.PUT("/funds", handlers.UpdateAvailableFunds(database))
+	pf.POST("/funds/transfer-in", handlers.TransferIn(database))
+	pf.POST("/funds/transfer-out", handlers.TransferOut(database))
+	pf.POST("/funds/transfer", handlers.TransferBetween(database))
+	pf.POST("/funds/convert", handlers.ConvertCurrency(database))
+	pf.GET("/fund-transactions", handlers.ListFundTransactions(database))
 
 	admin := api.Group("")
 	admin.Use(middleware.AdminRequired())

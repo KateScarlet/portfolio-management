@@ -9,7 +9,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -120,68 +119,6 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			result = []map[string]any{}
 		}
 		c.JSON(consts.StatusOK, result)
-	}
-}
-
-func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
-	return func(ctx context.Context, c *app.RequestContext) {
-		user := middleware.GetUser(c)
-		if user == nil {
-			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
-			return
-		}
-
-		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
-			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
-			return
-		}
-
-		var body struct {
-			Currency string  `json:"currency"`
-			Amount   float64 `json:"amount"`
-		}
-		if err := c.BindJSON(&body); err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
-		}
-		if body.Currency == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
-			return
-		}
-
-		var af models.AvailableFund
-		result := db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, body.Currency).First(&af)
-		if result.Error == gorm.ErrRecordNotFound {
-			af = models.AvailableFund{
-				ID:          uuid.New().String(),
-				UserID:      user.UserID,
-				PortfolioID: portfolioID,
-				Currency:    body.Currency,
-				Amount:      body.Amount,
-			}
-			if err := db.Create(&af).Error; err != nil {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-				return
-			}
-		} else if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
-			return
-		} else {
-			if body.Amount == 0 {
-				if err := db.Delete(&af).Error; err != nil {
-					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-					return
-				}
-			} else {
-				if err := db.Model(&af).Update("amount", body.Amount).Error; err != nil {
-					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-					return
-				}
-			}
-		}
-
-		c.JSON(consts.StatusOK, map[string]any{"currency": body.Currency, "amount": body.Amount})
 	}
 }
 

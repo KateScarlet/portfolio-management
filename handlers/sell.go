@@ -167,14 +167,15 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 			var af models.AvailableFund
 			err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, currency).First(&af).Error
-			if err == nil {
+			switch err {
+			case nil:
 				newFundsAmount = af.Amount + realizedValue
 				if err := tx.Model(&af).Update("amount", newFundsAmount).Error; err != nil {
 					tx.Rollback()
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return
 				}
-			} else if err == gorm.ErrRecordNotFound {
+			case gorm.ErrRecordNotFound:
 				newFundsAmount = realizedValue
 				if err := tx.Create(&models.AvailableFund{
 					ID:          uuid.New().String(),
@@ -187,7 +188,22 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return
 				}
-			} else {
+			default:
+				tx.Rollback()
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+
+			if err := tx.Create(&models.FundTransaction{
+				ID:          uuid.New().String(),
+				UserID:      user.UserID,
+				PortfolioID: portfolioID,
+				Type:        "sell",
+				Amount:      realizedValue,
+				Currency:    currency,
+				HoldingID:   holding.ID,
+				CreatedAt:   time.Now().UnixMilli(),
+			}).Error; err != nil {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return

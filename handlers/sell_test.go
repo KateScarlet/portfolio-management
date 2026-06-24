@@ -23,7 +23,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}, &models.FundTransaction{}); err != nil {
 		t.Fatal(err)
 	}
 	db.Create(&models.Portfolio{

@@ -64,8 +64,9 @@ export async function fetchRecords(pid: string): Promise<PortfolioRecord[]> {
   return request<PortfolioRecord[]>(`/api/portfolios/${pid}/records`)
 }
 
-export async function createRecord(pid: string): Promise<PortfolioRecord> {
-  return request<PortfolioRecord>(`/api/portfolios/${pid}/records`, {
+export async function createRecord(pid: string, currency?: string): Promise<PortfolioRecord> {
+  const params = currency ? `?currency=${currency}` : ""
+  return request<PortfolioRecord>(`/api/portfolios/${pid}/records${params}`, {
     method: "POST",
   })
 }
@@ -105,15 +106,60 @@ export async function fetchAvailableFunds(pid: string): Promise<{ currency: stri
   return request<{ currency: string; amount: number }[]>(`/api/portfolios/${pid}/funds`)
 }
 
-export async function updateAvailableFunds(
+export async function transferInFunds(
   pid: string,
   currency: string,
-  amount: number
-): Promise<{ currency: string; amount: number }> {
-  return request<{ currency: string; amount: number }>(`/api/portfolios/${pid}/funds`, {
-    method: "PUT",
-    body: JSON.stringify({ currency, amount }),
+  amount: number,
+  note: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/portfolios/${pid}/funds/transfer-in`, {
+    method: "POST",
+    body: JSON.stringify({ currency, amount, note }),
   })
+}
+
+export async function transferOutFunds(
+  pid: string,
+  currency: string,
+  amount: number,
+  note: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/portfolios/${pid}/funds/transfer-out`, {
+    method: "POST",
+    body: JSON.stringify({ currency, amount, note }),
+  })
+}
+
+export async function transferBetweenFunds(
+  pid: string,
+  currency: string,
+  amount: number,
+  targetPortfolioId: string,
+  note: string
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/portfolios/${pid}/funds/transfer`, {
+    method: "POST",
+    body: JSON.stringify({ currency, amount, targetPortfolioId, note }),
+  })
+}
+
+export async function convertCurrency(
+  pid: string,
+  fromCurrency: string,
+  toCurrency: string,
+  fromAmount: number,
+  toAmount: number,
+  exchangeRate: number
+): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/portfolios/${pid}/funds/convert`, {
+    method: "POST",
+    body: JSON.stringify({ fromCurrency, toCurrency, fromAmount, toAmount, exchangeRate }),
+  })
+}
+
+export async function fetchFundTransactions(pid: string, type?: string): Promise<import("./types").FundTransaction[]> {
+  const params = type ? `?type=${type}` : ""
+  return request<import("./types").FundTransaction[]>(`/api/portfolios/${pid}/fund-transactions${params}`)
 }
 
 export async function fetchSyncStatus(pid: string): Promise<SyncStatus> {

@@ -301,14 +301,14 @@ func TestGetAvailableFunds_HidesZeroAmount(t *testing.T) {
 	}
 }
 
-func TestUpdateAvailableFunds_Upsert(t *testing.T) {
+func TestTransferIn_Success(t *testing.T) {
 	db := setupTestDB(t)
 
-	c := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "USD", "amount": 3000})
-	UpdateAvailableFunds(db)(context.Background(), c)
+	c := newUserCtx("POST", "/api/funds/transfer-in", map[string]any{"currency": "USD", "amount": 3000, "note": "test"})
+	TransferIn(db)(context.Background(), c)
 
-	if c.Response.StatusCode() != 200 {
-		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 
 	var af models.AvailableFund
@@ -317,37 +317,54 @@ func TestUpdateAvailableFunds_Upsert(t *testing.T) {
 		t.Errorf("expected 3000, got %.2f", af.Amount)
 	}
 
-	c2 := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "USD", "amount": 5000})
-	UpdateAvailableFunds(db)(context.Background(), c2)
-
-	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
-	if af.Amount != 5000 {
-		t.Errorf("expected 5000 after update, got %.2f", af.Amount)
+	var tx models.FundTransaction
+	db.Where("portfolio_id = ? AND type = ?", testPortfolioID, "transfer_in").First(&tx)
+	if tx.Amount != 3000 || tx.Currency != "USD" {
+		t.Errorf("expected transaction 3000 USD, got %.2f %s", tx.Amount, tx.Currency)
 	}
 }
 
-func TestUpdateAvailableFunds_DeleteOnZero(t *testing.T) {
+func TestTransferOut_InsufficientFunds(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "HKD", Amount: 100,
 	})
 
-	c := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "HKD", "amount": 0})
-	UpdateAvailableFunds(db)(context.Background(), c)
+	c := newUserCtx("POST", "/api/funds/transfer-out", map[string]any{"currency": "HKD", "amount": 200})
+	TransferOut(db)(context.Background(), c)
 
-	var count int64
-	db.Model(&models.AvailableFund{}).Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").Count(&count)
-	if count != 0 {
-		t.Errorf("expected fund to be deleted when amount=0, count=%d", count)
+	if c.Response.StatusCode() != 400 {
+		t.Errorf("expected 400 for insufficient funds, got %d", c.Response.StatusCode())
 	}
 }
 
-func TestUpdateAvailableFunds_MissingCurrency(t *testing.T) {
+func TestTransferOut_Success(t *testing.T) {
+	db := setupTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "HKD", Amount: 100,
+	})
+
+	c := newUserCtx("POST", "/api/funds/transfer-out", map[string]any{"currency": "HKD", "amount": 50, "note": "withdraw"})
+	TransferOut(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
+	if af.Amount != 50 {
+		t.Errorf("expected 50, got %.2f", af.Amount)
+	}
+}
+
+func TestTransferIn_MissingCurrency(t *testing.T) {
 	db := setupTestDB(t)
 
-	c := newUserCtx("PUT", "/api/funds", map[string]any{"amount": 100})
-	UpdateAvailableFunds(db)(context.Background(), c)
+	c := newUserCtx("POST", "/api/funds/transfer-in", map[string]any{"amount": 100})
+	TransferIn(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
 		t.Errorf("expected 400 for missing currency, got %d", c.Response.StatusCode())

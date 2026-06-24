@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { AssetId, Holding, PortfolioRecord } from "./types"
 import * as api from "./api"
 
-export function usePortfolio(portfolioId: string | null) {
+export function usePortfolio(portfolioId: string | null, displayCurrency: string = "CNY") {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [history, setHistory] = useState<PortfolioRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,7 +16,7 @@ export function usePortfolio(portfolioId: string | null) {
       setLoading(true)
       try {
         const [h, r] = await Promise.all([
-          api.fetchHoldings(portfolioId),
+          api.fetchHoldings(portfolioId, displayCurrency),
           api.fetchRecords(portfolioId),
         ])
         if (!cancelled) {
@@ -31,7 +31,7 @@ export function usePortfolio(portfolioId: string | null) {
     }
     fetch()
     return () => { cancelled = true }
-  }, [portfolioId])
+  }, [portfolioId, displayCurrency])
 
   const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
   holdings.forEach((h) => {
@@ -75,12 +75,12 @@ export function usePortfolio(portfolioId: string | null) {
   const saveRecord = useCallback(async () => {
     if (!portfolioId) return
     try {
-      const result = await api.createRecord(portfolioId)
+      const result = await api.createRecord(portfolioId, displayCurrency)
       setHistory((prev) => [result, ...prev])
     } catch (e) {
       console.error("Failed to save record", e)
     }
-  }, [portfolioId])
+  }, [portfolioId, displayCurrency])
 
   const deleteRecord = useCallback(async (id: string) => {
     if (!portfolioId) return

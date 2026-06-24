@@ -5,6 +5,22 @@ export interface AvailableFund {
   amount: number
 }
 
+export interface FundTransaction {
+  id: string
+  userId: string
+  portfolioId: string
+  type: "transfer_in" | "transfer_out" | "transfer" | "convert" | "buy" | "sell"
+  amount: number
+  currency: string
+  targetPortfolioId?: string
+  targetAmount?: number
+  targetCurrency?: string
+  exchangeRate?: number
+  holdingId?: string
+  note?: string
+  createdAt: number
+}
+
 export interface UserInfo {
   id: string
   username: string
@@ -98,6 +114,7 @@ export interface Settings {
   driftThreshold: number // 漂移阈值百分比，如 5 表示 5%
   syncInterval: number // 同步间隔（分钟），0 = 关闭
   colorScheme: ColorScheme // 红涨绿跌 or 绿涨红跌
+  displayCurrency: string // 显示币种，如 "CNY"、"USD"
   // Target allocation
   targetStocks: number
   targetBonds: number
@@ -118,6 +135,7 @@ export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
   syncInterval: 60,
   colorScheme: "green-up",
+  displayCurrency: "CNY",
   targetStocks: 25,
   targetBonds: 25,
   targetCash: 25,

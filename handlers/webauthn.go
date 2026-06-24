@@ -249,7 +249,11 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话已过期"})
 			return
 		}
-		regSession := sessionRaw.(*webauthnRegisterSession)
+		regSession, ok := sessionRaw.(*webauthnRegisterSession)
+		if !ok {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话类型错误"})
+			return
+		}
 
 		w, err := newWebAuthnInstance(cfg)
 		if err != nil {
@@ -372,7 +376,11 @@ func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话已过期"})
 			return
 		}
-		sessionData := sessionRaw.(*webauthn.SessionData)
+		sessionData, ok := sessionRaw.(*webauthn.SessionData)
+		if !ok {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话类型错误"})
+			return
+		}
 
 		w, err := newWebAuthnInstance(cfg)
 		if err != nil {

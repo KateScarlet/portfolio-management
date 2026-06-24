@@ -160,6 +160,22 @@ type AvailableFund struct {
 	Amount      float64 `gorm:"default:0" json:"amount"`
 }
 
+type FundTransaction struct {
+	ID               string  `gorm:"primaryKey" json:"id"`
+	UserID           string  `gorm:"index;not null" json:"userId"`
+	PortfolioID      string  `gorm:"index;not null" json:"portfolioId"`
+	Type             string  `gorm:"size:20;not null" json:"type"`
+	Amount           float64 `gorm:"not null" json:"amount"`
+	Currency         string  `gorm:"size:10;not null" json:"currency"`
+	TargetPortfolioID string `gorm:"size:50;default:''" json:"targetPortfolioId,omitempty"`
+	TargetAmount     float64 `gorm:"default:0" json:"targetAmount,omitempty"`
+	TargetCurrency   string  `gorm:"size:10;default:''" json:"targetCurrency,omitempty"`
+	ExchangeRate     float64 `gorm:"default:0" json:"exchangeRate,omitempty"`
+	HoldingID        string  `gorm:"size:50;default:''" json:"holdingId,omitempty"`
+	Note             string  `gorm:"size:500;default:''" json:"note,omitempty"`
+	CreatedAt        int64   `json:"createdAt"`
+}
+
 type User struct {
 	ID          string `gorm:"primaryKey" json:"id"`
 	Username    string `gorm:"uniqueIndex;size:50;not null" json:"username"`
