@@ -15,11 +15,11 @@ tmp_dir = "tmp"
   # 完整的跟踪监控目录
   include_ext = ["go", "tpl", "tmpl", "html", "sql"]
   # 忽略的目录
-  exclude_dir = ["tmp", "vendor", "node_modules", ".git"]
+  exclude_dir = ["tmp", "vendor", "node_modules", ".git", "web"]
   # 忽略的文件
   exclude_regex = ["_test\\.go$"]
   # 延迟毫秒数
-  delay = 1000
+  delay = 500
 
 [color]
   # 构建中的颜色
