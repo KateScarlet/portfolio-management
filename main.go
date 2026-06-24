@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"portfolio-management/db"
+	"portfolio-management/eastmoney"
 	"portfolio-management/handlers"
 	"portfolio-management/middleware"
 	"portfolio-management/scheduler"
@@ -60,6 +61,7 @@ func main() {
 	defer sqlDB.Close()
 
 	yahoo.Init()
+	eastmoney.Init()
 
 	priceScheduler := scheduler.New(database)
 	notifier := scheduler.NewNotifier(database)

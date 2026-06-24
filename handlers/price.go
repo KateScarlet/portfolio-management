@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"portfolio-management/eastmoney"
 	"portfolio-management/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -17,7 +18,13 @@ func GetPrice() app.HandlerFunc {
 			return
 		}
 
-		result, err := yahoo.FetchQuote(symbol)
+		var result any
+		var err error
+		if eastmoney.IsFuturesSymbol(symbol) {
+			result, err = eastmoney.FetchQuote(symbol)
+		} else {
+			result, err = yahoo.FetchQuote(symbol)
+		}
 		if err != nil {
 			slog.Error("failed to fetch quote", "symbol", symbol, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
