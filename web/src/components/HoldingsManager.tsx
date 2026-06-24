@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useRef } from "react"
+import React, { useState, useCallback } from "react"
 import { ASSET_DEFINITIONS, Holding, HoldingLot, ColorScheme } from "../types"
-import { formatCurrency, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import SellModal from "./SellModal"
 import ConfirmDialog from "./ConfirmDialog"
-import { useToast } from "./toast-context"
 
 interface HoldingsManagerProps {
   portfolioId: string
@@ -45,23 +44,14 @@ export default function HoldingsManager({
   const [editingLotFee, setEditingLotFee] = useState("")
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
-  const [editingLotCurrency, setEditingLotCurrency] = useState("CNY")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
 
-  const { showToast } = useToast()
-
-  const fxRateRef = useRef<Record<string, number>>({})
-
   const computeCost = useCallback(
-    (costPriceStr: string, sharesStr: string, currency: string) => {
+    (costPriceStr: string, sharesStr: string) => {
       const p = parseFloat(costPriceStr) || 0
       const s = parseFloat(sharesStr) || 0
-      if (currency === "CNY") {
-        return String(p * s)
-      }
-      const rate = fxRateRef.current[currency] || 0
-      return rate > 0 ? String(p * rate * s) : String(p * s)
+      return String(p * s)
     },
     []
   )
@@ -210,12 +200,17 @@ export default function HoldingsManager({
                                 </span>
                               )}
                             </p>
-                            <p
-                              className="text-[10px] text-[#ADB5BD] truncate max-w-37.5"
-                              title={h.name}
-                            >
-                              {h.name}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p
+                                className="text-[10px] text-[#ADB5BD] truncate max-w-37.5"
+                                title={h.name}
+                              >
+                                {h.name}
+                              </p>
+                              <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                                {h.currency || "CNY"}
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
@@ -225,18 +220,21 @@ export default function HoldingsManager({
                                 {h.lots.length} 笔
                               </span>
                             )}
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                              {h.currency || "CNY"}
+                            </span>
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
                         {h.symbol ? (
                           <div>
-                            <p>{formatCurrency(h.price)}</p>
+                            <p>{formatCurrencyByCode(h.price, h.currency || "CNY")}</p>
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
                         ) : (h.shares || 0) > 0 ? (
                           <div>
-                            {(h.costPrice || 0) > 0 && <p>{formatCurrency(h.costPrice || 0)}</p>}
+                            {(h.costPrice || 0) > 0 && <p>{formatCurrencyByCode(h.costPrice || 0, h.currency || "CNY")}</p>}
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
                         ) : (
@@ -246,7 +244,7 @@ export default function HoldingsManager({
                       <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
                         {h.cost && h.cost > 0 ? (
                           <div>
-                            <p>{formatCurrency(h.cost)}</p>
+                            <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
                             {(() => {
                               const profit = h.value - h.cost
                               const returnRate = profit / h.cost
@@ -298,7 +296,7 @@ export default function HoldingsManager({
                             </button>
                           </div>
                         ) : (
-                          formatCurrency(h.value)
+                          formatCurrencyByCode(h.value, h.currency || "CNY")
                         )}
                       </td>
                       <td
@@ -363,45 +361,20 @@ export default function HoldingsManager({
                                           className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
                                         />
                                       </div>
-                                      {h.symbol && (
+                                       {h.symbol && (
                                         <>
                                           <div className="flex flex-col gap-0.5">
                                             <span className="text-[9px] text-[#ADB5BD] uppercase">单价</span>
-                                            <div className="flex w-full">
-                                              <select
-                                                value={editingLotCurrency}
-                                                onChange={async (e) => {
-                                                  const newCurrency = e.target.value
-                                                  setEditingLotCurrency(newCurrency)
-                                                  if (newCurrency !== "CNY" && !fxRateRef.current[newCurrency]) {
-                                                    try {
-                                                      const fxData = await api.fetchExchangeRate(`${newCurrency}CNY`)
-                                                      if (fxData && fxData.rate) {
-                                                        fxRateRef.current[newCurrency] = fxData.rate
-                                                      }
-                                                    } catch {
-                                                      showToast("汇率获取失败", "info")
-                                                    }
-                                                  }
-                                                  setEditingLotCost(computeCost(editingLotCostPrice, editingLotShares, newCurrency))
-                                                }}
-                                                className="px-1 py-1 border border-r-0 border-[#E9ECEF] rounded-l text-[10px] bg-gray-50 focus:outline-none focus:border-[#1A1A1A]"
-                                              >
-                                                <option value="CNY">CNY</option>
-                                                <option value="USD">USD</option>
-                                                <option value="HKD">HKD</option>
-                                              </select>
-                                              <input
-                                                type="number"
-                                                placeholder="0"
-                                                value={editingLotCostPrice}
-                                                onChange={(e) => {
-                                                  setEditingLotCostPrice(e.target.value)
-                                                  setEditingLotCost(computeCost(e.target.value, editingLotShares, editingLotCurrency))
-                                                }}
-                                                className="w-20 px-2 py-1 border border-[#E9ECEF] rounded-r text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
-                                              />
-                                            </div>
+                                            <input
+                                              type="number"
+                                              placeholder="0"
+                                              value={editingLotCostPrice}
+                                              onChange={(e) => {
+                                                setEditingLotCostPrice(e.target.value)
+                                                setEditingLotCost(computeCost(e.target.value, editingLotShares))
+                                              }}
+                                              className="w-24 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
+                                            />
                                           </div>
                                           <div className="flex flex-col gap-0.5">
                                             <span className="text-[9px] text-[#ADB5BD] uppercase">数量</span>
@@ -411,7 +384,7 @@ export default function HoldingsManager({
                                               value={editingLotShares}
                                               onChange={(e) => {
                                                 setEditingLotShares(e.target.value)
-                                                setEditingLotCost(computeCost(editingLotCostPrice, e.target.value, editingLotCurrency))
+                                                setEditingLotCost(computeCost(editingLotCostPrice, e.target.value))
                                               }}
                                               className="w-20 px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A] font-mono"
                                             />
@@ -420,7 +393,7 @@ export default function HoldingsManager({
                                       )}
                                       {h.symbol ? (
                                         <div className="flex flex-col gap-0.5">
-                                          <span className="text-[9px] text-[#ADB5BD] uppercase">成本 (CNY)</span>
+                                          <span className="text-[9px] text-[#ADB5BD] uppercase">成本</span>
                                           <input
                                             type="number"
                                             placeholder="0"
@@ -507,25 +480,25 @@ export default function HoldingsManager({
                                         {h.symbol ? (
                                           <>
                                             <span className="w-28 text-right">
-                                              单价: {formatCurrency(lot.costPrice || 0)}
+                                              单价: {formatCurrencyByCode(lot.costPrice || 0, h.currency || "CNY")}
                                             </span>
                                             <span className="w-20 text-right">
                                               数量: {lot.shares}
                                             </span>
                                             <span className="w-28 font-medium text-[#1A1A1A] text-right">
                                               {lot.type === "sell" ? "收入" : "成本"}:{" "}
-                                              {formatCurrency(lot.cost || 0)}
+                                              {formatCurrencyByCode(lot.cost || 0, h.currency || "CNY")}
                                             </span>
                                           </>
                                         ) : (
                                           <span className="w-28 font-medium text-[#1A1A1A] text-right">
                                             {lot.type === "sell" ? "收入" : "价值"}:{" "}
-                                            {formatCurrency(lot.valueAdded || lot.cost || 0)}
+                                            {formatCurrencyByCode(lot.valueAdded || lot.cost || 0, h.currency || "CNY")}
                                           </span>
                                         )}
                                         {(lot.fee || 0) > 0 && (
                                           <span className="w-20 text-[10px] text-[#ADB5BD] text-right">
-                                            费: {formatCurrency(lot.fee || 0)}
+                                            费: {formatCurrencyByCode(lot.fee || 0, h.currency || "CNY")}
                                           </span>
                                         )}
                                         <div className="flex gap-2 shrink-0">
@@ -537,7 +510,6 @@ export default function HoldingsManager({
                                               setEditingLotFee(String(lot.fee || 0))
                                               setEditingLotShares(String(lot.shares))
                                               setEditingLotCostPrice(String(lot.costPrice || 0))
-                                              setEditingLotCurrency("CNY")
                                             }}
                                             className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-blue-600 font-bold transition-colors whitespace-nowrap"
                                           >

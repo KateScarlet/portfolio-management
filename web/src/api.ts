@@ -21,8 +21,9 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export async function fetchHoldings(pid: string): Promise<Holding[]> {
-  return request<Holding[]>(`/api/portfolios/${pid}/holdings`)
+export async function fetchHoldings(pid: string, currency?: string): Promise<Holding[]> {
+  const params = currency ? `?currency=${currency}` : ""
+  return request<Holding[]>(`/api/portfolios/${pid}/holdings${params}`)
 }
 
 export async function createHolding(pid: string, h: Omit<Holding, "id">): Promise<Holding> {
@@ -100,14 +101,18 @@ export async function updateSettings(
   })
 }
 
-export async function fetchAvailableFunds(pid: string): Promise<{ value: string }> {
-  return request<{ value: string }>(`/api/portfolios/${pid}/funds`)
+export async function fetchAvailableFunds(pid: string): Promise<{ currency: string; amount: number }[]> {
+  return request<{ currency: string; amount: number }[]>(`/api/portfolios/${pid}/funds`)
 }
 
-export async function updateAvailableFunds(pid: string, value: string): Promise<{ key: string; value: string }> {
-  return request<{ key: string; value: string }>(`/api/portfolios/${pid}/funds`, {
+export async function updateAvailableFunds(
+  pid: string,
+  currency: string,
+  amount: number
+): Promise<{ currency: string; amount: number }> {
+  return request<{ currency: string; amount: number }>(`/api/portfolios/${pid}/funds`, {
     method: "PUT",
-    body: JSON.stringify({ value }),
+    body: JSON.stringify({ currency, amount }),
   })
 }
 

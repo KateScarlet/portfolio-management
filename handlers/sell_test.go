@@ -23,7 +23,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}); err != nil {
 		t.Fatal(err)
 	}
 	db.Create(&models.Portfolio{
@@ -170,4 +170,106 @@ func TestSell_ZeroFee_ShouldPass(t *testing.T) {
 	if c.Response.StatusCode() != 200 {
 		t.Errorf("expected 200, got %d", c.Response.StatusCode())
 	}
+}
+
+func TestSell_ProceedsGoToCorrectCurrencyFund(t *testing.T) {
+	db := setupTestDB(t)
+	id := createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
+
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: 1000,
+	})
+
+	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 0})
+	SellHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
+	expected := 1500.0 // 1000 + 5*100
+	if af.Amount != expected {
+		t.Errorf("expected USD funds %.2f, got %.2f", expected, af.Amount)
+	}
+
+	var cnCount int64
+	db.Model(&models.AvailableFund{}).Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").Count(&cnCount)
+	if cnCount != 0 {
+		t.Errorf("expected no CNY fund created, but found %d", cnCount)
+	}
+}
+
+func TestSell_ProceedsGoToCNYFundByDefault(t *testing.T) {
+	db := setupTestDB(t)
+	id := createTestHoldingWithCurrency(t, db, "CNY", 10, 100, 900)
+
+	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 10})
+	SellHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
+	expected := 490.0 // 5*100 - 10
+	if af.Amount != expected {
+		t.Errorf("expected CNY funds %.2f, got %.2f", expected, af.Amount)
+	}
+}
+
+func TestSell_NewCurrencyFundCreatedOnSell(t *testing.T) {
+	db := setupTestDB(t)
+	id := createTestHoldingWithCurrency(t, db, "HKD", 10, 200, 1800)
+
+	c := newCtx(id, SellRequest{Shares: 5, Price: 200, Fee: 0})
+	SellHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
+	if af.Amount != 1000 {
+		t.Errorf("expected HKD funds 1000, got %.2f", af.Amount)
+	}
+}
+
+func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, shares, price, cost float64) string {
+	t.Helper()
+	id := uuid.New().String()
+	lots := models.JSONColumn{
+		{
+			ID:         uuid.New().String(),
+			Date:       1000000,
+			Shares:     shares,
+			CostPrice:  cost / shares,
+			Cost:       cost,
+			ValueAdded: shares * price,
+			Fee:        0,
+		},
+	}
+	h := models.Holding{
+		ID:          id,
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		AssetId:     "stocks",
+		Symbol:      "TEST",
+		Name:        "Test Stock",
+		Currency:    currency,
+		Shares:      shares,
+		Price:       price,
+		Value:       shares * price,
+		Cost:        cost,
+		CostPrice:   cost / shares,
+		Lots:        lots,
+	}
+	if err := db.Create(&h).Error; err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

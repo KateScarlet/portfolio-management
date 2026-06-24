@@ -6,6 +6,7 @@ import (
 	"maps"
 	"portfolio-management/models"
 	"portfolio-management/telegram"
+	"portfolio-management/yahoo"
 	"strings"
 	"sync"
 	"time"
@@ -159,8 +160,11 @@ func (n *Notifier) checkPriceAlert(userID, portfolioID string, client *telegram.
 
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>价格波动提醒</b>\n\n" + strings.Join(alerts, "\n\n")
-		_ = client.SendMessage(msg)
-		slog.Info("sent price alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
+		if err := client.SendMessage(msg); err != nil {
+			slog.Error("failed to send price alert", "userId", userID, "portfolioId", portfolioID, "error", err)
+		} else {
+			slog.Info("sent price alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
+		}
 	}
 }
 
@@ -188,6 +192,17 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 	var holdings []models.Holding
 	if err := n.db.Where("portfolio_id = ?", portfolioID).Find(&holdings).Error; err != nil {
 		return
+	}
+
+	for i := range holdings {
+		h := &holdings[i]
+		if h.Currency != "" && h.Currency != "CNY" {
+			pair := h.Currency + "CNY"
+			rate, err := yahoo.FetchExchangeRate(pair)
+			if err == nil {
+				h.Value *= rate
+			}
+		}
 	}
 
 	assets := map[string]float64{
@@ -253,11 +268,14 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 
 	if len(alerts) > 0 {
 		msg := "⚠️ <b>配比偏离提醒</b>\n\n当前资产配置:\n" + strings.Join(alerts, "\n")
-		_ = client.SendMessage(msg)
-		n.mu.Lock()
-		n.lastDriftAlert[cacheKey] = time.Now()
-		n.mu.Unlock()
-		slog.Info("sent drift alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
+		if err := client.SendMessage(msg); err != nil {
+			slog.Error("failed to send drift alert", "userId", userID, "portfolioId", portfolioID, "error", err)
+		} else {
+			n.mu.Lock()
+			n.lastDriftAlert[cacheKey] = time.Now()
+			n.mu.Unlock()
+			slog.Info("sent drift alert", "userId", userID, "portfolioId", portfolioID, "count", len(alerts))
+		}
 	}
 }
 
@@ -338,10 +356,12 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 		lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
 	}
 
-	_ = client.SendMessage(strings.Join(lines, "\n"))
-
-	n.mu.Lock()
-	n.lastSummaryTime[cacheKey] = now
-	n.mu.Unlock()
-	slog.Info("sent portfolio summary", "userId", userID, "portfolioId", portfolioID)
+	if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
+		slog.Error("failed to send portfolio summary", "userId", userID, "portfolioId", portfolioID, "error", err)
+	} else {
+		n.mu.Lock()
+		n.lastSummaryTime[cacheKey] = now
+		n.mu.Unlock()
+		slog.Info("sent portfolio summary", "userId", userID, "portfolioId", portfolioID)
+	}
 }

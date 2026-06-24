@@ -15,7 +15,10 @@ export function usePortfolio(portfolioId: string | null) {
     const fetch = async () => {
       setLoading(true)
       try {
-        const [h, r] = await Promise.all([api.fetchHoldings(portfolioId), api.fetchRecords(portfolioId)])
+        const [h, r] = await Promise.all([
+          api.fetchHoldings(portfolioId),
+          api.fetchRecords(portfolioId),
+        ])
         if (!cancelled) {
           setHoldings(h)
           setHistory(r)
@@ -65,7 +68,7 @@ export function usePortfolio(portfolioId: string | null) {
       await api.deleteHolding(portfolioId, id)
       setHoldings((prev) => prev.filter((h) => h.id !== id))
     } catch (e) {
-      console.error("Failed to delete holding", e)
+      console.error("Failed to remove holding", e)
     }
   }, [portfolioId])
 

@@ -18,7 +18,7 @@ export default function AddHoldingForm({
   const [name, setName] = useState("")
   const [shares, setShares] = useState("")
   const [costPrice, setCostPrice] = useState("")
-  const [costCurrency, setCostCurrency] = useState("CNY")
+  const [costCurrency, setCostCurrency] = useState("USD")
   const [value, setValue] = useState("")
   const [cost, setCost] = useState("")
   const [fee, setFee] = useState("")
@@ -55,11 +55,15 @@ export default function AddHoldingForm({
         const c = parseFloat(cost)
         addedCost = (isNaN(c) || c <= 0 ? val : c)
       }
+      const targetCurrency = market === "US" || market === "CRYPTO" ? "USD"
+        : market === "HK" ? "HKD"
+        : "CNY"
       try {
         await onAddHolding({
           assetId,
           symbol: "",
           name: name.trim() || "手工资产",
+          currency: targetCurrency,
           shares: manualInputMode === "priceShares" ? (parseFloat(manualShares) || 0) : 0,
           price: manualInputMode === "priceShares" ? (parseFloat(manualPrice) || 0) : 0,
           value: val,
@@ -91,9 +95,13 @@ export default function AddHoldingForm({
           const authoritativeSymbol = data.symbol || symbol.toUpperCase()
           let finalCostPrice = isNaN(cPrice) || cPrice <= 0 ? data.price : cPrice
 
-          if (!isNaN(cPrice) && cPrice > 0 && costCurrency !== "CNY") {
+          const targetCurrency = market === "US" || market === "CRYPTO" ? "USD"
+            : market === "HK" ? "HKD"
+            : "CNY"
+
+          if (!isNaN(cPrice) && cPrice > 0 && costCurrency !== targetCurrency) {
             try {
-              const fxData = await api.fetchExchangeRate(`${costCurrency}CNY`)
+              const fxData = await api.fetchExchangeRate(`${costCurrency}${targetCurrency}`)
               if (fxData && fxData.rate) {
                 finalCostPrice = cPrice * fxData.rate
               }
@@ -106,6 +114,7 @@ export default function AddHoldingForm({
             assetId,
             symbol: authoritativeSymbol,
             name: name.trim() || data.name || authoritativeSymbol,
+            currency: targetCurrency,
             shares: sharesNum,
             price: data.price,
             costPrice: finalCostPrice,
@@ -197,8 +206,12 @@ export default function AddHoldingForm({
               <select
                 value={market}
                 onChange={(e) => {
-                  setMarket(e.target.value as "US" | "CN" | "HK" | "COMMODITY" | "CRYPTO")
+                  const m = e.target.value as "US" | "CN" | "HK" | "COMMODITY" | "CRYPTO"
+                  setMarket(m)
                   setSymbol("")
+                  if (m === "US" || m === "CRYPTO") setCostCurrency("USD")
+                  else if (m === "HK") setCostCurrency("HKD")
+                  else setCostCurrency("CNY")
                 }}
                 className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
               >
@@ -269,7 +282,7 @@ export default function AddHoldingForm({
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {market === "COMMODITY" ? "买入单价 (元/克, 选填)" : "买入单价 (选填, 货币)"}
+                {market === "COMMODITY" ? "买入单价 (元/克, 选填)" : "买入单价"}
               </label>
               <div className="flex w-full">
                 <select

@@ -157,21 +157,37 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// Add proceeds to available funds
-		var newFundsValue float64
+		// Add proceeds to available funds (in holding's currency)
+		var newFundsAmount float64
 		if realizedValue > 0 {
-			var fundsSetting models.Setting
-			fundsValue := 0.0
-			if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).First(&fundsSetting).Error; err == nil {
-				fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
+			currency := holding.Currency
+			if currency == "" {
+				currency = "CNY"
 			}
 
-			newFundsValue = fundsValue + realizedValue
-			fundsSetting.Key = "availableFunds"
-			fundsSetting.UserID = user.UserID
-			fundsSetting.PortfolioID = portfolioID
-			fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
-			if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
+			var af models.AvailableFund
+			err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, currency).First(&af).Error
+			if err == nil {
+				newFundsAmount = af.Amount + realizedValue
+				if err := tx.Model(&af).Update("amount", newFundsAmount).Error; err != nil {
+					tx.Rollback()
+					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+					return
+				}
+			} else if err == gorm.ErrRecordNotFound {
+				newFundsAmount = realizedValue
+				if err := tx.Create(&models.AvailableFund{
+					ID:          uuid.New().String(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Currency:    currency,
+					Amount:      newFundsAmount,
+				}).Error; err != nil {
+					tx.Rollback()
+					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+					return
+				}
+			} else {
 				tx.Rollback()
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
@@ -185,7 +201,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 		c.JSON(consts.StatusOK, map[string]any{
 			"soldHolding":    holding,
-			"availableFunds": fmt.Sprintf("%.2f", newFundsValue),
+			"availableFunds": fmt.Sprintf("%.2f", newFundsAmount),
 		})
 	}
 }

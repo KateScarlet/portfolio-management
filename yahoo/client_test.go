@@ -32,9 +32,13 @@ func TestConvertSymbol(t *testing.T) {
 		{"SZ300750", "300750.SZ"},
 		{"sz000001", "000001.SZ"},
 		{"Sz300750", "300750.SZ"},
-		// HK stocks - pass through unchanged
-		{"2800", "2800"},
-		{"9988", "9988"},
+		// HK stocks
+		{"2800", "2800.HK"},
+		{"9988", "9988.HK"},
+		{"0700", "0700.HK"},
+		// HK tag format (HKxxxx -> xxxx.HK)
+		{"HK2800", "2800.HK"},
+		{"HK0700", "0700.HK"},
 		// Crypto - pass through unchanged
 		{"BTC-USD", "BTC-USD"},
 		{"ETH-USD", "ETH-USD"},
@@ -54,7 +58,7 @@ func TestConvertSymbol(t *testing.T) {
 }
 
 func TestConvertSymbol_Idempotent(t *testing.T) {
-	symbols := []string{"VTI", "SPY", "600519.SS", "000001.SZ", "GC=F", "BTC-USD"}
+	symbols := []string{"VTI", "SPY", "600519.SS", "000001.SZ", "2800.HK", "GC=F", "BTC-USD"}
 	for _, sym := range symbols {
 		result := ConvertSymbol(sym)
 		if result != sym {

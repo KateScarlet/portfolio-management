@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
-import { formatCurrency, formatPercent, getProfitColor } from "../utils"
+import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {
@@ -134,11 +134,11 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme }: H
                                     <td className="py-1.5 text-[#6C757D]">{h.name}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.assetId}</td>
                                     <td className="py-1.5 text-right">{h.shares.toFixed(2)}</td>
-                                    <td className="py-1.5 text-right">{formatCurrency(h.price)}</td>
-                                    <td className="py-1.5 text-right">{formatCurrency(h.value)}</td>
-                                    <td className="py-1.5 text-right">{formatCurrency(h.cost)}</td>
+                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.price, h.currency || "CNY")}</td>
+                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.value, h.currency || "CNY")}</td>
+                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.cost, h.currency || "CNY")}</td>
                                     <td className={`py-1.5 text-right ${getProfitColor(pnl >= 0, colorScheme)}`}>
-                                      {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}
+                                      {pnl >= 0 ? "+" : ""}{formatCurrencyByCode(pnl, h.currency || "CNY")}
                                     </td>
                                   </tr>
                                 )

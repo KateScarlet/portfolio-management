@@ -226,23 +226,130 @@ func TestGetAvailableFunds_Default(t *testing.T) {
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
 	}
-	var result map[string]string
+	var result []map[string]any
 	json.Unmarshal(c.Response.Body(), &result)
-	if result["value"] != "0" {
-		t.Errorf("expected default funds '0', got %q", result["value"])
+	if len(result) != 0 {
+		t.Errorf("expected empty funds array, got %v", result)
 	}
 }
 
 func TestGetAvailableFunds_WithValue(t *testing.T) {
 	db := setupTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "50000.50", UserID: testUserID, PortfolioID: testPortfolioID})
+	db.Create(&models.AvailableFund{
+		ID:          uuid.New().String(),
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		Currency:    "CNY",
+		Amount:      50000.50,
+	})
 
 	c := newUserCtx("GET", "/api/funds", nil)
 	GetAvailableFunds(db)(context.Background(), c)
 
-	var result map[string]string
+	var result []map[string]any
 	json.Unmarshal(c.Response.Body(), &result)
-	if result["value"] != "50000.50" {
-		t.Errorf("expected '50000.50', got %q", result["value"])
+	if len(result) != 1 {
+		t.Fatalf("expected 1 fund entry, got %d", len(result))
+	}
+	if result[0]["currency"] != "CNY" {
+		t.Errorf("expected currency 'CNY', got %q", result[0]["currency"])
+	}
+}
+
+func TestGetAvailableFunds_MultipleCurrencies(t *testing.T) {
+	db := setupTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: 10000,
+	})
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: 5000,
+	})
+
+	c := newUserCtx("GET", "/api/funds", nil)
+	GetAvailableFunds(db)(context.Background(), c)
+
+	var result []map[string]any
+	json.Unmarshal(c.Response.Body(), &result)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 fund entries, got %d", len(result))
+	}
+}
+
+func TestGetAvailableFunds_HidesZeroAmount(t *testing.T) {
+	db := setupTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: 0,
+	})
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: 100,
+	})
+
+	c := newUserCtx("GET", "/api/funds", nil)
+	GetAvailableFunds(db)(context.Background(), c)
+
+	var result []map[string]any
+	json.Unmarshal(c.Response.Body(), &result)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 fund entry (zero hidden), got %d", len(result))
+	}
+	if result[0]["currency"] != "USD" {
+		t.Errorf("expected USD, got %q", result[0]["currency"])
+	}
+}
+
+func TestUpdateAvailableFunds_Upsert(t *testing.T) {
+	db := setupTestDB(t)
+
+	c := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "USD", "amount": 3000})
+	UpdateAvailableFunds(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
+	if af.Amount != 3000 {
+		t.Errorf("expected 3000, got %.2f", af.Amount)
+	}
+
+	c2 := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "USD", "amount": 5000})
+	UpdateAvailableFunds(db)(context.Background(), c2)
+
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
+	if af.Amount != 5000 {
+		t.Errorf("expected 5000 after update, got %.2f", af.Amount)
+	}
+}
+
+func TestUpdateAvailableFunds_DeleteOnZero(t *testing.T) {
+	db := setupTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "HKD", Amount: 100,
+	})
+
+	c := newUserCtx("PUT", "/api/funds", map[string]any{"currency": "HKD", "amount": 0})
+	UpdateAvailableFunds(db)(context.Background(), c)
+
+	var count int64
+	db.Model(&models.AvailableFund{}).Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").Count(&count)
+	if count != 0 {
+		t.Errorf("expected fund to be deleted when amount=0, count=%d", count)
+	}
+}
+
+func TestUpdateAvailableFunds_MissingCurrency(t *testing.T) {
+	db := setupTestDB(t)
+
+	c := newUserCtx("PUT", "/api/funds", map[string]any{"amount": 100})
+	UpdateAvailableFunds(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 400 {
+		t.Errorf("expected 400 for missing currency, got %d", c.Response.StatusCode())
 	}
 }

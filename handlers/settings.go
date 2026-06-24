@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -103,12 +104,22 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var setting models.Setting
-		if err := db.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).First(&setting).Error; err != nil {
-			c.JSON(consts.StatusOK, map[string]string{"value": "0"})
-			return
+		var funds []models.AvailableFund
+		db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(&funds)
+
+		result := make([]map[string]any, 0, len(funds))
+		for _, f := range funds {
+			if f.Amount != 0 {
+				result = append(result, map[string]any{
+					"currency": f.Currency,
+					"amount":   f.Amount,
+				})
+			}
 		}
-		c.JSON(consts.StatusOK, map[string]string{"value": setting.Value})
+		if result == nil {
+			result = []map[string]any{}
+		}
+		c.JSON(consts.StatusOK, result)
 	}
 }
 
@@ -127,21 +138,50 @@ func UpdateAvailableFunds(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			Value string `json:"value"`
+			Currency string  `json:"currency"`
+			Amount   float64 `json:"amount"`
 		}
-		if err := c.BindAndValidate(&body); err != nil {
+		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-
-		setting := models.Setting{Key: "availableFunds", Value: body.Value, UserID: user.UserID, PortfolioID: portfolioID}
-		result := db.Where(models.Setting{Key: "availableFunds", UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
-		if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+		if body.Currency == "" {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
 			return
 		}
 
-		c.JSON(consts.StatusOK, map[string]string{"key": "availableFunds", "value": body.Value})
+		var af models.AvailableFund
+		result := db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, body.Currency).First(&af)
+		if result.Error == gorm.ErrRecordNotFound {
+			af = models.AvailableFund{
+				ID:          uuid.New().String(),
+				UserID:      user.UserID,
+				PortfolioID: portfolioID,
+				Currency:    body.Currency,
+				Amount:      body.Amount,
+			}
+			if err := db.Create(&af).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+		} else if result.Error != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+			return
+		} else {
+			if body.Amount == 0 {
+				if err := db.Delete(&af).Error; err != nil {
+					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+					return
+				}
+			} else {
+				if err := db.Model(&af).Update("amount", body.Amount).Error; err != nil {
+					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+					return
+				}
+			}
+		}
+
+		c.JSON(consts.StatusOK, map[string]any{"currency": body.Currency, "amount": body.Amount})
 	}
 }
 

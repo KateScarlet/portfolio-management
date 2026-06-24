@@ -85,6 +85,7 @@ type Holding struct {
 	AssetId     string     `gorm:"size:20;not null" json:"assetId"`
 	Symbol      string     `gorm:"size:20;default:''" json:"symbol"`
 	Name        string     `gorm:"size:200;default:''" json:"name,omitempty"`
+	Currency    string     `gorm:"size:10;default:'CNY'" json:"currency"`
 	Shares      float64    `gorm:"default:0" json:"shares"`
 	Price       float64    `gorm:"default:0" json:"price"`
 	CostPrice   float64    `gorm:"default:0" json:"costPrice,omitempty"`
@@ -99,6 +100,7 @@ type HoldingSnapshot struct {
 	AssetId   string  `json:"assetId"`
 	Symbol    string  `json:"symbol"`
 	Name      string  `json:"name"`
+	Currency  string  `json:"currency"`
 	Shares    float64 `json:"shares"`
 	Price     float64 `json:"price"`
 	CostPrice float64 `json:"costPrice"`
@@ -148,6 +150,14 @@ type Setting struct {
 	Value       string `gorm:"not null" json:"value"`
 	UserID      string `gorm:"primaryKey;size:50;default:''" json:"userId,omitempty"`
 	PortfolioID string `gorm:"primaryKey;size:50;default:''" json:"portfolioId,omitempty"`
+}
+
+type AvailableFund struct {
+	ID          string  `gorm:"primaryKey" json:"id"`
+	UserID      string  `gorm:"index;not null" json:"userId"`
+	PortfolioID string  `gorm:"index;not null" json:"portfolioId"`
+	Currency    string  `gorm:"size:10;not null" json:"currency"`
+	Amount      float64 `gorm:"default:0" json:"amount"`
 }
 
 type User struct {

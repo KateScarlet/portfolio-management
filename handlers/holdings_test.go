@@ -210,7 +210,13 @@ func TestCreateHolding_ValidationErrors(t *testing.T) {
 
 func TestCreateHolding_DeductFromCash(t *testing.T) {
 	db := setupHoldingsTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "10000", UserID: testUserID, PortfolioID: testPortfolioID})
+	db.Create(&models.AvailableFund{
+		ID:          uuid.New().String(),
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		Currency:    "CNY",
+		Amount:      10000,
+	})
 
 	body := map[string]any{
 		"assetId":        "stocks",
@@ -221,6 +227,7 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 		"cost":           1000,
 		"value":          1000,
 		"fee":            5,
+		"currency":       "CNY",
 		"deductFromCash": true,
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
@@ -230,17 +237,23 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 
-	var setting models.Setting
-	db.Where("`key` = ? AND user_id = ?", "availableFunds", testUserID).First(&setting)
-	expected := "8995.00" // 10000 - 1000 - 5
-	if setting.Value != expected {
-		t.Errorf("expected funds %s, got %s", expected, setting.Value)
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
+	expected := 8995.0 // 10000 - 1000 - 5
+	if af.Amount != expected {
+		t.Errorf("expected funds %.2f, got %.2f", expected, af.Amount)
 	}
 }
 
 func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 	db := setupHoldingsTestDB(t)
-	db.Create(&models.Setting{Key: "availableFunds", Value: "500", UserID: testUserID, PortfolioID: testPortfolioID})
+	db.Create(&models.AvailableFund{
+		ID:          uuid.New().String(),
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		Currency:    "CNY",
+		Amount:      500,
+	})
 
 	body := map[string]any{
 		"assetId":        "stocks",
@@ -255,8 +268,108 @@ func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
 
-	if c.Response.StatusCode() != 500 {
-		t.Errorf("expected 500 (insufficient funds), got %d", c.Response.StatusCode())
+	if c.Response.StatusCode() != 400 {
+		t.Errorf("expected 400 (insufficient funds), got %d", c.Response.StatusCode())
+	}
+}
+
+func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: 5000,
+	})
+
+	body := map[string]any{
+		"assetId":        "stocks",
+		"symbol":         "SPY",
+		"shares":         5,
+		"price":          500,
+		"costPrice":      480,
+		"cost":           2400,
+		"value":          2500,
+		"fee":            10,
+		"currency":       "USD",
+		"deductFromCash": true,
+	}
+	c := newUserCtx("POST", "/api/holdings", body)
+	CreateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
+	expected := 2590.0 // 5000 - 2400 - 10
+	if af.Amount != expected {
+		t.Errorf("expected USD funds %.2f, got %.2f", expected, af.Amount)
+	}
+
+	var cnCount int64
+	db.Model(&models.AvailableFund{}).Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").Count(&cnCount)
+	if cnCount != 0 {
+		t.Errorf("expected no CNY fund affected, but found %d", cnCount)
+	}
+}
+
+func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: 100,
+	})
+
+	body := map[string]any{
+		"assetId":        "stocks",
+		"symbol":         "SPY",
+		"shares":         5,
+		"price":          500,
+		"costPrice":      480,
+		"cost":           2400,
+		"value":          2500,
+		"fee":            10,
+		"currency":       "USD",
+		"deductFromCash": true,
+	}
+	c := newUserCtx("POST", "/api/holdings", body)
+	CreateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 400 {
+		t.Errorf("expected 400 (insufficient USD funds), got %d", c.Response.StatusCode())
+	}
+}
+
+func TestCreateHolding_NoDeduct_PreservesFunds(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: 10000,
+	})
+
+	body := map[string]any{
+		"assetId":        "stocks",
+		"symbol":         "VTI",
+		"shares":         10,
+		"price":          100,
+		"costPrice":      100,
+		"cost":           1000,
+		"value":          1000,
+		"fee":            5,
+		"currency":       "CNY",
+		"deductFromCash": false,
+	}
+	c := newUserCtx("POST", "/api/holdings", body)
+	CreateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d", c.Response.StatusCode())
+	}
+
+	var af models.AvailableFund
+	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
+	if af.Amount != 10000 {
+		t.Errorf("expected funds unchanged at 10000, got %.2f", af.Amount)
 	}
 }
 
@@ -464,5 +577,70 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 	db.Model(&models.Holding{}).Where("id = ?", id).Count(&count)
 	if count != 1 {
 		t.Error("holding should still exist")
+	}
+}
+
+func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
+	holdings := []models.Holding{
+		{Currency: "CNY", Value: 1000, Cost: 800, Price: 100, CostPrice: 80},
+	}
+	convertHoldingsCurrency(holdings, "CNY")
+	if holdings[0].Value != 1000 {
+		t.Errorf("expected value unchanged at 1000, got %.2f", holdings[0].Value)
+	}
+	if holdings[0].Currency != "CNY" {
+		t.Errorf("expected currency unchanged at CNY, got %s", holdings[0].Currency)
+	}
+}
+
+func TestConvertHoldingsCurrency_EmptyCurrency_NoChange(t *testing.T) {
+	holdings := []models.Holding{
+		{Currency: "", Value: 500, Cost: 400, Price: 50, CostPrice: 40},
+	}
+	convertHoldingsCurrency(holdings, "CNY")
+	if holdings[0].Value != 500 {
+		t.Errorf("expected value unchanged at 500, got %.2f", holdings[0].Value)
+	}
+}
+
+func TestListHoldings_WithCurrencyParam(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
+
+	c := newUserCtx("GET", "/api/holdings?currency=CNY", nil)
+	ListHoldings(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
+	}
+
+	var holdings []models.Holding
+	json.Unmarshal(c.Response.Body(), &holdings)
+	if len(holdings) != 1 {
+		t.Fatalf("expected 1 holding, got %d", len(holdings))
+	}
+}
+
+func TestListHoldings_WithoutCurrencyParam_OriginalValues(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
+
+	c := newUserCtx("GET", "/api/holdings", nil)
+	ListHoldings(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
+	}
+
+	var holdings []models.Holding
+	json.Unmarshal(c.Response.Body(), &holdings)
+	if len(holdings) != 1 {
+		t.Fatalf("expected 1 holding, got %d", len(holdings))
+	}
+	if holdings[0].Currency != "USD" {
+		t.Errorf("expected original currency USD, got %s", holdings[0].Currency)
+	}
+	if holdings[0].Price != 100 {
+		t.Errorf("expected original price 100, got %.2f", holdings[0].Price)
 	}
 }

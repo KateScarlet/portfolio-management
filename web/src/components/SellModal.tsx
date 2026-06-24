@@ -112,7 +112,7 @@ export default function SellModal({ portfolioId, holding, onConfirm, onClose }: 
           ) : (
             <div className="flex flex-col gap-2">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                卖出金额 (最多: {formatCurrency(holding.value)})
+                  卖出金额 (最多: {formatCurrency(holding.value)})
               </label>
               <input
                 type="number"

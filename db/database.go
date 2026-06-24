@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"portfolio-management/models"
@@ -121,11 +122,12 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 
 	db.Exec("PRAGMA journal_mode=WAL")
 
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}); err != nil {
 		return nil, err
 	}
 
 	migrateToMultiPortfolio(db)
+	migrateAvailableFunds(db)
 
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
@@ -136,6 +138,7 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
@@ -157,11 +160,12 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}); err != nil {
 		return nil, err
 	}
 
 	migrateToMultiPortfolio(db)
+	migrateAvailableFunds(db)
 
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
@@ -172,6 +176,7 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
@@ -214,6 +219,37 @@ func migrateToMultiPortfolio(db *gorm.DB) {
 
 		slog.Info("migrated user to default portfolio", "userId", userID, "portfolioId", portfolioID)
 	}
+}
+
+// migrateAvailableFunds moves the old single availableFunds setting
+// into the new available_funds table with currency=CNY.
+func migrateAvailableFunds(db *gorm.DB) {
+	var settings []models.Setting
+	if err := db.Where("`key` = ? AND portfolio_id != ''", "availableFunds").Find(&settings).Error; err != nil {
+		return
+	}
+	if len(settings) == 0 {
+		return
+	}
+	slog.Info("migrating availableFunds to available_funds table", "count", len(settings))
+	for _, s := range settings {
+		var amount float64
+		if _, err := fmt.Sscanf(s.Value, "%f", &amount); err != nil {
+			continue
+		}
+		af := models.AvailableFund{
+			ID:          generateID(),
+			UserID:      s.UserID,
+			PortfolioID: s.PortfolioID,
+			Currency:    "CNY",
+			Amount:      amount,
+		}
+		db.Where(models.AvailableFund{UserID: s.UserID, PortfolioID: s.PortfolioID, Currency: "CNY"}).
+			Assign(models.AvailableFund{Amount: amount}).
+			FirstOrCreate(&af)
+		db.Delete(&models.Setting{}, "`key` = ? AND user_id = ? AND portfolio_id = ?", "availableFunds", s.UserID, s.PortfolioID)
+	}
+	slog.Info("availableFunds migration complete")
 }
 
 func generateID() string {

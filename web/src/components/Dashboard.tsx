@@ -1,21 +1,29 @@
-import React, { useState } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
-import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
-import { formatCurrency, formatPercent, getProfitColor } from "../utils"
+import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme } from "../types"
+import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import * as api from "../api"
 
 interface DashboardProps {
   assets: Record<AssetId, number>
   total: number
+  totalAssets: number
   principal: number
   totalFees: number
   colorScheme: ColorScheme
-  availableFunds: number
-  onUpdateAvailableFunds: (value: number) => void
+  availableFunds: AvailableFund[]
+  onUpdateAvailableFunds: (currency: string, amount: number) => void
 }
 
-export default function Dashboard({ assets, total, principal, totalFees, colorScheme, availableFunds, onUpdateAvailableFunds }: DashboardProps) {
+const SUPPORTED_CURRENCIES = ["CNY", "USD", "HKD", "EUR", "GBP", "JPY"]
+
+export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, onUpdateAvailableFunds }: DashboardProps) {
   const [isEditingFunds, setIsEditingFunds] = useState(false)
-  const [tempFunds, setTempFunds] = useState("")
+  const [editingCurrency, setEditingCurrency] = useState("")
+  const [tempAmount, setTempAmount] = useState("")
+  const [showDetails, setShowDetails] = useState(false)
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ CNY: 1 })
+
   const chartData = Object.keys(assets)
     .map((key) => {
       const id = key as AssetId
@@ -28,9 +36,50 @@ export default function Dashboard({ assets, total, principal, totalFees, colorSc
     })
     .filter((item) => item.value > 0)
 
-  const profit = total - principal
+  const profit = totalAssets - principal
   const returnRate = principal > 0 ? profit / principal : 0
   const isPositive = profit >= 0
+
+  useEffect(() => {
+    const currencies = availableFunds.filter((f) => f.currency !== "CNY").map((f) => f.currency)
+    const unique = [...new Set(currencies)]
+    if (unique.length === 0) return
+    Promise.all(
+      unique.map(async (cur) => {
+        try {
+          const res = await api.fetchExchangeRate(`${cur}CNY`)
+          return { currency: cur, rate: res.rate }
+        } catch {
+          return { currency: cur, rate: 1 }
+        }
+      })
+    ).then((results) => {
+      const rates: Record<string, number> = { CNY: 1 }
+      results.forEach((r) => { rates[r.currency] = r.rate })
+      setExchangeRates(rates)
+    })
+  }, [availableFunds])
+
+  const totalCNY = availableFunds.reduce((sum, f) => {
+    return sum + f.amount * (exchangeRates[f.currency] || 1)
+  }, 0)
+
+  const startEdit = useCallback((currency: string, amount: number) => {
+    setEditingCurrency(currency)
+    setTempAmount(amount.toString())
+    setIsEditingFunds(true)
+  }, [])
+
+  const saveEdit = useCallback(() => {
+    const num = parseFloat(tempAmount)
+    if (!isNaN(num) && num >= 0) {
+      onUpdateAvailableFunds(editingCurrency, num)
+      setIsEditingFunds(false)
+    }
+  }, [editingCurrency, tempAmount, onUpdateAvailableFunds])
+
+  const usedCurrencies = availableFunds.map((f) => f.currency)
+  const availableNewCurrencies = SUPPORTED_CURRENCIES.filter((c) => !usedCurrencies.includes(c))
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col h-full">
@@ -131,7 +180,7 @@ export default function Dashboard({ assets, total, principal, totalFees, colorSc
         {Object.keys(ASSET_DEFINITIONS).map((key) => {
           const id = key as AssetId
           const value = assets[id] || 0
-          const percentage = total > 0 ? value / total : 0
+          const percentage = totalAssets > 0 ? value / totalAssets : 0
           const def = ASSET_DEFINITIONS[id]
 
           return (
@@ -152,58 +201,114 @@ export default function Dashboard({ assets, total, principal, totalFees, colorSc
       <div className="mt-6 pt-4 border-t border-[#E9ECEF]">
         <div className="flex items-center justify-between">
           <span className="text-xs text-[#6C757D]">可用资金</span>
-          {isEditingFunds ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={tempFunds}
-                onChange={(e) => setTempFunds(e.target.value)}
-                className="w-28 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const num = parseFloat(tempFunds)
-                    if (!isNaN(num) && num >= 0) {
-                      onUpdateAvailableFunds(num)
-                      setIsEditingFunds(false)
-                    }
-                  } else if (e.key === "Escape") {
-                    setIsEditingFunds(false)
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  const num = parseFloat(tempFunds)
-                  if (!isNaN(num) && num >= 0) {
-                    onUpdateAvailableFunds(num)
-                    setIsEditingFunds(false)
-                  }
-                }}
-                className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90"
-              >
-                保存
-              </button>
-              <button
-                onClick={() => setIsEditingFunds(false)}
-                className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]"
-              >
-                取消
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setTempFunds(availableFunds.toString())
-                setIsEditingFunds(true)
-              }}
-              className="text-sm font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
-              title="点击编辑"
-            >
-              {formatCurrency(availableFunds)}
-            </button>
-          )}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="text-sm font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
+            title="点击查看详情"
+          >
+            {formatCurrency(totalCNY)}
+            <span className="text-[10px] ml-1 text-[#ADB5BD]">{showDetails ? "▲" : "▼"}</span>
+          </button>
         </div>
+
+        {showDetails && (
+          <div className="mt-3 space-y-2">
+            {availableFunds.map((f) => (
+              <div key={f.currency} className="flex items-center justify-between pl-2">
+                {isEditingFunds && editingCurrency === f.currency ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-xs text-[#6C757D] w-10">{f.currency}</span>
+                    <input
+                      type="number"
+                      value={tempAmount}
+                      onChange={(e) => setTempAmount(e.target.value)}
+                      className="flex-1 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit()
+                        else if (e.key === "Escape") setIsEditingFunds(false)
+                      }}
+                    />
+                    <button onClick={saveEdit} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">
+                      保存
+                    </button>
+                    <button onClick={() => setIsEditingFunds(false)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]">
+                      取消
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-xs text-[#6C757D]">{f.currency}</span>
+                    <button
+                      onClick={() => startEdit(f.currency, f.amount)}
+                      className="text-xs font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
+                      title="点击编辑"
+                    >
+                      {formatCurrencyByCode(f.amount, f.currency)}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+
+            {availableFunds.length === 0 && (
+              <div className="flex items-center justify-between pl-2">
+                {isEditingFunds && editingCurrency === "CNY" ? (
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-xs text-[#6C757D] w-10">CNY</span>
+                    <input
+                      type="number"
+                      value={tempAmount}
+                      onChange={(e) => setTempAmount(e.target.value)}
+                      className="flex-1 px-2 py-1 text-xs text-right border border-[#E9ECEF] rounded focus:outline-none focus:border-[#1A1A1A] font-mono"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit()
+                        else if (e.key === "Escape") setIsEditingFunds(false)
+                      }}
+                    />
+                    <button onClick={saveEdit} className="text-[10px] text-white bg-[#1A1A1A] px-2 py-1 rounded hover:opacity-90">
+                      保存
+                    </button>
+                    <button onClick={() => setIsEditingFunds(false)} className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A]">
+                      取消
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-xs text-[#6C757D]">CNY</span>
+                    <button
+                      onClick={() => startEdit("CNY", 0)}
+                      className="text-xs font-mono text-[#ADB5BD] hover:text-blue-600 transition-colors cursor-pointer"
+                      title="点击设置"
+                    >
+                      ¥0.00
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {availableNewCurrencies.length > 0 && (
+              <div className="pl-2 pt-1">
+                <select
+                  className="text-[10px] text-[#ADB5BD] border border-[#E9ECEF] rounded px-1 py-0.5 focus:outline-none"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      startEdit(e.target.value, 0)
+                    }
+                  }}
+                >
+                  <option value="">+ 添加币种</option>
+                  {availableNewCurrencies.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

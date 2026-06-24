@@ -1,5 +1,10 @@
 export type AssetId = "stocks" | "bonds" | "cash" | "commodities"
 
+export interface AvailableFund {
+  currency: string
+  amount: number
+}
+
 export interface UserInfo {
   id: string
   username: string
@@ -54,6 +59,7 @@ export interface Holding {
   assetId: AssetId
   symbol: string // empty if manual value
   name?: string
+  currency: string
   shares: number
   price: number
   costPrice?: number // Avg cost per share for calculated holdings
@@ -69,6 +75,7 @@ export interface HoldingSnapshot {
   assetId: AssetId
   symbol: string
   name: string
+  currency: string
   shares: number
   price: number
   costPrice: number

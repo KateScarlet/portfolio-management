@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"portfolio-management/yahoo"
 	"strconv"
 	"time"
 
@@ -15,6 +16,29 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+type httpError struct {
+	status int
+	msg    string
+}
+
+func (e *httpError) Error() string { return e.msg }
+
+func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) {
+	for i := range holdings {
+		h := &holdings[i]
+		if h.Currency == "" || h.Currency == targetCurrency {
+			continue
+		}
+		pair := h.Currency + targetCurrency
+		rate, err := yahoo.FetchExchangeRate(pair)
+		if err != nil {
+			continue
+		}
+		h.Value *= rate
+		h.Cost *= rate
+	}
+}
 
 func ListHoldings(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
@@ -35,6 +59,11 @@ func ListHoldings(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
+
+		if displayCurrency := c.Query("currency"); displayCurrency != "" {
+			convertHoldingsCurrency(holdings, displayCurrency)
+		}
+
 		c.JSON(consts.StatusOK, holdings)
 	}
 }
@@ -148,23 +177,41 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			if input.DeductFromCash {
 				addedCost := newLot.Cost + input.Fee
 				if addedCost > 0 {
-					var fundsSetting models.Setting
-					fundsValue := 0.0
-					if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).First(&fundsSetting).Error; err == nil {
-						fmt.Sscanf(fundsSetting.Value, "%f", &fundsValue)
+					holdingCurrency := input.Currency
+					if holdingCurrency == "" {
+						holdingCurrency = "CNY"
 					}
 
-					if fundsValue < addedCost {
-						return fmt.Errorf("可用资金不足: 可用 %.2f, 需要 %.2f", fundsValue, addedCost)
-					}
-
-					newFundsValue := fundsValue - addedCost
-					fundsSetting.Key = "availableFunds"
-					fundsSetting.UserID = user.UserID
-					fundsSetting.PortfolioID = portfolioID
-					fundsSetting.Value = fmt.Sprintf("%.2f", newFundsValue)
-					if err := tx.Where("`key` = ? AND portfolio_id = ?", "availableFunds", portfolioID).Assign(models.Setting{Value: fundsSetting.Value}).FirstOrCreate(&fundsSetting).Error; err != nil {
+					var af models.AvailableFund
+					err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, holdingCurrency).First(&af).Error
+					fundsAmount := 0.0
+					if err == nil {
+						fundsAmount = af.Amount
+					} else if err != gorm.ErrRecordNotFound {
 						return err
+					}
+
+				if fundsAmount < addedCost {
+					return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %.2f, 需要 %.2f", holdingCurrency, fundsAmount, addedCost)}
+				}
+
+					newAmount := fundsAmount - addedCost
+					if err == nil {
+						if err := tx.Model(&af).Update("amount", newAmount).Error; err != nil {
+							return err
+						}
+					} else {
+						if newAmount > 0 {
+							if err := tx.Create(&models.AvailableFund{
+								ID:          uuid.New().String(),
+								UserID:      user.UserID,
+								PortfolioID: portfolioID,
+								Currency:    holdingCurrency,
+								Amount:      newAmount,
+							}).Error; err != nil {
+								return err
+							}
+						}
 					}
 				}
 			}
@@ -172,7 +219,12 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			var he *httpError
+			if errors.As(err, &he) {
+				c.JSON(he.status, map[string]string{"error": he.msg})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
 			return
 		}
 		if created {

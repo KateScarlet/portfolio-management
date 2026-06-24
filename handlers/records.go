@@ -55,6 +55,8 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		convertHoldingsCurrency(holdings, "CNY")
+
 		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 		var total, principal float64
 		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
@@ -68,6 +70,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 					AssetId:   holdings[i].AssetId,
 					Symbol:    holdings[i].Symbol,
 					Name:      holdings[i].Name,
+					Currency:  holdings[i].Currency,
 					Shares:    holdings[i].Shares,
 					Price:     holdings[i].Price,
 					CostPrice: holdings[i].CostPrice,
