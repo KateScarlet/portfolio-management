@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { startAuthentication } from "@simplewebauthn/browser"
 import * as api from "../api"
 
 interface LoginPageProps {
@@ -49,6 +48,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setError("")
     try {
       const options = await api.webAuthnLoginStart()
+      const { startAuthentication } = await import("@simplewebauthn/browser")
       const credential = await startAuthentication({ optionsJSON: options })
       await api.webAuthnLoginFinish(credential)
       onLogin()
