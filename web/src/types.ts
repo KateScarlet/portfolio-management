@@ -187,13 +187,22 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
   },
 }
 
-export const COMMODITY_SYMBOLS = [
+export const COMMODITY_CN_SYMBOLS = [
+  { symbol: "au9999", name: "黄金9999" },
+  { symbol: "agtd", name: "白银T+D" },
+  { symbol: "scm", name: "原油" },
+  { symbol: "cum", name: "沪铜" },
+] as const
+
+export const COMMODITY_INTL_SYMBOLS = [
   { symbol: "GC=F", name: "黄金" },
   { symbol: "SI=F", name: "白银" },
   { symbol: "CL=F", name: "原油 (WTI)" },
   { symbol: "NG=F", name: "天然气" },
   { symbol: "HG=F", name: "铜" },
 ] as const
+
+export const COMMODITY_SYMBOLS = [...COMMODITY_CN_SYMBOLS, ...COMMODITY_INTL_SYMBOLS] as const
 
 export const CRYPTO_SYMBOLS = [
   { symbol: "BTC-USD", name: "Bitcoin" },

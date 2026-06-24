@@ -193,15 +193,6 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	currency := meta.Currency
 	price := meta.RegularMarketPrice
 	originalPrice := meta.RegularMarketPrice
-	unit := ""
-	upperSymbol := strings.ToUpper(meta.Symbol)
-	isPreciousMetal := upperSymbol == "GC=F" || upperSymbol == "SI=F" || upperSymbol == "PL=F" || upperSymbol == "PA=F"
-
-	if isPreciousMetal {
-		price /= 31.1035
-		originalPrice /= 31.1035
-		unit = "克"
-	}
 
 	priceResult := &PriceResult{
 		Symbol:           meta.Symbol,
@@ -210,7 +201,6 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		OriginalPrice:    originalPrice,
 		Currency:         currency,
 		OriginalCurrency: currency,
-		Unit:             unit,
 	}
 	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
 	setCachedQuote(querySymbol, priceResult)

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AssetId, ASSET_DEFINITIONS, COMMODITY_SYMBOLS, CRYPTO_SYMBOLS } from "../types"
+import { AssetId, ASSET_DEFINITIONS, COMMODITY_CN_SYMBOLS, COMMODITY_INTL_SYMBOLS, CRYPTO_SYMBOLS } from "../types"
 import * as api from "../api"
 import { useToast } from "./toast-context"
 
@@ -10,7 +10,7 @@ interface AddHoldingFormProps {
 
 export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")
-  const [market, setMarket] = useState<"US" | "CN" | "HK" | "COMMODITY" | "CRYPTO">("US")
+  const [market, setMarket] = useState<"US" | "CN" | "HK" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO">("US")
   const [symbol, setSymbol] = useState("")
   const [name, setName] = useState("")
   const [shares, setShares] = useState("")
@@ -92,7 +92,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           let finalCostPrice = isNaN(cPrice) || cPrice <= 0 ? data.price : cPrice
 
           const targetCurrency =
-            market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
+            market === "US" || market === "CRYPTO" || market === "COMMODITY_INTL" ? "USD" : market === "HK" ? "HKD" : "CNY"
 
           if (!isNaN(cPrice) && cPrice > 0 && costCurrency !== targetCurrency) {
             try {
@@ -201,10 +201,10 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
               <select
                 value={market}
                 onChange={(e) => {
-                  const m = e.target.value as "US" | "CN" | "HK" | "COMMODITY" | "CRYPTO"
+                  const m = e.target.value as "US" | "CN" | "HK" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
                   setMarket(m)
                   setSymbol("")
-                  if (m === "US" || m === "CRYPTO") setCostCurrency("USD")
+                  if (m === "US" || m === "CRYPTO" || m === "COMMODITY_INTL") setCostCurrency("USD")
                   else if (m === "HK") setCostCurrency("HKD")
                   else setCostCurrency("CNY")
                 }}
@@ -213,22 +213,36 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
                 <option value="US">美股</option>
                 <option value="CN">A股</option>
                 <option value="HK">港股</option>
-                <option value="COMMODITY">期货</option>
+                <option value="COMMODITY_CN">商品 (国内)</option>
+                <option value="COMMODITY_INTL">商品 (国际)</option>
                 <option value="CRYPTO">加密货币</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {market === "COMMODITY" ? "商品" : market === "CRYPTO" ? "币种" : "代码"}
+                {(market === "COMMODITY_CN" || market === "COMMODITY_INTL") ? "商品" : market === "CRYPTO" ? "币种" : "代码"}
               </label>
-              {market === "COMMODITY" ? (
+              {market === "COMMODITY_CN" ? (
                 <select
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}
                   className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
                 >
                   <option value="">选择商品...</option>
-                  {COMMODITY_SYMBOLS.map((c) => (
+                  {COMMODITY_CN_SYMBOLS.map((c) => (
+                    <option key={c.symbol} value={c.symbol}>
+                      {c.name} ({c.symbol})
+                    </option>
+                  ))}
+                </select>
+              ) : market === "COMMODITY_INTL" ? (
+                <select
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                >
+                  <option value="">选择商品...</option>
+                  {COMMODITY_INTL_SYMBOLS.map((c) => (
                     <option key={c.symbol} value={c.symbol}>
                       {c.name} ({c.symbol})
                     </option>
@@ -277,7 +291,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {market === "COMMODITY" ? "买入单价 (元/克, 选填)" : "买入单价"}
+                {market === "COMMODITY_CN" ? "买入单价 (选填)" : "买入单价"}
               </label>
               <div className="flex w-full">
                 <select
@@ -300,8 +314,8 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {market === "COMMODITY"
-                  ? "数量 (克)"
+                {(market === "COMMODITY_CN" || market === "COMMODITY_INTL")
+                  ? "数量"
                   : market === "CRYPTO"
                     ? "数量"
                     : "份额 (股份)"}
@@ -309,7 +323,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
               <input
                 type="number"
                 placeholder={
-                  market === "COMMODITY" ? "如: 50" : market === "CRYPTO" ? "如: 0.5" : "0"
+                  market === "COMMODITY_CN" || market === "COMMODITY_INTL" ? "如: 50" : market === "CRYPTO" ? "如: 0.5" : "0"
                 }
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}
