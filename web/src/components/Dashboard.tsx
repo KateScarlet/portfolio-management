@@ -21,9 +21,25 @@ interface DashboardProps {
   displayCurrency: string
 }
 
-export default function Dashboard({ assets, total, totalAssets, principal, totalFees, colorScheme, availableFunds, exchangeRates, portfolios, currentPortfolioId, onRefreshFunds, displayCurrency }: DashboardProps) {
+export default function Dashboard({
+  assets,
+  total,
+  totalAssets,
+  principal,
+  totalFees,
+  colorScheme,
+  availableFunds,
+  exchangeRates,
+  portfolios,
+  currentPortfolioId,
+  onRefreshFunds,
+  displayCurrency,
+}: DashboardProps) {
   const [showDetails, setShowDetails] = useState(false)
-  const [fundOperation, setFundOperation] = useState<{ type: OperationType; currency?: string } | null>(null)
+  const [fundOperation, setFundOperation] = useState<{
+    type: OperationType
+    currency?: string
+  } | null>(null)
 
   const chartData = Object.keys(assets)
     .map((key) => {
@@ -55,17 +71,21 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
 
         <div className="flex items-center gap-2 text-xs text-[#ADB5BD]">
           <span>
-            累计投入成本: <span className="font-mono">{formatCurrencyByCode(principal, displayCurrency)}</span>
+            累计投入成本:{" "}
+            <span className="font-mono">{formatCurrencyByCode(principal, displayCurrency)}</span>
           </span>
           {totalFees > 0 && (
             <span className="ml-2">
-              累计手续费: <span className="font-mono">{formatCurrencyByCode(totalFees, displayCurrency)}</span>
+              累计手续费:{" "}
+              <span className="font-mono">{formatCurrencyByCode(totalFees, displayCurrency)}</span>
             </span>
           )}
         </div>
       </div>
 
-      <h2 className="text-4xl font-light mb-2 text-[#1A1A1A]">{formatCurrencyByCode(total, displayCurrency)}</h2>
+      <h2 className="text-4xl font-light mb-2 text-[#1A1A1A]">
+        {formatCurrencyByCode(total, displayCurrency)}
+      </h2>
 
       <div
         className={`flex items-center gap-2 mb-8 ${getProfitColor(isPositive, colorScheme)} font-mono`}
@@ -134,7 +154,8 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
         {total > 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <p className={`text-2xl font-light ${getProfitColor(isPositive, colorScheme)}`}>
-              {isPositive ? "+" : ""}{formatPercent(returnRate)}
+              {isPositive ? "+" : ""}
+              {formatPercent(returnRate)}
             </p>
             <p className="text-[10px] text-[#ADB5BD] uppercase tracking-wider mt-1">累计收益</p>
           </div>
@@ -187,14 +208,18 @@ export default function Dashboard({ assets, total, totalAssets, principal, total
                   </span>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => setFundOperation({ type: "transfer_in", currency: f.currency })}
+                      onClick={() =>
+                        setFundOperation({ type: "transfer_in", currency: f.currency })
+                      }
                       className="text-[10px] text-green-600 hover:text-green-800 transition-colors"
                       title="转入"
                     >
                       转入
                     </button>
                     <button
-                      onClick={() => setFundOperation({ type: "transfer_out", currency: f.currency })}
+                      onClick={() =>
+                        setFundOperation({ type: "transfer_out", currency: f.currency })
+                      }
                       className="text-[10px] text-red-600 hover:text-red-800 transition-colors"
                       title="转出"
                     >

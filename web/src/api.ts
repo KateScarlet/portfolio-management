@@ -4,7 +4,14 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser"
-import { Holding, Portfolio, PortfolioRecord, PortfolioSummary, SyncStatus, UserInfo } from "./types"
+import {
+  Holding,
+  Portfolio,
+  PortfolioRecord,
+  PortfolioSummary,
+  SyncStatus,
+  UserInfo,
+} from "./types"
 
 const BASE = ""
 
@@ -33,7 +40,11 @@ export async function createHolding(pid: string, h: Omit<Holding, "id">): Promis
   })
 }
 
-export async function updateHolding(pid: string, id: string, updates: Partial<Holding>): Promise<Holding> {
+export async function updateHolding(
+  pid: string,
+  id: string,
+  updates: Partial<Holding>
+): Promise<Holding> {
   return request<Holding>(`/api/portfolios/${pid}/holdings/${id}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
@@ -54,10 +65,13 @@ export async function sellHolding(
   fee: number,
   value: number
 ): Promise<{ soldHolding: Holding; availableFunds: string }> {
-  return request<{ soldHolding: Holding; availableFunds: string }>(`/api/portfolios/${pid}/holdings/${id}/sell`, {
-    method: "POST",
-    body: JSON.stringify({ shares, price, fee, value }),
-  })
+  return request<{ soldHolding: Holding; availableFunds: string }>(
+    `/api/portfolios/${pid}/holdings/${id}/sell`,
+    {
+      method: "POST",
+      body: JSON.stringify({ shares, price, fee, value }),
+    }
+  )
 }
 
 export async function fetchRecords(pid: string): Promise<PortfolioRecord[]> {
@@ -102,7 +116,9 @@ export async function updateSettings(
   })
 }
 
-export async function fetchAvailableFunds(pid: string): Promise<{ currency: string; amount: number }[]> {
+export async function fetchAvailableFunds(
+  pid: string
+): Promise<{ currency: string; amount: number }[]> {
   return request<{ currency: string; amount: number }[]>(`/api/portfolios/${pid}/funds`)
 }
 
@@ -157,9 +173,14 @@ export async function convertCurrency(
   })
 }
 
-export async function fetchFundTransactions(pid: string, type?: string): Promise<import("./types").FundTransaction[]> {
+export async function fetchFundTransactions(
+  pid: string,
+  type?: string
+): Promise<import("./types").FundTransaction[]> {
   const params = type ? `?type=${type}` : ""
-  return request<import("./types").FundTransaction[]>(`/api/portfolios/${pid}/fund-transactions${params}`)
+  return request<import("./types").FundTransaction[]>(
+    `/api/portfolios/${pid}/fund-transactions${params}`
+  )
 }
 
 export async function fetchSyncStatus(pid: string): Promise<SyncStatus> {
@@ -197,7 +218,10 @@ export async function createPortfolio(name: string, description?: string): Promi
   })
 }
 
-export async function updatePortfolio(id: string, updates: { name?: string; description?: string }): Promise<Portfolio> {
+export async function updatePortfolio(
+  id: string,
+  updates: { name?: string; description?: string }
+): Promise<Portfolio> {
   return request<Portfolio>(`/api/portfolios/${id}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
@@ -218,13 +242,10 @@ export async function testTelegramConnection(
   botToken: string,
   chatID: string
 ): Promise<{ success: boolean; botName?: string; error?: string }> {
-  return request<{ success: boolean; botName?: string; error?: string }>(
-    "/api/telegram/test",
-    {
-      method: "POST",
-      body: JSON.stringify({ botToken, chatID, type: "connection" }),
-    }
-  )
+  return request<{ success: boolean; botName?: string; error?: string }>("/api/telegram/test", {
+    method: "POST",
+    body: JSON.stringify({ botToken, chatID, type: "connection" }),
+  })
 }
 
 export async function testTelegramMessage(
@@ -232,13 +253,10 @@ export async function testTelegramMessage(
   chatID: string,
   type: "price" | "drift" | "summary"
 ): Promise<{ success: boolean; error?: string }> {
-  return request<{ success: boolean; error?: string }>(
-    "/api/telegram/test",
-    {
-      method: "POST",
-      body: JSON.stringify({ botToken, chatID, type }),
-    }
-  )
+  return request<{ success: boolean; error?: string }>("/api/telegram/test", {
+    method: "POST",
+    body: JSON.stringify({ botToken, chatID, type }),
+  })
 }
 
 export async function fetchSetupStatus(): Promise<{ configured: boolean }> {
@@ -272,7 +290,11 @@ export async function fetchMe(): Promise<UserInfo> {
   return request<UserInfo>("/api/auth/me")
 }
 
-export async function register(username: string, password: string, role: string): Promise<UserInfo> {
+export async function register(
+  username: string,
+  password: string,
+  role: string
+): Promise<UserInfo> {
   return request<UserInfo>("/api/users", {
     method: "POST",
     body: JSON.stringify({ username, password, role }),
@@ -330,14 +352,18 @@ export interface WebAuthnCredentialInfo {
   lastUsedAt: number
 }
 
-export async function webAuthnRegisterStart(name: string): Promise<PublicKeyCredentialCreationOptionsJSON> {
+export async function webAuthnRegisterStart(
+  name: string
+): Promise<PublicKeyCredentialCreationOptionsJSON> {
   return request("/api/webauthn/register/start", {
     method: "POST",
     body: JSON.stringify({ name }),
   })
 }
 
-export async function webAuthnRegisterFinish(data: RegistrationResponseJSON): Promise<{ success: string }> {
+export async function webAuthnRegisterFinish(
+  data: RegistrationResponseJSON
+): Promise<{ success: string }> {
   return request("/api/webauthn/register/finish", {
     method: "POST",
     body: JSON.stringify(data),
@@ -348,7 +374,9 @@ export async function webAuthnLoginStart(): Promise<PublicKeyCredentialRequestOp
   return request("/api/webauthn/login/start", { method: "POST" })
 }
 
-export async function webAuthnLoginFinish(data: AuthenticationResponseJSON): Promise<{ user: UserInfo }> {
+export async function webAuthnLoginFinish(
+  data: AuthenticationResponseJSON
+): Promise<{ user: UserInfo }> {
   return request<{ user: UserInfo }>("/api/webauthn/login/finish", {
     method: "POST",
     body: JSON.stringify(data),

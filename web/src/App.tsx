@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
-import { Settings, SyncStatus, UserInfo, Portfolio, PortfolioSummary, DEFAULT_SETTINGS, ColorScheme, Holding, AvailableFund } from "./types"
+import {
+  Settings,
+  SyncStatus,
+  UserInfo,
+  Portfolio,
+  PortfolioSummary,
+  DEFAULT_SETTINGS,
+  ColorScheme,
+  Holding,
+  AvailableFund,
+} from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
@@ -48,14 +58,16 @@ export default function App() {
   }, 0)
 
   useEffect(() => {
-    api.fetchSetupStatus()
+    api
+      .fetchSetupStatus()
       .then((s) => setSetupMode(!s.configured))
       .catch(() => setSetupMode(false))
   }, [])
 
   useEffect(() => {
     if (setupMode === false) {
-      api.fetchMe()
+      api
+        .fetchMe()
         .then((u) => setUser(u))
         .catch(() => setUser(null))
         .finally(() => setAuthChecked(true))
@@ -101,36 +113,49 @@ export default function App() {
       }
     }
     fetchPortfolios()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   useEffect(() => {
     if (!currentPortfolio) return
-    api.fetchSettings(currentPortfolio.id)
+    api
+      .fetchSettings(currentPortfolio.id)
       .then((s) => {
         setSettings({
-          driftThreshold: s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
-          syncInterval: s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
+          driftThreshold:
+            s.driftThreshold != null ? Number(s.driftThreshold) : DEFAULT_SETTINGS.driftThreshold,
+          syncInterval:
+            s.syncInterval != null ? Number(s.syncInterval) : DEFAULT_SETTINGS.syncInterval,
           colorScheme: (s.colorScheme as ColorScheme) || DEFAULT_SETTINGS.colorScheme,
-          targetStocks: s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
+          targetStocks:
+            s.targetStocks != null ? Number(s.targetStocks) : DEFAULT_SETTINGS.targetStocks,
           targetBonds: s.targetBonds != null ? Number(s.targetBonds) : DEFAULT_SETTINGS.targetBonds,
           targetCash: s.targetCash != null ? Number(s.targetCash) : DEFAULT_SETTINGS.targetCash,
-          targetCommodities: s.targetCommodities != null ? Number(s.targetCommodities) : (s as any).targetGold != null ? Number((s as any).targetGold) : DEFAULT_SETTINGS.targetCommodities,
+          targetCommodities:
+            s.targetCommodities != null
+              ? Number(s.targetCommodities)
+              : (s as any).targetGold != null
+                ? Number((s as any).targetGold)
+                : DEFAULT_SETTINGS.targetCommodities,
           telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
           telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,
           telegramEnabled: s.telegramEnabled === "true",
           telegramPriceAlert: s.telegramPriceAlert !== "false",
           telegramDriftAlert: s.telegramDriftAlert !== "false",
           telegramSummary: s.telegramSummary !== "false",
-          telegramPriceThreshold: s.telegramPriceThreshold != null ? Number(s.telegramPriceThreshold) : DEFAULT_SETTINGS.telegramPriceThreshold,
-          telegramSummaryInterval: s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
+          telegramPriceThreshold:
+            s.telegramPriceThreshold != null
+              ? Number(s.telegramPriceThreshold)
+              : DEFAULT_SETTINGS.telegramPriceThreshold,
+          telegramSummaryInterval:
+            s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
           displayCurrency: s.displayCurrency || DEFAULT_SETTINGS.displayCurrency,
         })
       })
       .catch(console.error)
-    api.fetchAvailableFunds(currentPortfolio.id)
-      .then(setAvailableFunds)
-      .catch(console.error)
+    api.fetchAvailableFunds(currentPortfolio.id).then(setAvailableFunds).catch(console.error)
     api.fetchSyncStatus(currentPortfolio.id).then(setSyncStatus).catch(console.error)
   }, [currentPortfolio])
 
@@ -140,15 +165,18 @@ export default function App() {
 
   const pollSyncStatus = useCallback(() => {
     if (!currentPortfolio) return
-    api.fetchSyncStatus(currentPortfolio.id).then((status) => {
-      if (prevSyncingRef.current && !status.syncing && currentPortfolio) {
-        api.fetchHoldings(currentPortfolio.id).then(setHoldings).catch(console.error)
-      }
-      prevSyncingRef.current = status.syncing
-      setSyncStatus(status)
-      if (syncPollRef.current) clearInterval(syncPollRef.current)
-      syncPollRef.current = setInterval(pollSyncStatusRef.current, status.syncing ? 2000 : 30000)
-    }).catch(console.error)
+    api
+      .fetchSyncStatus(currentPortfolio.id)
+      .then((status) => {
+        if (prevSyncingRef.current && !status.syncing && currentPortfolio) {
+          api.fetchHoldings(currentPortfolio.id).then(setHoldings).catch(console.error)
+        }
+        prevSyncingRef.current = status.syncing
+        setSyncStatus(status)
+        if (syncPollRef.current) clearInterval(syncPollRef.current)
+        syncPollRef.current = setInterval(pollSyncStatusRef.current, status.syncing ? 2000 : 30000)
+      })
+      .catch(console.error)
   }, [setHoldings, currentPortfolio])
 
   useEffect(() => {
@@ -163,32 +191,35 @@ export default function App() {
     }
   }, [user, currentPortfolio, pollSyncStatus])
 
-  const handleSaveSettings = useCallback(async (newSettings: Settings) => {
-    if (!currentPortfolio) return
-    try {
-      await api.updateSettings(currentPortfolio.id, {
-        driftThreshold: String(newSettings.driftThreshold),
-        syncInterval: String(newSettings.syncInterval),
-        colorScheme: newSettings.colorScheme,
-        targetStocks: String(newSettings.targetStocks),
-        targetBonds: String(newSettings.targetBonds),
-        targetCash: String(newSettings.targetCash),
-        targetCommodities: String(newSettings.targetCommodities),
-        telegramBotToken: newSettings.telegramBotToken,
-        telegramChatID: newSettings.telegramChatID,
-        telegramEnabled: String(newSettings.telegramEnabled),
-        telegramPriceAlert: String(newSettings.telegramPriceAlert),
-        telegramDriftAlert: String(newSettings.telegramDriftAlert),
-        telegramSummary: String(newSettings.telegramSummary),
-        telegramPriceThreshold: String(newSettings.telegramPriceThreshold),
-        telegramSummaryInterval: newSettings.telegramSummaryInterval,
-        displayCurrency: newSettings.displayCurrency,
-      })
-      setSettings(newSettings)
-    } catch (e) {
-      console.error("Failed to save settings", e)
-    }
-  }, [currentPortfolio])
+  const handleSaveSettings = useCallback(
+    async (newSettings: Settings) => {
+      if (!currentPortfolio) return
+      try {
+        await api.updateSettings(currentPortfolio.id, {
+          driftThreshold: String(newSettings.driftThreshold),
+          syncInterval: String(newSettings.syncInterval),
+          colorScheme: newSettings.colorScheme,
+          targetStocks: String(newSettings.targetStocks),
+          targetBonds: String(newSettings.targetBonds),
+          targetCash: String(newSettings.targetCash),
+          targetCommodities: String(newSettings.targetCommodities),
+          telegramBotToken: newSettings.telegramBotToken,
+          telegramChatID: newSettings.telegramChatID,
+          telegramEnabled: String(newSettings.telegramEnabled),
+          telegramPriceAlert: String(newSettings.telegramPriceAlert),
+          telegramDriftAlert: String(newSettings.telegramDriftAlert),
+          telegramSummary: String(newSettings.telegramSummary),
+          telegramPriceThreshold: String(newSettings.telegramPriceThreshold),
+          telegramSummaryInterval: newSettings.telegramSummaryInterval,
+          displayCurrency: newSettings.displayCurrency,
+        })
+        setSettings(newSettings)
+      } catch (e) {
+        console.error("Failed to save settings", e)
+      }
+    },
+    [currentPortfolio]
+  )
 
   const handleRefreshAvailableFunds = useCallback(async () => {
     if (!currentPortfolio) return
@@ -200,12 +231,15 @@ export default function App() {
     }
   }, [currentPortfolio])
 
-  const handleAddHolding = useCallback(async (holding: Omit<Holding, "id">) => {
-    await addHolding(holding)
-    if (holding.deductFromCash) {
-      handleRefreshAvailableFunds()
-    }
-  }, [addHolding, handleRefreshAvailableFunds])
+  const handleAddHolding = useCallback(
+    async (holding: Omit<Holding, "id">) => {
+      await addHolding(holding)
+      if (holding.deductFromCash) {
+        handleRefreshAvailableFunds()
+      }
+    },
+    [addHolding, handleRefreshAvailableFunds]
+  )
 
   const handleTriggerSync = useCallback(async () => {
     if (!currentPortfolio) return
@@ -217,9 +251,12 @@ export default function App() {
     }
   }, [currentPortfolio])
 
-  const handleSyncComplete = useCallback((status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => {
-    setSyncStatus(status)
-  }, [])
+  const handleSyncComplete = useCallback(
+    (status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => {
+      setSyncStatus(status)
+    },
+    []
+  )
 
   const handleLogout = useCallback(async () => {
     await api.logout()
@@ -285,8 +322,7 @@ export default function App() {
   )
   const totalBuyFees = holdings.reduce(
     (sum, h) =>
-      sum +
-      (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? (l.fee || 0) : 0), 0),
+      sum + (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? l.fee || 0 : 0), 0),
     0
   )
   const principal = totalCost + totalBuyFees
@@ -343,7 +379,20 @@ export default function App() {
       <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard assets={assets} total={total} totalAssets={totalAssets} principal={principal} totalFees={totalFees} colorScheme={settings.colorScheme} availableFunds={availableFunds} exchangeRates={exchangeRates} portfolios={portfolios} currentPortfolioId={currentPortfolio.id} onRefreshFunds={handleRefreshAvailableFunds} displayCurrency={settings.displayCurrency} />
+            <Dashboard
+              assets={assets}
+              total={total}
+              totalAssets={totalAssets}
+              principal={principal}
+              totalFees={totalFees}
+              colorScheme={settings.colorScheme}
+              availableFunds={availableFunds}
+              exchangeRates={exchangeRates}
+              portfolios={portfolios}
+              currentPortfolioId={currentPortfolio.id}
+              onRefreshFunds={handleRefreshAvailableFunds}
+              displayCurrency={settings.displayCurrency}
+            />
           </div>
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
@@ -376,7 +425,12 @@ export default function App() {
             onRefreshAvailableFunds={handleRefreshAvailableFunds}
             onSyncComplete={handleSyncComplete}
           />
-          <HistoryPanel history={history} onDeleteRecord={deleteRecord} colorScheme={settings.colorScheme} displayCurrency={settings.displayCurrency} />
+          <HistoryPanel
+            history={history}
+            onDeleteRecord={deleteRecord}
+            colorScheme={settings.colorScheme}
+            displayCurrency={settings.displayCurrency}
+          />
         </div>
       </main>
 

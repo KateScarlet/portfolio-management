@@ -37,22 +37,44 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
   const [draft, setDraft] = useState(settings)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">("connection")
+  const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">(
+    "connection"
+  )
   const [oidcConfig, setOidcConfig] = useState<api.OIDCConfig | null>(null)
-  const [oidcDraft, setOidcDraft] = useState<api.OIDCConfig>({ enabled: false, issuer: "", clientID: "", clientSecret: "", redirectURL: "" })
-  const [webauthnDraft, setWebauthnDraft] = useState<{ enabled: boolean; rpid: string; rpOrigins: string }>({ enabled: false, rpid: "", rpOrigins: "" })
+  const [oidcDraft, setOidcDraft] = useState<api.OIDCConfig>({
+    enabled: false,
+    issuer: "",
+    clientID: "",
+    clientSecret: "",
+    redirectURL: "",
+  })
+  const [webauthnDraft, setWebauthnDraft] = useState<{
+    enabled: boolean
+    rpid: string
+    rpOrigins: string
+  }>({ enabled: false, rpid: "", rpOrigins: "" })
 
   const handleOpen = () => {
     setDraft(settings)
     setIsOpen(true)
     if (userRole === "admin") {
-      api.fetchOIDCConfig().then((config) => {
-        setOidcConfig(config)
-        setOidcDraft(config)
-      }).catch(() => {})
-      api.fetchWebAuthnConfig().then((config) => {
-        setWebauthnDraft({ enabled: config.enabled, rpid: config.rpid, rpOrigins: config.rpOrigins.join(", ") })
-      }).catch(() => {})
+      api
+        .fetchOIDCConfig()
+        .then((config) => {
+          setOidcConfig(config)
+          setOidcDraft(config)
+        })
+        .catch(() => {})
+      api
+        .fetchWebAuthnConfig()
+        .then((config) => {
+          setWebauthnDraft({
+            enabled: config.enabled,
+            rpid: config.rpid,
+            rpOrigins: config.rpOrigins.join(", "),
+          })
+        })
+        .catch(() => {})
     }
   }
 
@@ -69,8 +91,15 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
         }
       }
       try {
-        const origins = webauthnDraft.rpOrigins.split(",").map((s) => s.trim()).filter(Boolean)
-        await api.updateWebAuthnConfig({ enabled: webauthnDraft.enabled, rpid: webauthnDraft.rpid, rpOrigins: origins })
+        const origins = webauthnDraft.rpOrigins
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+        await api.updateWebAuthnConfig({
+          enabled: webauthnDraft.enabled,
+          rpid: webauthnDraft.rpid,
+          rpOrigins: origins,
+        })
       } catch (e) {
         console.error("Failed to save WebAuthn config", e)
       }
@@ -94,7 +123,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
         setTestResult({ success: false, message: result.error || "连接失败" })
       }
     } catch (e) {
-      setTestResult({ success: false, message: "连接失败: " + (e instanceof Error ? e.message : "未知错误") })
+      setTestResult({
+        success: false,
+        message: "连接失败: " + (e instanceof Error ? e.message : "未知错误"),
+      })
     } finally {
       setTesting(false)
     }
@@ -108,7 +140,11 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
     setTesting(true)
     setTestResult(null)
     try {
-      const result = await api.testTelegramMessage(draft.telegramBotToken, draft.telegramChatID, type)
+      const result = await api.testTelegramMessage(
+        draft.telegramBotToken,
+        draft.telegramChatID,
+        type
+      )
       if (result.success) {
         const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
         setTestResult({ success: true, message: `已发送${labels[type]}测试消息` })
@@ -116,7 +152,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
         setTestResult({ success: false, message: result.error || "发送失败" })
       }
     } catch (e) {
-      setTestResult({ success: false, message: "发送失败: " + (e instanceof Error ? e.message : "未知错误") })
+      setTestResult({
+        success: false,
+        message: "发送失败: " + (e instanceof Error ? e.message : "未知错误"),
+      })
     } finally {
       setTesting(false)
     }
@@ -210,13 +249,14 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
               {/* Target Allocation */}
               <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                  目标配比
-                </label>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">目标配比</label>
                 <p className="text-xs text-[#6C757D] mb-3">
                   拖动分隔线调整各资产类别目标占比，用于再平衡建议和偏离提醒。
                 </p>
-                <TargetAllocationBar draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+                <TargetAllocationBar
+                  draft={draft}
+                  onChange={(patch) => setDraft({ ...draft, ...patch })}
+                />
               </div>
 
               {/* Sync Interval */}
@@ -244,9 +284,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
               {/* Color Scheme */}
               <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                  涨跌配色
-                </label>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">涨跌配色</label>
                 <p className="text-xs text-[#6C757D] mb-3">选择盈亏颜色显示方式。</p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -276,9 +314,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
               {/* Display Currency */}
               <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                  显示币种
-                </label>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">显示币种</label>
                 <p className="text-xs text-[#6C757D] mb-3">
                   所有资产将按此币种汇总显示，汇率自动转换。
                 </p>
@@ -367,7 +403,11 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                         <option value="summary">组合摘要</option>
                       </select>
                       <button
-                        onClick={() => testType === "connection" ? handleTestConnection() : handleTestMessage(testType)}
+                        onClick={() =>
+                          testType === "connection"
+                            ? handleTestConnection()
+                            : handleTestMessage(testType)
+                        }
                         disabled={testing}
                         className="px-3 py-1.5 text-xs text-[#1A1A1A] border border-[#E9ECEF] rounded-lg hover:bg-[#F1F3F5] transition-colors disabled:opacity-50"
                       >
@@ -386,9 +426,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
                     {/* Notification Toggles */}
                     <div className="space-y-3 pt-2">
-                      <label className="block text-xs font-medium text-[#6C757D]">
-                        通知类型
-                      </label>
+                      <label className="block text-xs font-medium text-[#6C757D]">通知类型</label>
 
                       {/* Price Alert */}
                       <div className="flex items-center justify-between">
@@ -474,84 +512,86 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
               {/* OIDC / SSO */}
               {userRole === "admin" && (
-              <div className="border-t border-[#E9ECEF] pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[#1A1A1A]">
-                      SSO 登录 (OIDC)
-                    </label>
-                    <p className="text-xs text-[#6C757D] mt-1">
-                      配置 OpenID Connect 单点登录
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setOidcDraft({ ...oidcDraft, enabled: !oidcDraft.enabled })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      oidcDraft.enabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        oidcDraft.enabled ? "translate-x-6" : "translate-x-1"
+                <div className="border-t border-[#E9ECEF] pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#1A1A1A]">
+                        SSO 登录 (OIDC)
+                      </label>
+                      <p className="text-xs text-[#6C757D] mt-1">配置 OpenID Connect 单点登录</p>
+                    </div>
+                    <button
+                      onClick={() => setOidcDraft({ ...oidcDraft, enabled: !oidcDraft.enabled })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        oidcDraft.enabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
                       }`}
-                    />
-                  </button>
-                </div>
-
-                {oidcDraft.enabled && (
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
-                        Issuer URL
-                      </label>
-                      <input
-                        type="text"
-                        value={oidcDraft.issuer}
-                        onChange={(e) => setOidcDraft({ ...oidcDraft, issuer: e.target.value })}
-                        placeholder="https://your-provider.example.com"
-                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          oidcDraft.enabled ? "translate-x-6" : "translate-x-1"
+                        }`}
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
-                        Client ID
-                      </label>
-                      <input
-                        type="text"
-                        value={oidcDraft.clientID}
-                        onChange={(e) => setOidcDraft({ ...oidcDraft, clientID: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
-                        Client Secret
-                      </label>
-                      <input
-                        type="password"
-                        value={oidcDraft.clientSecret}
-                        onChange={(e) => setOidcDraft({ ...oidcDraft, clientSecret: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-[#6C757D] mb-1">
-                        Redirect URL
-                      </label>
-                      <input
-                        type="text"
-                        value={oidcDraft.redirectURL}
-                        onChange={(e) => setOidcDraft({ ...oidcDraft, redirectURL: e.target.value })}
-                        placeholder="http://localhost:3000/api/auth/oidc/callback"
-                        className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
-                      />
-                    </div>
+                    </button>
                   </div>
-                )}
-              </div>
+
+                  {oidcDraft.enabled && (
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                          Issuer URL
+                        </label>
+                        <input
+                          type="text"
+                          value={oidcDraft.issuer}
+                          onChange={(e) => setOidcDraft({ ...oidcDraft, issuer: e.target.value })}
+                          placeholder="https://your-provider.example.com"
+                          className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                          Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={oidcDraft.clientID}
+                          onChange={(e) => setOidcDraft({ ...oidcDraft, clientID: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                          Client Secret
+                        </label>
+                        <input
+                          type="password"
+                          value={oidcDraft.clientSecret}
+                          onChange={(e) =>
+                            setOidcDraft({ ...oidcDraft, clientSecret: e.target.value })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                          Redirect URL
+                        </label>
+                        <input
+                          type="text"
+                          value={oidcDraft.redirectURL}
+                          onChange={(e) =>
+                            setOidcDraft({ ...oidcDraft, redirectURL: e.target.value })
+                          }
+                          placeholder="http://localhost:3000/api/auth/oidc/callback"
+                          className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Passkey 管理 */}
@@ -559,7 +599,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
               {/* WebAuthn 配置 */}
               {userRole === "admin" && (
-              <WebAuthnConfigSection draft={webauthnDraft} onChange={setWebauthnDraft} />
+                <WebAuthnConfigSection draft={webauthnDraft} onChange={setWebauthnDraft} />
               )}
             </div>
 
@@ -616,7 +656,9 @@ function PasskeyManager() {
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleRegister = async () => {
@@ -649,21 +691,22 @@ function PasskeyManager() {
 
   return (
     <div className="border-t border-[#E9ECEF] pt-6">
-      <label className="block text-sm font-medium text-[#1A1A1A] mb-1">
-        Passkey 管理
-      </label>
-      <p className="text-xs text-[#6C757D] mb-4">
-        管理已注册的 Passkey 凭证
-      </p>
+      <label className="block text-sm font-medium text-[#1A1A1A] mb-1">Passkey 管理</label>
+      <p className="text-xs text-[#6C757D] mb-4">管理已注册的 Passkey 凭证</p>
 
       {credentials.length > 0 && (
         <div className="space-y-2 mb-4">
           {credentials.map((cred) => (
-            <div key={cred.id} className="flex items-center justify-between py-2 px-3 bg-[#F8F9FA] rounded-lg">
+            <div
+              key={cred.id}
+              className="flex items-center justify-between py-2 px-3 bg-[#F8F9FA] rounded-lg"
+            >
               <div>
                 <span className="text-sm text-[#1A1A1A]">{cred.name || "未命名"}</span>
                 <span className="text-xs text-[#6C757D] ml-2">
-                  {cred.lastUsedAt ? `上次使用: ${new Date(cred.lastUsedAt * 1000).toLocaleDateString()}` : "未使用"}
+                  {cred.lastUsedAt
+                    ? `上次使用: ${new Date(cred.lastUsedAt * 1000).toLocaleDateString()}`
+                    : "未使用"}
                 </span>
               </div>
               <button
@@ -698,7 +741,13 @@ function PasskeyManager() {
   )
 }
 
-function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean; rpid: string; rpOrigins: string }, onChange: (d: { enabled: boolean; rpid: string; rpOrigins: string }) => void }) {
+function WebAuthnConfigSection({
+  draft,
+  onChange,
+}: {
+  draft: { enabled: boolean; rpid: string; rpOrigins: string }
+  onChange: (d: { enabled: boolean; rpid: string; rpOrigins: string }) => void
+}) {
   return (
     <div className="border-t border-[#E9ECEF] pt-6">
       <div className="flex items-center justify-between mb-4">
@@ -706,9 +755,7 @@ function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean;
           <label className="block text-sm font-medium text-[#1A1A1A]">
             Passkey 登录 (WebAuthn)
           </label>
-          <p className="text-xs text-[#6C757D] mt-1">
-            配置 Passkey 无密码登录
-          </p>
+          <p className="text-xs text-[#6C757D] mt-1">配置 Passkey 无密码登录</p>
         </div>
         <button
           onClick={() => onChange({ ...draft, enabled: !draft.enabled })}
@@ -727,9 +774,7 @@ function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean;
       {draft.enabled && (
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-[#6C757D] mb-1">
-              RPID (域名)
-            </label>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">RPID (域名)</label>
             <input
               type="text"
               value={draft.rpid}
@@ -758,10 +803,18 @@ function WebAuthnConfigSection({ draft, onChange }: { draft: { enabled: boolean;
 }
 
 const ASSET_ORDER: AssetId[] = ["stocks", "bonds", "cash", "commodities"]
-const ASSET_KEYS = ASSET_ORDER.map((id) => `target${id.charAt(0).toUpperCase() + id.slice(1)}` as keyof Settings)
+const ASSET_KEYS = ASSET_ORDER.map(
+  (id) => `target${id.charAt(0).toUpperCase() + id.slice(1)}` as keyof Settings
+)
 const MIN_SEG = 1
 
-function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (patch: Partial<Settings>) => void }) {
+function TargetAllocationBar({
+  draft,
+  onChange,
+}: {
+  draft: Settings
+  onChange: (patch: Partial<Settings>) => void
+}) {
   const barRef = useRef<HTMLDivElement>(null)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const dragRef = useRef<{
@@ -796,7 +849,7 @@ function TargetAllocationBar({ draft, onChange }: { draft: Settings; onChange: (
       setDragIdx(idx)
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     },
-    [currentPcts],
+    [currentPcts]
   )
 
   useEffect(() => {

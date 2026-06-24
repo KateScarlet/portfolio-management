@@ -40,7 +40,7 @@ export default function FundOperationDialog({
     type === "transfer" && otherPortfolios.length > 0 ? otherPortfolios[0].id : ""
   )
   const [toCurrency, setToCurrency] = useState(
-    type === "convert" ? (CURRENCIES.find((c) => c !== (currentCurrency || "CNY")) || "USD") : ""
+    type === "convert" ? CURRENCIES.find((c) => c !== (currentCurrency || "CNY")) || "USD" : ""
   )
   const [toAmount, setToAmount] = useState("")
   const [exchangeRate, setExchangeRate] = useState("")
@@ -149,14 +149,22 @@ export default function FundOperationDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-xl shadow-lg border border-[#E9ECEF] w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9ECEF]">
           <h3 className="text-sm font-semibold text-[#1A1A1A]">{OPERATION_TITLES[type]}</h3>
-          <button onClick={onClose} className="text-[#ADB5BD] hover:text-[#1A1A1A] text-lg leading-none">&times;</button>
+          <button
+            onClick={onClose}
+            className="text-[#ADB5BD] hover:text-[#1A1A1A] text-lg leading-none"
+          >
+            &times;
+          </button>
         </div>
 
         <div className="p-5 flex flex-col gap-4">
@@ -164,33 +172,43 @@ export default function FundOperationDialog({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">源币种</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    源币种
+                  </label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
                     className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                   >
                     {CURRENCIES.filter((c) => c !== toCurrency).map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">目标币种</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    目标币种
+                  </label>
                   <select
                     value={toCurrency}
                     onChange={(e) => setToCurrency(e.target.value)}
                     className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                   >
                     {CURRENCIES.filter((c) => c !== currency).map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">源金额</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    源金额
+                  </label>
                   <input
                     type="number"
                     value={amount}
@@ -200,7 +218,9 @@ export default function FundOperationDialog({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">目标金额</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    目标金额
+                  </label>
                   <input
                     type="number"
                     value={toAmount}
@@ -212,7 +232,9 @@ export default function FundOperationDialog({
               </div>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">汇率</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    汇率
+                  </label>
                   <button
                     onClick={fetchRate}
                     disabled={fetchingRate}
@@ -234,19 +256,25 @@ export default function FundOperationDialog({
           ) : (
             <>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">币种</label>
+                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                  币种
+                </label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                 >
                   {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">金额</label>
+                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                  金额
+                </label>
                 <input
                   type="number"
                   value={amount}
@@ -257,14 +285,18 @@ export default function FundOperationDialog({
               </div>
               {type === "transfer" && (
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">目标组合</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                    目标组合
+                  </label>
                   <select
                     value={targetPortfolioId}
                     onChange={(e) => setTargetPortfolioId(e.target.value)}
                     className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                   >
                     {otherPortfolios.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -273,7 +305,9 @@ export default function FundOperationDialog({
           )}
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">备注 (选填)</label>
+            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+              备注 (选填)
+            </label>
             <input
               type="text"
               value={note}

@@ -11,7 +11,14 @@ interface RebalancePanelProps {
   displayCurrency: string
 }
 
-export default function RebalancePanel({ assets, total, driftThreshold, colorScheme, targetPcts, displayCurrency }: RebalancePanelProps) {
+export default function RebalancePanel({
+  assets,
+  total,
+  driftThreshold,
+  colorScheme,
+  targetPcts,
+  displayCurrency,
+}: RebalancePanelProps) {
   if (total === 0) {
     return null
   }
@@ -24,7 +31,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
     const currentPct = total > 0 ? currentValue / total : 0
     const targetValue = total * (targetPct / 100)
     const difference = targetValue - currentValue
-    const driftPct = (currentPct * 100) - targetPct
+    const driftPct = currentPct * 100 - targetPct
     const isBalanced = Math.abs(driftPct) < driftThreshold
 
     return {
@@ -56,8 +63,18 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
       <div className="p-6 bg-white flex flex-col gap-3 overflow-auto">
         {allBalanced && (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-[#F8F9FA] border border-[#E9ECEF] mb-1">
-            <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-4 h-4 text-emerald-500 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <p className="text-xs text-[#6C757D]">资产比例健康，无需调整</p>
           </div>
@@ -85,32 +102,46 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
                     className={`w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold ${item.id === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
                     style={{ backgroundColor: item.def.color }}
                   >
-                    {item.id === "stocks" ? "STK" : item.id === "bonds" ? "BND" : item.id === "commodities" ? "CMD" : "CSH"}
+                    {item.id === "stocks"
+                      ? "STK"
+                      : item.id === "bonds"
+                        ? "BND"
+                        : item.id === "commodities"
+                          ? "CMD"
+                          : "CSH"}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
-                    <p className="text-[11px] text-[#ADB5BD] font-mono">{formatCurrencyByCode(item.currentValue, displayCurrency)}</p>
+                    <p className="text-[11px] text-[#ADB5BD] font-mono">
+                      {formatCurrencyByCode(item.currentValue, displayCurrency)}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   {!item.isBalanced && (
-                    <span className={`text-[11px] font-mono font-medium ${isOver ? getProfitColor(false, colorScheme) : "text-[#1A1A1A]"}`}>
-                      {isOver ? "+" : ""}{item.driftPct.toFixed(1)}%
+                    <span
+                      className={`text-[11px] font-mono font-medium ${isOver ? getProfitColor(false, colorScheme) : "text-[#1A1A1A]"}`}
+                    >
+                      {isOver ? "+" : ""}
+                      {item.driftPct.toFixed(1)}%
                     </span>
                   )}
                   <span
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium tracking-wide
-                      ${item.action === "buy"
-                        ? "bg-[#1A1A1A] text-white"
-                        : item.action === "sell"
-                          ? `bg-white border border-orange-200 ${getProfitColor(false, colorScheme)}`
-                          : "bg-[#F8F9FA] text-[#ADB5BD] border border-[#E9ECEF]"
+                      ${
+                        item.action === "buy"
+                          ? "bg-[#1A1A1A] text-white"
+                          : item.action === "sell"
+                            ? `bg-white border border-orange-200 ${getProfitColor(false, colorScheme)}`
+                            : "bg-[#F8F9FA] text-[#ADB5BD] border border-[#E9ECEF]"
                       }`}
                   >
                     {item.action === "buy" ? "补仓" : item.action === "sell" ? "减仓" : "保持"}
                     {item.action !== "keep" && (
-                      <span className="font-mono">{formatCurrencyByCode(Math.abs(item.difference), displayCurrency)}</span>
+                      <span className="font-mono">
+                        {formatCurrencyByCode(Math.abs(item.difference), displayCurrency)}
+                      </span>
                     )}
                   </span>
                 </div>
@@ -135,9 +166,7 @@ export default function RebalancePanel({ assets, total, driftThreshold, colorSch
                 <span className="text-[10px] text-[#ADB5BD] font-mono">
                   当前 {(item.currentPct * 100).toFixed(1)}%
                 </span>
-                <span className="text-[10px] text-[#6C757D] font-mono">
-                  目标 {item.targetPct}%
-                </span>
+                <span className="text-[10px] text-[#6C757D] font-mono">目标 {item.targetPct}%</span>
               </div>
             </div>
           )

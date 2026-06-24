@@ -140,7 +140,10 @@ export default function UserManager() {
                       创建
                     </button>
                     <button
-                      onClick={() => { setShowAdd(false); setError("") }}
+                      onClick={() => {
+                        setShowAdd(false)
+                        setError("")
+                      }}
                       className="px-4 py-2 text-sm text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
                     >
                       取消

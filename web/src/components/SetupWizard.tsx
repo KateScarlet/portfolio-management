@@ -58,12 +58,8 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           {step === 0 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                  数据库类型
-                </label>
-                <p className="text-xs text-[#6C757D] mb-3">
-                  选择用于存储数据的数据库类型。
-                </p>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">数据库类型</label>
+                <p className="text-xs text-[#6C757D] mb-3">选择用于存储数据的数据库类型。</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setDatabaseType("sqlite")}
@@ -126,9 +122,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                 <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
                   创建管理员账户
                 </label>
-                <p className="text-xs text-[#6C757D] mb-3">
-                  管理员可以管理用户和系统设置。
-                </p>
+                <p className="text-xs text-[#6C757D] mb-3">管理员可以管理用户和系统设置。</p>
                 <div className="space-y-3">
                   <input
                     type="text"
@@ -147,9 +141,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                 </div>
               </div>
 
-              {error && (
-                <p className="text-xs text-red-500">{error}</p>
-              )}
+              {error && <p className="text-xs text-red-500">{error}</p>}
 
               <div className="flex justify-between pt-2">
                 <button

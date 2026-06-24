@@ -11,7 +11,12 @@ interface HistoryPanelProps {
   displayCurrency: string
 }
 
-export default function HistoryPanel({ history, onDeleteRecord, colorScheme, displayCurrency }: HistoryPanelProps) {
+export default function HistoryPanel({
+  history,
+  onDeleteRecord,
+  colorScheme,
+  displayCurrency,
+}: HistoryPanelProps) {
   const [deletingRecord, setDeletingRecord] = useState<PortfolioRecord | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -135,11 +140,20 @@ export default function HistoryPanel({ history, onDeleteRecord, colorScheme, dis
                                     <td className="py-1.5 text-[#6C757D]">{h.name}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.assetId}</td>
                                     <td className="py-1.5 text-right">{h.shares.toFixed(2)}</td>
-                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.price, h.currency || "CNY")}</td>
-                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.value, h.currency || "CNY")}</td>
-                                    <td className="py-1.5 text-right">{formatCurrencyByCode(h.cost, h.currency || "CNY")}</td>
-                                    <td className={`py-1.5 text-right ${getProfitColor(pnl >= 0, colorScheme)}`}>
-                                      {pnl >= 0 ? "+" : ""}{formatCurrencyByCode(pnl, h.currency || "CNY")}
+                                    <td className="py-1.5 text-right">
+                                      {formatCurrencyByCode(h.price, h.currency || "CNY")}
+                                    </td>
+                                    <td className="py-1.5 text-right">
+                                      {formatCurrencyByCode(h.value, h.currency || "CNY")}
+                                    </td>
+                                    <td className="py-1.5 text-right">
+                                      {formatCurrencyByCode(h.cost, h.currency || "CNY")}
+                                    </td>
+                                    <td
+                                      className={`py-1.5 text-right ${getProfitColor(pnl >= 0, colorScheme)}`}
+                                    >
+                                      {pnl >= 0 ? "+" : ""}
+                                      {formatCurrencyByCode(pnl, h.currency || "CNY")}
                                     </td>
                                   </tr>
                                 )

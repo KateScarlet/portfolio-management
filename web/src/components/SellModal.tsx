@@ -78,9 +78,7 @@ export default function SellModal({ portfolioId, holding, onConfirm, onClose }: 
       <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl flex flex-col gap-6">
         <div>
           <h3 className="text-lg font-bold text-[#1A1A1A]">卖出资产</h3>
-          <p className="text-sm text-[#6C757D] mt-1">
-            {holding.name || holding.symbol}
-          </p>
+          <p className="text-sm text-[#6C757D] mt-1">{holding.name || holding.symbol}</p>
         </div>
 
         <div className="space-y-4">
@@ -112,7 +110,7 @@ export default function SellModal({ portfolioId, holding, onConfirm, onClose }: 
           ) : (
             <div className="flex flex-col gap-2">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                  卖出金额 (最多: {formatCurrency(holding.value)})
+                卖出金额 (最多: {formatCurrency(holding.value)})
               </label>
               <input
                 type="number"

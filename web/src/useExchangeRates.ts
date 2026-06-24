@@ -38,7 +38,9 @@ export function useExchangeRates(availableFunds: AvailableFund[]) {
       setExchangeRates((prev) => ({ ...prev, ...rates }))
     })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [availableFunds, showToast])
 
   return exchangeRates

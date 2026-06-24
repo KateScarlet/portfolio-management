@@ -8,10 +8,7 @@ interface AddHoldingFormProps {
   onClose: () => void
 }
 
-export default function AddHoldingForm({
-  onAddHolding,
-  onClose,
-}: AddHoldingFormProps) {
+export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")
   const [market, setMarket] = useState<"US" | "CN" | "HK" | "COMMODITY" | "CRYPTO">("US")
   const [symbol, setSymbol] = useState("")
@@ -53,19 +50,18 @@ export default function AddHoldingForm({
         addedCost = p * s
       } else {
         const c = parseFloat(cost)
-        addedCost = (isNaN(c) || c <= 0 ? val : c)
+        addedCost = isNaN(c) || c <= 0 ? val : c
       }
-      const targetCurrency = market === "US" || market === "CRYPTO" ? "USD"
-        : market === "HK" ? "HKD"
-        : "CNY"
+      const targetCurrency =
+        market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
       try {
         await onAddHolding({
           assetId,
           symbol: "",
           name: name.trim() || "手工资产",
           currency: targetCurrency,
-          shares: manualInputMode === "priceShares" ? (parseFloat(manualShares) || 0) : 0,
-          price: manualInputMode === "priceShares" ? (parseFloat(manualPrice) || 0) : 0,
+          shares: manualInputMode === "priceShares" ? parseFloat(manualShares) || 0 : 0,
+          price: manualInputMode === "priceShares" ? parseFloat(manualPrice) || 0 : 0,
           value: val,
           cost: addedCost,
           fee: feeNum,
@@ -95,9 +91,8 @@ export default function AddHoldingForm({
           const authoritativeSymbol = data.symbol || symbol.toUpperCase()
           let finalCostPrice = isNaN(cPrice) || cPrice <= 0 ? data.price : cPrice
 
-          const targetCurrency = market === "US" || market === "CRYPTO" ? "USD"
-            : market === "HK" ? "HKD"
-            : "CNY"
+          const targetCurrency =
+            market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
 
           if (!isNaN(cPrice) && cPrice > 0 && costCurrency !== targetCurrency) {
             try {
@@ -314,11 +309,7 @@ export default function AddHoldingForm({
               <input
                 type="number"
                 placeholder={
-                  market === "COMMODITY"
-                    ? "如: 50"
-                    : market === "CRYPTO"
-                      ? "如: 0.5"
-                      : "0"
+                  market === "COMMODITY" ? "如: 50" : market === "CRYPTO" ? "如: 0.5" : "0"
                 }
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}

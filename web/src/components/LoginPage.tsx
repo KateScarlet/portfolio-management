@@ -76,9 +76,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#6C757D] mb-1">
-              用户名
-            </label>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">用户名</label>
             <input
               type="text"
               value={username}
@@ -89,9 +87,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#6C757D] mb-1">
-              密码
-            </label>
+            <label className="block text-xs font-medium text-[#6C757D] mb-1">密码</label>
             <input
               type="password"
               value={password}
@@ -100,9 +96,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             />
           </div>
 
-          {error && (
-            <p className="text-xs text-red-500">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500">{error}</p>}
 
           <button
             type="submit"

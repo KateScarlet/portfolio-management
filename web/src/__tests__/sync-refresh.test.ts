@@ -10,8 +10,8 @@ describe("Bug 2: Refresh holdings after price sync completes", () => {
     const prevSyncingRef = { current: true }
 
     const statusTransitioning: { syncing: boolean }[] = [
-      { syncing: true },  // still syncing
-      { syncing: true },  // still syncing
+      { syncing: true }, // still syncing
+      { syncing: true }, // still syncing
       { syncing: false }, // sync completed!
     ]
 
