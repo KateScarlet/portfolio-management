@@ -114,7 +114,7 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if body.Role == "" {
+		if body.Role != "user" && body.Role != "admin" {
 			body.Role = "user"
 		}
 
