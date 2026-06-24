@@ -24,7 +24,7 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 			DatabaseType string `json:"databaseType"`
 			DatabaseDSN  string `json:"databaseDsn"`
 			Username     string `json:"username"`
-			Password     string `json:"password"`
+			Password     string `json:"password"` //nolint:gosec // Request body field
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})

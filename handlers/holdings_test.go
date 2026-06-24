@@ -122,14 +122,14 @@ func TestListHoldings_Unauthorized(t *testing.T) {
 func TestCreateHolding_NewStockHolding(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	body := map[string]any{
-		"assetId":    "stocks",
-		"symbol":     "AAPL",
-		"name":       "Apple",
-		"shares":     10,
-		"price":      150,
-		"costPrice":  140,
-		"cost":       1400,
-		"value":      1500,
+		"assetId":        "stocks",
+		"symbol":         "AAPL",
+		"name":           "Apple",
+		"shares":         10,
+		"price":          150,
+		"costPrice":      140,
+		"cost":           1400,
+		"value":          1500,
 		"deductFromCash": false,
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
@@ -273,16 +273,16 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		AssetId:     "bonds",
-		Name:    "手工债券",
-		Value:   5000,
-		Cost:    5000,
-		Lots:    lots,
+		Name:        "手工债券",
+		Value:       5000,
+		Cost:        5000,
+		Lots:        lots,
 	}
 	db.Create(&h)
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"value": 6000}`))
@@ -311,7 +311,7 @@ func TestUpdateHolding_BlockAssetIdChange(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"assetId": "bonds"}`))
@@ -339,7 +339,7 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)
@@ -371,7 +371,7 @@ func TestUpdateHolding_NotFound(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/nonexistent")
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/nonexistent")
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"name": "new"}`))
@@ -396,7 +396,7 @@ func TestDeleteHolding_Success(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id)
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -422,7 +422,7 @@ func TestDeleteHolding_NotFound(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/nonexistent")
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/nonexistent")
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -446,7 +446,7 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+otherPortfolioID+"/holdings/" + id)
+	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID + "/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   "other-user",

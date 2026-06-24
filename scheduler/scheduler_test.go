@@ -91,7 +91,7 @@ func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 			s.TriggerSyncForPortfolio("concurrent-user", "concurrent-portfolio")
@@ -122,7 +122,7 @@ func TestPriceScheduler_ConcurrentTriggerSyncForPortfolioSync_NoDuplicateStates(
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 			s.TriggerSyncForPortfolioSync("sync-user", "sync-portfolio")
@@ -149,7 +149,7 @@ func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		go func(idx int) {
 			defer wg.Done()
 			s.TriggerSyncForPortfolio("user-"+string(rune('A'+idx%26)), "portfolio-"+string(rune('A'+idx%26)))

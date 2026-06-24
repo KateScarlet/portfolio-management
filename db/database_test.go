@@ -9,8 +9,10 @@ import (
 func TestIsSetupMode_NoConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	if !IsSetupMode() {
 		t.Error("expected setup mode when config file doesn't exist")
@@ -20,11 +22,17 @@ func TestIsSetupMode_NoConfig(t *testing.T) {
 func TestIsSetupMode_WithConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
 	defer os.Chdir(origDir)
 
-	os.MkdirAll("config", 0o750)
-	os.WriteFile("config/config.yaml", []byte("jwtSecret: test"), 0o640)
+	if err := os.MkdirAll("config", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("config/config.yaml", []byte("jwtSecret: test"), 0o640); err != nil {
+		t.Fatal(err)
+	}
 
 	if IsSetupMode() {
 		t.Error("expected non-setup mode when config file exists")
@@ -34,8 +42,10 @@ func TestIsSetupMode_WithConfig(t *testing.T) {
 func TestSaveAndLoadConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	cfg := &Config{
 		JWTSecret: "test-secret-123",
@@ -68,8 +78,10 @@ func TestSaveAndLoadConfig(t *testing.T) {
 func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	cfg := &Config{JWTSecret: "secret"}
 	if err := SaveConfig(cfg); err != nil {
@@ -112,7 +124,7 @@ func TestInit_SQLite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck // test cleanup
 
 	if err := sqlDB.Ping(); err != nil {
 		t.Fatalf("database not reachable: %v", err)
@@ -122,8 +134,10 @@ func TestInit_SQLite(t *testing.T) {
 func TestInit_NilConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	db, err := Init(nil)
 	if err != nil {
@@ -134,7 +148,7 @@ func TestInit_NilConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck // test cleanup
 
 	if err := sqlDB.Ping(); err != nil {
 		t.Fatalf("database not reachable: %v", err)
@@ -142,7 +156,7 @@ func TestInit_NilConfig(t *testing.T) {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
+	return len(s) >= len(substr) && (s == substr || s != "" && containsSubstr(s, substr))
 }
 
 func containsSubstr(s, substr string) bool {

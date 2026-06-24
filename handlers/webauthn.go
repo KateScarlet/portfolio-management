@@ -94,9 +94,9 @@ func (u *webauthnUser) WebAuthnName() string                       { return u.na
 func (u *webauthnUser) WebAuthnDisplayName() string                { return u.displayName }
 func (u *webauthnUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
 
-func loadUserCredentials(db *gorm.DB, userID string) []webauthn.Credential {
+func loadUserCredentials(gormDB *gorm.DB, userID string) []webauthn.Credential {
 	var creds []models.WebAuthnCredential
-	db.Where("user_id = ?", userID).Find(&creds)
+	gormDB.Where("user_id = ?", userID).Find(&creds)
 	result := make([]webauthn.Credential, len(creds))
 	for i := range creds {
 		c := &creds[i]
@@ -105,26 +105,26 @@ func loadUserCredentials(db *gorm.DB, userID string) []webauthn.Credential {
 			PublicKey: c.PublicKey,
 			Flags:     webauthn.CredentialFlagsFromMsgpByte(c.Flags),
 			Authenticator: webauthn.Authenticator{
-				SignCount: uint32(min(c.SignCount, math.MaxUint32)),
+				SignCount: uint32(min(c.SignCount, math.MaxUint32)), //nolint:gosec // G115: min ensures value fits in uint32
 			},
 		}
 	}
 	return result
 }
 
-func loadUserByID(db *gorm.DB, id string) (*models.User, error) {
+func loadUserByID(gormDB *gorm.DB, id string) (*models.User, error) {
 	var user models.User
-	err := db.Where("id = ?", id).First(&user).Error
+	err := gormDB.Where("id = ?", id).First(&user).Error
 	return &user, err
 }
 
-func loadWebAuthnUser(db *gorm.DB, userHandle []byte) (*webauthnUser, error) {
+func loadWebAuthnUser(gormDB *gorm.DB, userHandle []byte) (*webauthnUser, error) {
 	userID := string(userHandle)
-	user, err := loadUserByID(db, userID)
+	user, err := loadUserByID(gormDB, userID)
 	if err != nil {
 		return nil, err
 	}
-	creds := loadUserCredentials(db, user.ID)
+	creds := loadUserCredentials(gormDB, user.ID)
 	return &webauthnUser{
 		id:          []byte(user.ID),
 		name:        user.Username,
@@ -148,7 +148,7 @@ func WebAuthnStatus(cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func WebAuthnRegisterStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
+func WebAuthnRegisterStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		claims := middleware.GetUser(c)
 		if claims == nil {
@@ -167,13 +167,13 @@ func WebAuthnRegisterStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		user, err := loadUserByID(db, claims.UserID)
+		user, err := loadUserByID(gormDB, claims.UserID)
 		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return
 		}
 
-		existingCreds := loadUserCredentials(db, user.ID)
+		existingCreds := loadUserCredentials(gormDB, user.ID)
 		webUser := &webauthnUser{
 			id:          []byte(user.ID),
 			name:        user.Username,
@@ -199,7 +199,7 @@ func WebAuthnRegisterStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		saveSession(db, sessionID, &webauthnRegisterSession{
+		saveSession(gormDB, sessionID, &webauthnRegisterSession{
 			SessionData: sessionData,
 			CredName:    reqBody.Name,
 		})
@@ -222,7 +222,7 @@ func WebAuthnRegisterStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
+func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		claims := middleware.GetUser(c)
 		if claims == nil {
@@ -241,9 +241,9 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话无效"})
 			return
 		}
-		defer deleteSession(db, sessionID)
+		defer deleteSession(gormDB, sessionID)
 
-		sessionRaw := loadSession(db, sessionID)
+		sessionRaw := loadSession(gormDB, sessionID)
 		if sessionRaw == nil {
 			slog.Warn("webauthn register finish: session not found", "sessionID", sessionID)
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话已过期"})
@@ -257,13 +257,13 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		user, err := loadUserByID(db, claims.UserID)
+		user, err := loadUserByID(gormDB, claims.UserID)
 		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return
 		}
 
-		existingCreds := loadUserCredentials(db, user.ID)
+		existingCreds := loadUserCredentials(gormDB, user.ID)
 		webUser := &webauthnUser{
 			id:          []byte(user.ID),
 			name:        user.Username,
@@ -309,7 +309,7 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			LastUsedAt:   time.Now().Unix(),
 		}
 
-		if err := db.Create(&newCred).Error; err != nil {
+		if err := gormDB.Create(&newCred).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存凭证失败"})
 			return
 		}
@@ -319,7 +319,7 @@ func WebAuthnRegisterFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func WebAuthnLoginStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
+func WebAuthnLoginStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
@@ -339,7 +339,7 @@ func WebAuthnLoginStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		sessionID := generateSessionID()
-		saveSession(db, sessionID, sessionData)
+		saveSession(gormDB, sessionID, sessionData)
 		c.SetCookie("webauthn_session", sessionID, 300, "/", "", 2, false, true)
 
 		authOptions := assertion.Response
@@ -353,7 +353,7 @@ func WebAuthnLoginStart(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
+func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		if !cfg.WebAuthn.Enabled || cfg.WebAuthn.RPID == "" {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "WebAuthn未启用"})
@@ -365,9 +365,9 @@ func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话无效"})
 			return
 		}
-		defer deleteSession(db, sessionID)
+		defer deleteSession(gormDB, sessionID)
 
-		sessionRaw := loadSession(db, sessionID)
+		sessionRaw := loadSession(gormDB, sessionID)
 		if sessionRaw == nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "会话已过期"})
 			return
@@ -393,7 +393,7 @@ func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		handler := func(rawID []byte, userHandle []byte) (webauthn.User, error) {
-			return loadWebAuthnUser(db, userHandle)
+			return loadWebAuthnUser(gormDB, userHandle)
 		}
 
 		user, credential, err := w.ValidatePasskeyLogin(handler, *sessionData, parsedAssertion)
@@ -404,15 +404,15 @@ func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		var cred models.WebAuthnCredential
-		if err := db.Where("credential_id = ?", credential.ID).First(&cred).Error; err == nil {
-			db.Model(&cred).Updates(map[string]any{
+		if err := gormDB.Where("credential_id = ?", credential.ID).First(&cred).Error; err == nil {
+			gormDB.Model(&cred).Updates(map[string]any{
 				"sign_count":   credential.Authenticator.SignCount,
 				"last_used_at": time.Now().Unix(),
 			})
 		}
 
 		var dbUser models.User
-		if err := db.Where("id = ?", string(user.WebAuthnID())).First(&dbUser).Error; err != nil {
+		if err := gormDB.Where("id = ?", string(user.WebAuthnID())).First(&dbUser).Error; err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return
 		}
@@ -435,7 +435,7 @@ func WebAuthnLoginFinish(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func WebAuthnListCredentials(db *gorm.DB) app.HandlerFunc {
+func WebAuthnListCredentials(gormDB *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		claims := middleware.GetUser(c)
 		if claims == nil {
@@ -444,7 +444,7 @@ func WebAuthnListCredentials(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var creds []models.WebAuthnCredential
-		db.Where("user_id = ?", claims.UserID).Find(&creds)
+		gormDB.Where("user_id = ?", claims.UserID).Find(&creds)
 
 		result := make([]map[string]any, len(creds))
 		for i := range creds {
@@ -460,7 +460,7 @@ func WebAuthnListCredentials(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func WebAuthnDeleteCredential(db *gorm.DB) app.HandlerFunc {
+func WebAuthnDeleteCredential(gormDB *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		claims := middleware.GetUser(c)
 		if claims == nil {
@@ -469,7 +469,7 @@ func WebAuthnDeleteCredential(db *gorm.DB) app.HandlerFunc {
 		}
 
 		id := c.Param("id")
-		result := db.Where("id = ? AND user_id = ?", id, claims.UserID).Delete(&models.WebAuthnCredential{})
+		result := gormDB.Where("id = ? AND user_id = ?", id, claims.UserID).Delete(&models.WebAuthnCredential{})
 		if result.Error != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
 			return

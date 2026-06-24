@@ -69,13 +69,13 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		AssetId:     "stocks",
-		Symbol:  "TEST",
-		Name:    "Test Stock",
-		Shares:  shares,
-		Price:   price,
-		Value:   shares * price,
-		Cost:    cost,
-		Lots:    lots,
+		Symbol:      "TEST",
+		Name:        "Test Stock",
+		Shares:      shares,
+		Price:       price,
+		Value:       shares * price,
+		Cost:        cost,
+		Lots:        lots,
 	}
 	if shares > 0 {
 		h.CostPrice = cost / shares
@@ -89,7 +89,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 func newCtx(id string, body any) *app.RequestContext {
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/"+testPortfolioID+"/holdings/" + id + "/sell")
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id + "/sell")
 	c.Request.Header.SetMethod("POST")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)

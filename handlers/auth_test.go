@@ -67,7 +67,9 @@ func TestRegister_Success(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.Unmarshal(c.Response.Body(), &resp)
+	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["username"] != "newuser" {
 		t.Errorf("expected username 'newuser', got %v", resp["username"])
 	}
@@ -140,7 +142,9 @@ func TestLogin_Success(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.Unmarshal(c.Response.Body(), &resp)
+	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	user, ok := resp["user"].(map[string]any)
 	if !ok {
 		t.Fatal("expected user in response")
@@ -218,7 +222,9 @@ func TestMe_Authenticated(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.Unmarshal(c.Response.Body(), &resp)
+	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["username"] != "meuser" {
 		t.Errorf("expected 'meuser', got %v", resp["username"])
 	}

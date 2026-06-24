@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"portfolio-management/db"
 	"portfolio-management/models"
 	"time"
@@ -54,7 +55,7 @@ func OIDCLogin(cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
+func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		if !cfg.OIDC.Enabled {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "SSO未启用"})
@@ -133,8 +134,8 @@ func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		var user models.User
-		err = db.Where("sso_provider = ? AND sso_id = ?", "oidc", sub).First(&user).Error
-		if err == gorm.ErrRecordNotFound {
+		err = gormDB.Where("sso_provider = ? AND sso_id = ?", "oidc", sub).First(&user).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			user = models.User{
 				ID:          uuid.New().String(),
 				Username:    username,
@@ -144,7 +145,7 @@ func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				SSOId:       sub,
 				CreatedAt:   time.Now().Unix(),
 			}
-			if err := db.Create(&user).Error; err != nil {
+			if err := gormDB.Create(&user).Error; err != nil {
 				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败: " + err.Error()})
 				return
 			}
@@ -152,7 +153,7 @@ func OIDCCallback(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询用户失败"})
 			return
 		} else if user.Username != username {
-			db.Model(&user).Update("username", username)
+			gormDB.Model(&user).Update("username", username)
 			user.Username = username
 		}
 
@@ -191,7 +192,7 @@ func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 			Enabled      *bool  `json:"enabled"`
 			Issuer       string `json:"issuer"`
 			ClientID     string `json:"clientID"`
-			ClientSecret string `json:"clientSecret"`
+			ClientSecret string `json:"clientSecret"` //nolint:gosec // Request body field
 			RedirectURL  string `json:"redirectURL"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {

@@ -21,7 +21,7 @@ func Login(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Username string `json:"username"`
-			Password string `json:"password"`
+			Password string `json:"password"` //nolint:gosec // Request body field
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -94,7 +94,7 @@ func Register(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Username string `json:"username"`
-			Password string `json:"password"`
+			Password string `json:"password"` //nolint:gosec // Request body field
 			Role     string `json:"role"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {

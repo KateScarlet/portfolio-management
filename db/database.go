@@ -3,6 +3,7 @@ package db
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"os"
 	"portfolio-management/models"
@@ -18,7 +19,7 @@ const ConfigDir = "config"
 const ConfigFile = "config/config.yaml"
 
 type Config struct {
-	JWTSecret string `mapstructure:"jwtSecret"`
+	JWTSecret string `mapstructure:"jwtSecret"` //nolint:gosec // Config field, not exposed
 	Database  struct {
 		Type string `mapstructure:"type"`
 		DSN  string `mapstructure:"dsn"`
@@ -27,7 +28,7 @@ type Config struct {
 		Enabled      bool   `mapstructure:"enabled"`
 		Issuer       string `mapstructure:"issuer"`
 		ClientID     string `mapstructure:"clientID"`
-		ClientSecret string `mapstructure:"clientSecret"`
+		ClientSecret string `mapstructure:"clientSecret"` //nolint:gosec // Config field, not exposed
 		RedirectURL  string `mapstructure:"redirectURL"`
 	} `mapstructure:"oidc"`
 	WebAuthn struct {
@@ -47,7 +48,8 @@ func LoadConfig() *Config {
 	v.SetDefault("database.dsn", "portfolio.db")
 
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
 			if os.IsNotExist(err) {
 				return &Config{}
 			}

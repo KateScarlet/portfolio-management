@@ -11,17 +11,17 @@ import (
 )
 
 type PortfolioSummaryItem struct {
-	ID        string                      `json:"id"`
-	Name      string                      `json:"name"`
-	Total     float64                     `json:"total"`
-	Principal float64                     `json:"principal"`
-	Assets    models.AssetMapColumn       `json:"assets"`
+	ID        string                `json:"id"`
+	Name      string                `json:"name"`
+	Total     float64               `json:"total"`
+	Principal float64               `json:"principal"`
+	Assets    models.AssetMapColumn `json:"assets"`
 }
 
 type SummaryResponse struct {
-	Total      float64               `json:"total"`
-	Principal  float64               `json:"principal"`
-	Assets     models.AssetMapColumn `json:"assets"`
+	Total      float64                `json:"total"`
+	Principal  float64                `json:"principal"`
+	Assets     models.AssetMapColumn  `json:"assets"`
 	Portfolios []PortfolioSummaryItem `json:"portfolios"`
 }
 
