@@ -17,6 +17,7 @@ var (
 	shTagRe  = regexp.MustCompile(`^SH\d{6}$`)
 	szTagRe  = regexp.MustCompile(`^SZ\d{6}$`)
 	hkTagRe  = regexp.MustCompile(`^HK\d{4,5}$`)
+	hkCodeRe = regexp.MustCompile(`^\d{4,5}$`)
 
 	rateCache   sync.Map
 	quoteCache  sync.Map
@@ -132,7 +133,7 @@ func ConvertSymbol(symbol string) string {
 		return s[2:] + ".HK"
 	}
 	// HK stocks: 4-5 digit codes without prefix
-	if matched, _ := regexp.MatchString(`^\d{4,5}$`, s); matched {
+	if hkCodeRe.MatchString(s) {
 		return s + ".HK"
 	}
 	return s
