@@ -38,11 +38,10 @@ dev-go:
 dev-frontend:
     cd {{frontend_dir}} && pnpm dev
 
-# 清理构建产物 + database
+# 清理构建产物
 clean:
     rm -f {{go_binary}}
     rm -rf {{dist_dir}}
-    rm -f portfolio.db
 
 # 整理 Go 依赖
 tidy:
