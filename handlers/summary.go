@@ -4,6 +4,7 @@ import (
 	"context"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"portfolio-management/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -68,13 +69,34 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 				total += holdings[i].Value
 			}
 
+			var fundsTotal float64
+			var funds []models.AvailableFund
+			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, p.ID).Find(&funds).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+			for _, f := range funds {
+				amt := f.Amount
+				if f.Currency != displayCurrency && f.Currency != "" {
+					pair := f.Currency + displayCurrency
+					rate, err := yahoo.FetchExchangeRate(pair)
+					if err != nil {
+						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+						return
+					}
+					amt *= rate
+				}
+				fundsTotal += amt
+			}
+
 			principal, err := CalcPrincipal(db, p.ID, displayCurrency)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
 
-			summary.Total += total
+			portfolioTotal := total + fundsTotal
+			summary.Total += portfolioTotal
 			summary.Principal += principal
 			for k, v := range assets {
 				summary.Assets[k] += v
@@ -83,7 +105,7 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 			summary.Portfolios = append(summary.Portfolios, PortfolioSummaryItem{
 				ID:        p.ID,
 				Name:      p.Name,
-				Total:     total,
+				Total:     portfolioTotal,
 				Principal: principal,
 				Assets:    assets,
 			})
