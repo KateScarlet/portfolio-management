@@ -20,7 +20,9 @@ func GetPrice() app.HandlerFunc {
 
 		var result any
 		var err error
-		if eastmoney.IsFuturesSymbol(symbol) {
+		if eastmoney.IsFundCode(symbol) {
+			result, err = eastmoney.FetchFundQuote(symbol)
+		} else if eastmoney.IsFuturesSymbol(symbol) {
 			result, err = eastmoney.FetchQuote(symbol)
 		} else {
 			result, err = yahoo.FetchQuote(symbol)

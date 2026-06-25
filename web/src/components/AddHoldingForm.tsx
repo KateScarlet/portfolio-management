@@ -10,7 +10,7 @@ interface AddHoldingFormProps {
 
 export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")
-  const [market, setMarket] = useState<"US" | "CN" | "HK" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO">("US")
+  const [market, setMarket] = useState<"US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO">("US")
   const [symbol, setSymbol] = useState("")
   const [name, setName] = useState("")
   const [shares, setShares] = useState("")
@@ -201,7 +201,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
               <select
                 value={market}
                 onChange={(e) => {
-                  const m = e.target.value as "US" | "CN" | "HK" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
+                  const m = e.target.value as "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
                   setMarket(m)
                   setSymbol("")
                   if (m === "US" || m === "CRYPTO" || m === "COMMODITY_INTL") setCostCurrency("USD")
@@ -213,6 +213,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
                 <option value="US">美股</option>
                 <option value="CN">A股</option>
                 <option value="HK">港股</option>
+                <option value="FUND">场外基金</option>
                 <option value="COMMODITY_CN">商品 (国内)</option>
                 <option value="COMMODITY_INTL">商品 (国际)</option>
                 <option value="CRYPTO">加密货币</option>
@@ -269,7 +270,9 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
                       ? "如 VTI, SPY"
                       : market === "CN"
                         ? "如 510300, 600519"
-                        : "如 2800, 9988"
+                        : market === "FUND"
+                          ? "如 110011, 161725"
+                          : "如 2800, 9988"
                   }
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}

@@ -1,9 +1,11 @@
 package eastmoney
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +17,8 @@ var (
 	client      *resty.Client
 	quoteCache  sync.Map
 	cacheExpiry = 5 * time.Minute
+
+	fundCodeRe = regexp.MustCompile(`^\d{6}$`)
 
 	symbolMarket = map[string]int{
 		"au9999": 118,
@@ -141,5 +145,76 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 
 	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
 	setCachedQuote(lower, result)
+	return result, nil
+}
+
+func IsFundCode(code string) bool {
+	return fundCodeRe.MatchString(code)
+}
+
+type fundGZResponse struct {
+	FundCode string `json:"fundcode"`
+	Name     string `json:"name"`
+	JZRQ     string `json:"jzrq"`
+	DWJZ     string `json:"dwjz"`
+	GSZ      string `json:"gsz"`
+	GSZSZL   string `json:"gszzl"`
+	GZTime   string `json:"gztime"`
+}
+
+var jsonpRe = regexp.MustCompile(`^jsonpgz\((.*)\);$`)
+
+func FetchFundQuote(code string) (*PriceResult, error) {
+	if client == nil {
+		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
+	}
+
+	cacheKey := "fund:" + code
+	if cached, ok := getCachedQuote(cacheKey); ok {
+		slog.Info("eastmoney fund price fetched from cache", "code", code)
+		return cached, nil
+	}
+
+	r, err := client.R().
+		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", code))
+	if err != nil {
+		return nil, fmt.Errorf("eastmoney fund request failed: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("eastmoney fund returned status %d", r.StatusCode())
+	}
+
+	body := strings.TrimSpace(r.String())
+	m := jsonpRe.FindStringSubmatch(body)
+	if len(m) < 2 {
+		return nil, fmt.Errorf("unexpected fund response format for %s: %s", code, body[:min(len(body), 200)])
+	}
+
+	var resp fundGZResponse
+	if err := json.Unmarshal([]byte(m[1]), &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse fund response for %s: %w", code, err)
+	}
+
+	var price float64
+	if resp.GSZ != "" {
+		fmt.Sscanf(resp.GSZ, "%f", &price)
+	} else if resp.DWJZ != "" {
+		fmt.Sscanf(resp.DWJZ, "%f", &price)
+	}
+	if price == 0 {
+		return nil, fmt.Errorf("no price for fund %s", code)
+	}
+
+	result := &PriceResult{
+		Symbol:           resp.FundCode,
+		Name:             resp.Name,
+		Price:            price,
+		OriginalPrice:    price,
+		Currency:         "CNY",
+		OriginalCurrency: "CNY",
+	}
+
+	slog.Info("eastmoney fund price fetched from API", "code", code, "price", price)
+	setCachedQuote(cacheKey, result)
 	return result, nil
 }
