@@ -333,15 +333,34 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 		"cash":        0,
 		"commodities": 0,
 	}
-	var total, totalCost, totalBuyFees float64
+	var total float64
 	for i := range holdings {
 		h := &holdings[i]
 		assets[h.AssetId] += h.Value
 		total += h.Value
-		totalCost += h.Cost
-		totalBuyFees += h.BuyFees()
 	}
-	principal := totalCost + totalBuyFees
+
+	var txs []models.FundTransaction
+	_ = n.db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}).Find(&txs).Error
+	byCurrency := make(map[string]float64)
+	for _, tx := range txs {
+		if tx.Type == "transfer_in" {
+			byCurrency[tx.Currency] += tx.Amount
+		} else {
+			byCurrency[tx.Currency] -= tx.Amount
+		}
+	}
+	var principal float64
+	for currency, amount := range byCurrency {
+		if currency == "CNY" || amount == 0 {
+			principal += amount
+			continue
+		}
+		rate, err := yahoo.FetchExchangeRate(currency + "CNY")
+		if err == nil {
+			principal += amount * rate
+		}
+	}
 
 	assetNames := map[string]string{
 		"stocks":      "股票",

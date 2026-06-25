@@ -86,15 +86,13 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 			_ = db.Where("user_id = ?", user.UserID).Find(&holdings).Error
 
 			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
-			var total, totalCost, totalBuyFees float64
+			var total float64
 			for i := range holdings {
 				h := &holdings[i]
 				assets[h.AssetId] += h.Value
 				total += h.Value
-				totalCost += h.Cost
-				totalBuyFees += h.BuyFees()
 			}
-			principal := totalCost + totalBuyFees
+			principal, _ := CalcPrincipalByUser(db, user.UserID, "CNY")
 
 			assetNames := map[string]string{
 				"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品",

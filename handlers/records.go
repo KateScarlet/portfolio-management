@@ -65,12 +65,11 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 		}
 
 		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
-		var total, principal float64
+		var total float64
 		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
 		for i := range holdings {
 			assets[holdings[i].AssetId] += holdings[i].Value
 			total += holdings[i].Value
-			principal += holdings[i].Cost + holdings[i].BuyFees()
 
 			if holdings[i].Value > 0 {
 				snapshotHoldings = append(snapshotHoldings, models.HoldingSnapshot{
@@ -89,6 +88,12 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 
 		if total == 0 {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "No data to record"})
+			return
+		}
+
+		principal, err := CalcPrincipal(db, portfolioID, displayCurrency)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 

@@ -16,6 +16,7 @@ interface HoldingsManagerProps {
   onRemoveHolding: (id: string) => void
   onSaveRecord: () => void
   colorScheme: ColorScheme
+  displayCurrency: string
   onRefreshAvailableFunds: () => Promise<void>
   onSyncComplete: (status: { lastSyncAt: string; lastSyncErr?: string; syncing: boolean }) => void
 }
@@ -30,6 +31,7 @@ export default function HoldingsManager({
   onRemoveHolding,
   onSaveRecord,
   colorScheme,
+  displayCurrency,
   onRefreshAvailableFunds,
   onSyncComplete,
 }: HoldingsManagerProps) {
@@ -583,6 +585,7 @@ export default function HoldingsManager({
         <SellModal
           portfolioId={portfolioId}
           holding={sellingHolding}
+          displayCurrency={displayCurrency}
           onConfirm={handleSellConfirm}
           onClose={() => setSellingHolding(null)}
         />

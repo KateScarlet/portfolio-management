@@ -11,6 +11,7 @@ import {
   ColorScheme,
   Holding,
   AvailableFund,
+  FundTransaction,
 } from "./types"
 import * as api from "./api"
 import Dashboard from "./components/Dashboard"
@@ -37,7 +38,8 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [availableFunds, setAvailableFunds] = useState<AvailableFund[]>([])
-  const exchangeRates = useExchangeRates(availableFunds)
+  const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([])
+  const exchangeRates = useExchangeRates(availableFunds, settings.displayCurrency)
 
   const {
     holdings,
@@ -52,7 +54,7 @@ export default function App() {
     deleteRecord,
   } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency)
 
-  const totalFundsCNY = availableFunds.reduce((sum, f) => {
+  const totalFundsDisplay = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
     return rate ? sum + f.amount * rate : sum
   }, 0)
@@ -156,6 +158,7 @@ export default function App() {
       })
       .catch(console.error)
     api.fetchAvailableFunds(currentPortfolio.id).then(setAvailableFunds).catch(console.error)
+    api.fetchFundTransactions(currentPortfolio.id).then(setFundTransactions).catch(console.error)
     api.fetchSyncStatus(currentPortfolio.id).then(setSyncStatus).catch(console.error)
   }, [currentPortfolio])
 
@@ -224,8 +227,12 @@ export default function App() {
   const handleRefreshAvailableFunds = useCallback(async () => {
     if (!currentPortfolio) return
     try {
-      const funds = await api.fetchAvailableFunds(currentPortfolio.id)
+      const [funds, txs] = await Promise.all([
+        api.fetchAvailableFunds(currentPortfolio.id),
+        api.fetchFundTransactions(currentPortfolio.id),
+      ])
       setAvailableFunds(funds)
+      setFundTransactions(txs)
     } catch (e) {
       console.error("Failed to refresh available funds", e)
     }
@@ -313,19 +320,30 @@ export default function App() {
     )
   }
 
-  const total = Object.values(assets).reduce((sum, val) => sum + val, 0) + totalFundsCNY
+  const total = Object.values(assets).reduce((sum, val) => sum + val, 0) + totalFundsDisplay
   const totalAssets = Object.values(assets).reduce((sum, val) => sum + val, 0)
-  const totalCost = holdings.reduce((sum, h) => sum + (h.cost || 0), 0)
   const totalFees = holdings.reduce(
     (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
     0
   )
-  const totalBuyFees = holdings.reduce(
-    (sum, h) =>
-      sum + (h.lots || []).reduce((ls, l) => ls + (l.type !== "sell" ? l.fee || 0 : 0), 0),
-    0
-  )
-  const principal = totalCost + totalBuyFees
+
+  const byCurrency: Record<string, number> = {}
+  for (const tx of fundTransactions) {
+    if (tx.type === "transfer_in") {
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || 0) + tx.amount
+    } else if (tx.type === "transfer_out") {
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || 0) - tx.amount
+    }
+  }
+  let principal = 0
+  for (const [currency, amount] of Object.entries(byCurrency)) {
+    if (currency === settings.displayCurrency || amount === 0) {
+      principal += amount
+    } else {
+      const rate = exchangeRates[currency]
+      if (rate) principal += amount * rate
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">
@@ -422,6 +440,7 @@ export default function App() {
             onRemoveHolding={removeHolding}
             onSaveRecord={saveRecord}
             colorScheme={settings.colorScheme}
+            displayCurrency={settings.displayCurrency}
             onRefreshAvailableFunds={handleRefreshAvailableFunds}
             onSyncComplete={handleSyncComplete}
           />
@@ -445,6 +464,7 @@ export default function App() {
         <SummaryDashboard
           summary={summary}
           colorScheme={settings.colorScheme}
+          displayCurrency={settings.displayCurrency}
           onClose={() => setShowSummary(false)}
         />
       )}

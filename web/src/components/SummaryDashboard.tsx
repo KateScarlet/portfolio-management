@@ -1,12 +1,14 @@
 import { PortfolioSummary, ASSET_DEFINITIONS, AssetId, ColorScheme } from "../types"
+import { formatCurrencyByCode } from "../utils"
 
 interface Props {
   summary: PortfolioSummary | null
   colorScheme: ColorScheme
+  displayCurrency: string
   onClose: () => void
 }
 
-export default function SummaryDashboard({ summary, colorScheme, onClose }: Props) {
+export default function SummaryDashboard({ summary, colorScheme, displayCurrency, onClose }: Props) {
   if (!summary) return null
 
   const greenUp = colorScheme === "green-up"
@@ -42,21 +44,13 @@ export default function SummaryDashboard({ summary, colorScheme, onClose }: Prop
           <div>
             <p className="text-xs text-[#6C757D]">总资产</p>
             <p className="text-lg font-semibold">
-              ¥
-              {summary.total.toLocaleString("zh-CN", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
+              {formatCurrencyByCode(summary.total, displayCurrency)}
             </p>
           </div>
           <div>
             <p className="text-xs text-[#6C757D]">总投入</p>
             <p className="text-lg font-semibold">
-              ¥
-              {summary.principal.toLocaleString("zh-CN", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
+              {formatCurrencyByCode(summary.principal, displayCurrency)}
             </p>
           </div>
           <div>
@@ -88,7 +82,7 @@ export default function SummaryDashboard({ summary, colorScheme, onClose }: Prop
                 </div>
                 <span className="w-12 text-right text-xs">{pct.toFixed(1)}%</span>
                 <span className="w-20 text-right text-xs text-[#6C757D]">
-                  ¥{val.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}
+                  {formatCurrencyByCode(val, displayCurrency)}
                 </span>
               </div>
             )
@@ -104,12 +98,12 @@ export default function SummaryDashboard({ summary, colorScheme, onClose }: Prop
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{p.name}</span>
                   <span className="text-sm">
-                    ¥{p.total.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}
+                    {formatCurrencyByCode(p.total, displayCurrency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-xs text-[#6C757D]">
-                    投入 ¥{p.principal.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}
+                    投入 {formatCurrencyByCode(p.principal, displayCurrency)}
                   </span>
                   <span className={`text-xs ${pnlColor(pPnl)}`}>
                     {pPnl > 0 ? "+" : ""}

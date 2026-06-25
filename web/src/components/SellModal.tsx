@@ -1,17 +1,18 @@
 import { useState } from "react"
 import { Holding } from "../types"
-import { formatCurrency } from "../utils"
+import { formatCurrencyByCode } from "../utils"
 import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface SellModalProps {
   portfolioId: string
   holding: Holding
+  displayCurrency: string
   onConfirm: (soldHolding: Holding) => void
   onClose: () => void
 }
 
-export default function SellModal({ portfolioId, holding, onConfirm, onClose }: SellModalProps) {
+export default function SellModal({ portfolioId, holding, displayCurrency, onConfirm, onClose }: SellModalProps) {
   const [sellShares, setSellShares] = useState(
     holding.shares && holding.shares > 0 ? holding.shares.toString() : ""
   )
@@ -58,7 +59,7 @@ export default function SellModal({ portfolioId, holding, onConfirm, onClose }: 
         return
       }
       if (sValue > holding.value) {
-        showToast(`卖出金额不能超过持有值 ${formatCurrency(holding.value)}`, "error")
+        showToast(`卖出金额不能超过持有值 ${formatCurrencyByCode(holding.value, displayCurrency)}`, "error")
         return
       }
 
@@ -110,7 +111,7 @@ export default function SellModal({ portfolioId, holding, onConfirm, onClose }: 
           ) : (
             <div className="flex flex-col gap-2">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                卖出金额 (最多: {formatCurrency(holding.value)})
+                卖出金额 (最多: {formatCurrencyByCode(holding.value, displayCurrency)})
               </label>
               <input
                 type="number"

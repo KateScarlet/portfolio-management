@@ -6,6 +6,7 @@ import (
 	"math"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"portfolio-management/yahoo"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -13,6 +14,44 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string) (float64, error) {
+	return calcPrincipalByQuery(db, db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency)
+}
+
+func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string) (float64, error) {
+	return calcPrincipalByQuery(db, db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency)
+}
+
+func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string) (float64, error) {
+	var txs []models.FundTransaction
+	if err := query.Find(&txs).Error; err != nil {
+		return 0, err
+	}
+
+	byCurrency := make(map[string]float64)
+	for _, tx := range txs {
+		if tx.Type == "transfer_in" {
+			byCurrency[tx.Currency] += tx.Amount
+		} else {
+			byCurrency[tx.Currency] -= tx.Amount
+		}
+	}
+
+	var total float64
+	for currency, amount := range byCurrency {
+		if currency == targetCurrency || amount == 0 {
+			total += amount
+			continue
+		}
+		rate, err := yahoo.FetchExchangeRate(currency + targetCurrency)
+		if err != nil {
+			return 0, fmt.Errorf("获取 %s 汇率失败: %w", currency+targetCurrency, err)
+		}
+		total += amount * rate
+	}
+	return total, nil
+}
 
 func ListFundTransactions(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {

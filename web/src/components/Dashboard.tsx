@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
-import { formatCurrency, formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
 import FundOperationDialog from "./FundOperationDialog"
 
 type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
@@ -53,11 +53,11 @@ export default function Dashboard({
     })
     .filter((item) => item.value > 0)
 
-  const profit = totalAssets - principal
+  const profit = total - principal
   const returnRate = principal > 0 ? profit / principal : 0
   const isPositive = profit >= 0
 
-  const totalCNY = availableFunds.reduce((sum, f) => {
+  const totalFunds = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
     return rate ? sum + f.amount * rate : sum
   }, 0)
@@ -192,7 +192,7 @@ export default function Dashboard({
             className="text-sm font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
             title="点击查看详情"
           >
-            {formatCurrency(totalCNY)}
+            {formatCurrencyByCode(totalFunds, displayCurrency)}
             <span className="text-[10px] ml-1 text-[#ADB5BD]">{showDetails ? "▲" : "▼"}</span>
           </button>
         </div>
@@ -200,64 +200,53 @@ export default function Dashboard({
         {showDetails && (
           <div className="mt-3 space-y-2">
             {availableFunds.map((f) => (
-              <div key={f.currency} className="flex items-center justify-between pl-2">
-                <span className="text-xs text-[#6C757D]">{f.currency}</span>
-                <div className="flex items-center gap-2">
+              <div key={f.currency} className="pl-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#6C757D]">{f.currency}</span>
                   <span className="text-xs font-mono text-[#1A1A1A]">
                     {formatCurrencyByCode(f.amount, f.currency)}
                   </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() =>
-                        setFundOperation({ type: "transfer_in", currency: f.currency })
-                      }
-                      className="text-[10px] text-green-600 hover:text-green-800 transition-colors"
-                      title="转入"
-                    >
-                      转入
-                    </button>
-                    <button
-                      onClick={() =>
-                        setFundOperation({ type: "transfer_out", currency: f.currency })
-                      }
-                      className="text-[10px] text-red-600 hover:text-red-800 transition-colors"
-                      title="转出"
-                    >
-                      转出
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
 
             {availableFunds.length === 0 && (
-              <div className="flex items-center justify-between pl-2">
+              <div className="pl-2">
                 <span className="text-xs text-[#6C757D]">暂无可用资金</span>
-                <button
-                  onClick={() => setFundOperation({ type: "transfer_in", currency: "CNY" })}
-                  className="text-[10px] text-green-600 hover:text-green-800 transition-colors"
-                >
-                  转入
-                </button>
               </div>
             )}
 
-            <div className="flex gap-2 pl-2 pt-2 border-t border-[#F1F3F5]">
-              <button
-                onClick={() => setFundOperation({ type: "transfer" })}
-                className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
-              >
-                划转
-              </button>
-              <button
-                onClick={() => setFundOperation({ type: "convert" })}
-                className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
-              >
-                货币转换
-              </button>
-            </div>
           </div>
         )}
+
+        <div className="flex gap-2 mt-2 justify-end">
+          <button
+            onClick={() => setFundOperation({ type: "transfer_in" })}
+            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+            title="转入"
+          >
+            转入
+          </button>
+          <button
+            onClick={() => setFundOperation({ type: "transfer_out" })}
+            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+            title="转出"
+          >
+            转出
+          </button>
+          <button
+            onClick={() => setFundOperation({ type: "transfer" })}
+            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+          >
+            划转
+          </button>
+          <button
+            onClick={() => setFundOperation({ type: "convert" })}
+            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+          >
+            货币转换
+          </button>
+        </div>
       </div>
 
       {fundOperation && (

@@ -62,11 +62,16 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 			}
 
 			assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
-			var total, principal float64
+			var total float64
 			for i := range holdings {
 				assets[holdings[i].AssetId] += holdings[i].Value
 				total += holdings[i].Value
-				principal += holdings[i].Cost + holdings[i].BuyFees()
+			}
+
+			principal, err := CalcPrincipal(db, p.ID, displayCurrency)
+			if err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
 			}
 
 			summary.Total += total
