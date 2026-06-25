@@ -134,7 +134,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   driftThreshold: 5,
-  syncInterval: 60,
+  syncInterval: 30,
   colorScheme: "green-up",
   displayCurrency: "CNY",
   targetStocks: 25,

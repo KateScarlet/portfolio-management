@@ -11,6 +11,7 @@ interface SettingsPanelProps {
 
 const SYNC_PRESETS = [
   { value: 0, label: "关闭" },
+  { value: 10, label: "10分钟" },
   { value: 30, label: "30分钟" },
   { value: 60, label: "1小时" },
   { value: 120, label: "2小时" },
