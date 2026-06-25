@@ -118,7 +118,7 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		SetQueryParam("secid", fmt.Sprintf("%d.%s", market, lower)).
 		SetQueryParam("fields", "f43,f57,f58,f59").
 		SetResult(&resp).
-		Get("https://push2.eastmoney.com/api/qt/stock/get")
+		Get("http://push2.eastmoney.com/api/qt/stock/get")
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney request failed: %w", err)
 	}
@@ -181,7 +181,7 @@ func FetchAShareQuote(symbol string) (*PriceResult, error) {
 		SetQueryParam("secid", secid).
 		SetQueryParam("fields", "f43,f57,f58,f59").
 		SetResult(&resp).
-		Get("https://push2.eastmoney.com/api/qt/stock/get")
+		Get("http://push2.eastmoney.com/api/qt/stock/get")
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney A-share request failed: %w", err)
 	}
