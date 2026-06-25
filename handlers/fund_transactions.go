@@ -269,14 +269,15 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			return tx.Create(&models.FundTransaction{
-				ID:          uuid.New().String(),
-				UserID:      user.UserID,
-				PortfolioID: body.TargetPortfolioID,
-				Type:        "transfer_in",
-				Amount:      body.Amount,
-				Currency:    body.Currency,
-				Note:        "从其他组合划转转入",
-				CreatedAt:   now,
+				ID:                uuid.New().String(),
+				UserID:            user.UserID,
+				PortfolioID:       body.TargetPortfolioID,
+				Type:              "transfer_in",
+				Amount:            body.Amount,
+				Currency:          body.Currency,
+				TargetPortfolioID: portfolioID,
+				Note:              "从其他组合划转转入",
+				CreatedAt:         now,
 			}).Error
 		})
 		if err != nil {
