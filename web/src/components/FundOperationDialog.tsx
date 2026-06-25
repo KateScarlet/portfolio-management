@@ -2,6 +2,7 @@ import { useState, useCallback } from "react"
 import { Portfolio } from "../types"
 import * as api from "../api"
 import { useToast } from "./toast-context"
+import { ArrowLeftRight } from "lucide-react"
 
 type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
 
@@ -97,6 +98,17 @@ export default function FundOperationDialog({
     }
   }
 
+  const handleSwap = () => {
+    setCurrency(toCurrency)
+    setToCurrency(currency)
+    setAmount(toAmount)
+    setToAmount(amount)
+    const rate = parseFloat(exchangeRate)
+    if (!isNaN(rate) && rate > 0) {
+      setExchangeRate((1 / rate).toFixed(4))
+    }
+  }
+
   const handleSubmit = async () => {
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) {
@@ -170,7 +182,7 @@ export default function FundOperationDialog({
         <div className="p-5 flex flex-col gap-4">
           {type === "convert" ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                     源币种
@@ -187,6 +199,14 @@ export default function FundOperationDialog({
                     ))}
                   </select>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleSwap}
+                  className="mb-0.5 p-1.5 rounded-lg text-[#ADB5BD] hover:text-[#1A1A1A] hover:bg-[#F8F9FA] transition-colors"
+                  title="互换币种"
+                >
+                  <ArrowLeftRight size={16} />
+                </button>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                     目标币种
