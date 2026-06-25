@@ -75,6 +75,7 @@ export interface Holding {
   assetId: AssetId
   symbol: string // empty if manual value
   name?: string
+  market?: string // e.g. "US", "CN", "HK", "FUND", "COMMODITY_CN", "COMMODITY_INTL", "CRYPTO"
   currency: string
   shares: number
   price: number

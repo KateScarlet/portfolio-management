@@ -18,17 +18,24 @@ func GetPrice() app.HandlerFunc {
 			return
 		}
 
+		market := c.Query("market")
+
 		var result any
 		var err error
-		if eastmoney.IsFundCode(symbol) {
+		switch market {
+		case "FUND":
 			result, err = eastmoney.FetchFundQuote(symbol)
-		} else if eastmoney.IsFuturesSymbol(symbol) {
-			result, err = eastmoney.FetchQuote(symbol)
-		} else {
-			result, err = yahoo.FetchQuote(symbol)
+		case "CN":
+			result, err = eastmoney.FetchAShareQuote(symbol)
+		default:
+			if eastmoney.IsFuturesSymbol(symbol) {
+				result, err = eastmoney.FetchQuote(symbol)
+			} else {
+				result, err = yahoo.FetchQuote(symbol)
+			}
 		}
 		if err != nil {
-			slog.Error("failed to fetch quote", "symbol", symbol, "error", err)
+			slog.Error("failed to fetch quote", "symbol", symbol, "market", market, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}

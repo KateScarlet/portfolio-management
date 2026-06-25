@@ -86,6 +86,7 @@ type Holding struct {
 	AssetId     string     `gorm:"size:20;not null" json:"assetId"`
 	Symbol      string     `gorm:"size:20;default:''" json:"symbol"`
 	Name        string     `gorm:"size:200;default:''" json:"name,omitempty"`
+	Market      string     `gorm:"size:20;default:''" json:"market,omitempty"`
 	Currency    string     `gorm:"size:10;default:'CNY'" json:"currency"`
 	Shares      float64    `gorm:"default:0" json:"shares"`
 	Price       float64    `gorm:"default:0" json:"price"`

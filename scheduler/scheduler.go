@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
+	"portfolio-management/eastmoney"
 	"portfolio-management/models"
 	"portfolio-management/yahoo"
 	"strconv"
@@ -196,8 +197,29 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 				<-sem
 				wg.Done()
 			}()
-			result, err := yahoo.FetchQuote(h.Symbol)
-			results <- syncResult{holding: h, result: result, err: err}
+			var result *yahoo.PriceResult
+			var err error
+			switch h.Market {
+			case "FUND":
+				var r *eastmoney.PriceResult
+				r, err = eastmoney.FetchFundQuote(h.Symbol)
+				if err == nil {
+					result = &yahoo.PriceResult{Symbol: r.Symbol, Name: r.Name, Price: r.Price, Currency: r.Currency}
+				}
+			case "CN":
+				var r *eastmoney.PriceResult
+				r, err = eastmoney.FetchAShareQuote(h.Symbol)
+				if err == nil {
+					result = &yahoo.PriceResult{Symbol: r.Symbol, Name: r.Name, Price: r.Price, Currency: r.Currency}
+				}
+			default:
+				result, err = yahoo.FetchQuote(h.Symbol)
+			}
+			if err != nil {
+				results <- syncResult{holding: h, result: nil, err: err}
+			} else {
+				results <- syncResult{holding: h, result: result, err: nil}
+			}
 		}(&holdings[i])
 		time.Sleep(fetchRateLimit)
 	}

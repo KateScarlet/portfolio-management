@@ -191,7 +191,7 @@ export async function triggerSync(pid: string): Promise<SyncStatus> {
   return request<SyncStatus>(`/api/portfolios/${pid}/sync/trigger`, { method: "POST" })
 }
 
-export async function fetchPrice(symbol: string): Promise<{
+export async function fetchPrice(symbol: string, market?: string): Promise<{
   symbol: string
   name: string
   price: number
@@ -200,7 +200,8 @@ export async function fetchPrice(symbol: string): Promise<{
   originalCurrency: string
   unit: string
 }> {
-  return request(`/api/price/${encodeURIComponent(symbol)}`)
+  const params = market ? `?market=${market}` : ""
+  return request(`/api/price/${encodeURIComponent(symbol)}${params}`)
 }
 
 export async function fetchExchangeRate(pair: string): Promise<{ rate: number }> {

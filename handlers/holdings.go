@@ -289,7 +289,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		allowedFields := map[string]bool{
-			"name": true, "symbol": true, "price": true,
+			"name": true, "symbol": true, "market": true, "price": true,
 			"date": true, "lots": true, "value": true,
 		}
 		safeUpdates := make(map[string]any)

@@ -152,6 +152,59 @@ func IsFundCode(code string) bool {
 	return fundCodeRe.MatchString(code)
 }
 
+func convertAShareSymbol(code string) string {
+	s := strings.ToUpper(code)
+	if s[0] == '6' || s[0] == '5' || s[0] == '7' || s[0] == '9' {
+		return "1." + s
+	}
+	return "0." + s
+}
+
+func FetchAShareQuote(symbol string) (*PriceResult, error) {
+	if client == nil {
+		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
+	}
+
+	secid := convertAShareSymbol(symbol)
+	cacheKey := "cn:" + secid
+	if cached, ok := getCachedQuote(cacheKey); ok {
+		slog.Info("eastmoney A-share price fetched from cache", "symbol", symbol)
+		return cached, nil
+	}
+
+	var resp eastmoneyResponse
+	r, err := client.R().
+		SetQueryParam("secid", secid).
+		SetQueryParam("fields", "f43,f57,f58,f59").
+		SetResult(&resp).
+		Get("https://push2.eastmoney.com/api/qt/stock/get")
+	if err != nil {
+		return nil, fmt.Errorf("eastmoney A-share request failed: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("eastmoney A-share returned status %d", r.StatusCode())
+	}
+
+	if resp.RC != 0 || resp.Data == nil {
+		return nil, fmt.Errorf("eastmoney no data for A-share %s", symbol)
+	}
+
+	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+
+	result := &PriceResult{
+		Symbol:           strings.ToUpper(resp.Data.F57),
+		Name:             resp.Data.F58,
+		Price:            price,
+		OriginalPrice:    price,
+		Currency:         "CNY",
+		OriginalCurrency: "CNY",
+	}
+
+	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
+	setCachedQuote(cacheKey, result)
+	return result, nil
+}
+
 type fundGZResponse struct {
 	FundCode string `json:"fundcode"`
 	Name     string `json:"name"`

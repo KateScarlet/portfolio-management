@@ -28,7 +28,7 @@ func Init() {
 	client = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
-		SetTimeout(30 * time.Second).
+		SetTimeout(10 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
 		SetRetryMaxWaitTime(5 * time.Second).

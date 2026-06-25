@@ -59,6 +59,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           assetId,
           symbol: "",
           name: name.trim() || "手工资产",
+          market,
           currency: targetCurrency,
           shares: manualInputMode === "priceShares" ? parseFloat(manualShares) || 0 : 0,
           price: manualInputMode === "priceShares" ? parseFloat(manualPrice) || 0 : 0,
@@ -86,7 +87,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
 
       setIsFetching(true)
       try {
-        const data = await api.fetchPrice(symbol)
+        const data = await api.fetchPrice(symbol, market)
         if (data && data.price) {
           const authoritativeSymbol = data.symbol || symbol.toUpperCase()
           let finalCostPrice = isNaN(cPrice) || cPrice <= 0 ? data.price : cPrice
@@ -109,6 +110,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             assetId,
             symbol: authoritativeSymbol,
             name: name.trim() || data.name || authoritativeSymbol,
+            market,
             currency: targetCurrency,
             shares: sharesNum,
             price: data.price,
