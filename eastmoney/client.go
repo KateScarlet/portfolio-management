@@ -148,6 +148,10 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	return result, nil
 }
 
+func ClearCache() {
+	quoteCache = sync.Map{}
+}
+
 func IsFundCode(code string) bool {
 	return fundCodeRe.MatchString(code)
 }

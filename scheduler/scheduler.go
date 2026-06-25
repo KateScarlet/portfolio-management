@@ -297,6 +297,8 @@ func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) boo
 	}
 	s.mu.Unlock()
 
+	yahoo.ClearRateCache()
+	eastmoney.ClearCache()
 	go s.syncPortfolio(userID, portfolioID, state)
 	return true
 }
@@ -311,6 +313,8 @@ func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string)
 	}
 	s.mu.Unlock()
 
+	yahoo.ClearRateCache()
+	eastmoney.ClearCache()
 	s.syncPortfolio(userID, portfolioID, state)
 
 	state.mu.Lock()
