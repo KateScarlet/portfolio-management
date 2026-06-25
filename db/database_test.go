@@ -8,9 +8,11 @@ import (
 
 func TestIsSetupMode_NoConfig(t *testing.T) {
 	dir := t.TempDir()
-	origConfigFile := configFile
-	configFile = filepath.Join(dir, "config.yaml")
-	defer func() { configFile = origConfigFile }()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	if !IsSetupMode() {
 		t.Error("expected setup mode when config file doesn't exist")
@@ -19,11 +21,16 @@ func TestIsSetupMode_NoConfig(t *testing.T) {
 
 func TestIsSetupMode_WithConfig(t *testing.T) {
 	dir := t.TempDir()
-	origConfigFile := configFile
-	configFile = filepath.Join(dir, "config.yaml")
-	defer func() { configFile = origConfigFile }()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
 
-	if err := os.WriteFile(configFile, []byte("jwtSecret: test"), 0o640); err != nil {
+	if err := os.MkdirAll("config", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("config/config.yaml", []byte("jwtSecret: test"), 0o640); err != nil {
 		t.Fatal(err)
 	}
 
@@ -34,26 +41,23 @@ func TestIsSetupMode_WithConfig(t *testing.T) {
 
 func TestSaveAndLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	origConfigFile := configFile
-	origConfigDir := configDir
-	configDir = dir
-	configFile = filepath.Join(dir, "config.yaml")
-	defer func() {
-		configFile = origConfigFile
-		configDir = origConfigDir
-	}()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	cfg := &Config{
 		JWTSecret: "test-secret-123",
 	}
 	cfg.Database.Type = "sqlite"
-	cfg.Database.DSN = filepath.Join(dir, "test.db")
+	cfg.Database.DSN = "test.db"
 
 	if err := SaveConfig(cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
-	data, err := os.ReadFile(configFile)
+	data, err := os.ReadFile(ConfigFile)
 	if err != nil {
 		t.Fatalf("config file not created: %v", err)
 	}
@@ -61,6 +65,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		t.Error("config file is empty")
 	}
 
+	// Verify the file contains our settings
 	content := string(data)
 	if !contains(content, "test-secret-123") {
 		t.Error("config file missing jwtSecret")
@@ -72,21 +77,18 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	dir := t.TempDir()
-	origConfigDir := configDir
-	origConfigFile := configFile
-	configDir = filepath.Join(dir, "subdir")
-	configFile = filepath.Join(configDir, "config.yaml")
-	defer func() {
-		configDir = origConfigDir
-		configFile = origConfigFile
-	}()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	cfg := &Config{JWTSecret: "secret"}
 	if err := SaveConfig(cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
-	info, err := os.Stat(configDir)
+	info, err := os.Stat("config")
 	if err != nil {
 		t.Fatal("config directory not created")
 	}
@@ -102,7 +104,7 @@ func TestGenerateJWTSecret_Unique(t *testing.T) {
 	if s1 == s2 {
 		t.Error("expected unique secrets")
 	}
-	if len(s1) != 64 {
+	if len(s1) != 64 { // 32 bytes hex-encoded
 		t.Errorf("expected 64 char hex string, got %d chars", len(s1))
 	}
 }
@@ -131,9 +133,11 @@ func TestInit_SQLite(t *testing.T) {
 
 func TestInit_NilConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDataDir := dataDir
-	dataDir = dir
-	defer func() { dataDir = origDataDir }()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	db, err := Init(nil)
 	if err != nil {
@@ -148,17 +152,6 @@ func TestInit_NilConfig(t *testing.T) {
 
 	if err := sqlDB.Ping(); err != nil {
 		t.Fatalf("database not reachable: %v", err)
-	}
-}
-
-func TestDefaultDSN(t *testing.T) {
-	origDataDir := dataDir
-	dataDir = "/tmp/test-data"
-	defer func() { dataDir = origDataDir }()
-
-	dsn := DefaultDSN()
-	if dsn != "/tmp/test-data/portfolio.db" {
-		t.Errorf("unexpected DSN: %s", dsn)
 	}
 }
 

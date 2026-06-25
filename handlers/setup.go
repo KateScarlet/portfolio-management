@@ -38,7 +38,7 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 			if body.DatabaseType == "postgres" {
 				body.DatabaseDSN = "postgres://localhost:5432/portfolio?sslmode=disable"
 			} else {
-				body.DatabaseDSN = db.DefaultDSN()
+				body.DatabaseDSN = "portfolio.db"
 			}
 		}
 

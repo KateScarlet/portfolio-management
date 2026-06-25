@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"portfolio-management/models"
-	"runtime"
 	"time"
 
 	"github.com/libtnb/sqlite"
@@ -18,36 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
-const AppName = "portfolio-management"
-
-var (
-	configDir  string
-	configFile string
-	dataDir    string
-)
-
-func init() {
-	if runtime.GOOS == "windows" {
-		home, _ := os.UserHomeDir()
-		configDir = filepath.Join(home, "AppData", "Roaming", AppName)
-		dataDir = filepath.Join(home, "AppData", "Local", AppName)
-	} else {
-		xdgConfig := os.Getenv("XDG_CONFIG_HOME")
-		if xdgConfig == "" {
-			home, _ := os.UserHomeDir()
-			xdgConfig = filepath.Join(home, ".config")
-		}
-		configDir = filepath.Join(xdgConfig, AppName)
-
-		xdgData := os.Getenv("XDG_DATA_HOME")
-		if xdgData == "" {
-			home, _ := os.UserHomeDir()
-			xdgData = filepath.Join(home, ".local", "share")
-		}
-		dataDir = filepath.Join(xdgData, AppName)
-	}
-	configFile = filepath.Join(configDir, "config.yaml")
-}
+const ConfigDir = "config"
+const ConfigFile = "config/config.yaml"
 
 type Config struct {
 	JWTSecret    string `mapstructure:"jwtSecret"` //nolint:gosec // Config field, not exposed
@@ -70,26 +40,14 @@ type Config struct {
 	} `mapstructure:"webauthn"`
 }
 
-func ConfigFile() string {
-	return configFile
-}
-
-func DataDir() string {
-	return dataDir
-}
-
-func DefaultDSN() string {
-	return filepath.Join(dataDir, "portfolio.db")
-}
-
 func LoadConfig() *Config {
 	v := viper.GetViper()
 
-	v.SetConfigFile(configFile)
+	v.SetConfigFile(ConfigFile)
 	v.SetConfigType("yaml")
 
 	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.dsn", DefaultDSN())
+	v.SetDefault("database.dsn", "portfolio.db")
 
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
@@ -138,13 +96,7 @@ func Init(cfg *Config) (*gorm.DB, error) {
 		if dbType == "postgres" {
 			dsn = "postgres://localhost:5432/portfolio?sslmode=disable"
 		} else {
-			dsn = DefaultDSN()
-		}
-	}
-
-	if dbType == "sqlite" {
-		if err := os.MkdirAll(filepath.Dir(dsn), 0o750); err != nil {
-			return nil, fmt.Errorf("failed to create data directory: %w", err)
+			dsn = "portfolio.db"
 		}
 	}
 
@@ -313,13 +265,13 @@ func generateID() string {
 
 // IsSetupMode checks if config file exists
 func IsSetupMode() bool {
-	_, err := os.Stat(configFile)
+	_, err := os.Stat(ConfigFile)
 	return os.IsNotExist(err)
 }
 
 // SaveConfig writes the configuration to config file
 func SaveConfig(cfg *Config) error {
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := os.MkdirAll(ConfigDir, 0o750); err != nil {
 		return err
 	}
 
@@ -335,7 +287,7 @@ func SaveConfig(cfg *Config) error {
 	v.Set("webauthn.enabled", cfg.WebAuthn.Enabled)
 	v.Set("webauthn.rpid", cfg.WebAuthn.RPID)
 	v.Set("webauthn.rpOrigins", cfg.WebAuthn.RPOrigins)
-	v.SetConfigFile(configFile)
+	v.SetConfigFile(ConfigFile)
 	v.SetConfigType("yaml")
 	return v.WriteConfig()
 }

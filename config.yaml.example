@@ -1,7 +1,7 @@
 # Database configuration
-# Default: SQLite with file at XDG data dir (~/.local/share/portfolio-management/portfolio.db)
+# Default: SQLite with file "portfolio.db"
 #
-# Config file location: ~/.config/portfolio-management/config.yaml (XDG standard)
+# Config file location: config/config.yaml
 # If config file does not exist, the web setup wizard will guide you through
 # initial configuration on first launch.
 #
@@ -11,7 +11,7 @@
 
 database:
   type: sqlite          # sqlite | postgres
-  dsn:                  # SQLite: file path; Postgres: DSN string. Leave empty for default.
+  dsn: portfolio.db     # SQLite: file path; Postgres: DSN string
 
 # OIDC/SSO configuration (optional)
 # Enables SSO login via any OpenID Connect provider (Keycloak, Auth0, etc.)
