@@ -9,7 +9,10 @@ import (
 	"portfolio-management/db"
 	"portfolio-management/handlers"
 	"portfolio-management/marketsource"
+	"portfolio-management/marketsource/coingecko"
 	"portfolio-management/marketsource/eastmoney"
+	"portfolio-management/marketsource/sina"
+	"portfolio-management/marketsource/tencent"
 	"portfolio-management/marketsource/yahoo"
 	"portfolio-management/middleware"
 	"portfolio-management/scheduler"
@@ -63,10 +66,16 @@ func main() {
 
 	yahoo.Init()
 	eastmoney.Init()
+	tencent.Init()
+	sina.Init()
+	coingecko.Init()
 
 	router := marketsource.NewRouter(database, map[string]marketsource.MarketSource{
 		"yahoo":     &yahoo.Client{},
 		"eastmoney": &eastmoney.Client{},
+		"tencent":   &tencent.Client{},
+		"sina":      &sina.Client{},
+		"coingecko": &coingecko.Client{},
 	})
 
 	priceScheduler := scheduler.New(database, router)
@@ -92,11 +101,11 @@ func main() {
 	oidcAdmin.GET("/webauthn-config", handlers.GetWebAuthnConfig(cfg))
 	oidcAdmin.PUT("/webauthn-config", handlers.UpdateWebAuthnConfig(cfg))
 
-	h.GET("/api/price/:symbol", handlers.GetPrice(router))
-	h.GET("/api/exchange/:pair", handlers.GetExchange(router))
-
 	api := h.Group("/api")
 	api.Use(middleware.AuthRequired())
+
+	api.GET("/price/:symbol", handlers.GetPrice(router))
+	api.GET("/exchange/:pair", handlers.GetExchange(router))
 
 	api.GET("/settings/market-sources", handlers.GetMarketSources(router))
 	api.PUT("/settings/market-sources", handlers.UpdateMarketSources(router))

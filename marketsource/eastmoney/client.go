@@ -66,7 +66,7 @@ type Client struct{}
 func (c *Client) Name() string { return "东方财富" }
 
 func (c *Client) SupportedMarkets() []string {
-	return []string{"CN", "FUND", "COMMODITY_CN"}
+	return []string{"CN", "FUND", "COMMODITY_CN", "US", "HK"}
 }
 
 func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
@@ -75,6 +75,10 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 		return fetchFundQuote(symbol)
 	case "CN":
 		return fetchAShareQuote(symbol)
+	case "US":
+		return fetchUSStockQuote(symbol)
+	case "HK":
+		return fetchHKStockQuote(symbol)
 	default:
 		return fetchCommodityQuote(symbol)
 	}
@@ -93,20 +97,14 @@ func IsFundCode(code string) bool {
 	return fundCodeRe.MatchString(code)
 }
 
-func convertAShareSymbol(code string) string {
-	s := strings.ToUpper(code)
-	if s[0] == '6' || s[0] == '5' || s[0] == '7' || s[0] == '9' {
-		return "1." + s
-	}
-	return "0." + s
-}
-
 func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	lower := strings.ToLower(symbol)
+	// symbol is canonical like "au9999.CN", normalize for source
+	querySymbol := marketsource.NormalizeForSource(symbol, "COMMODITY_CN", "eastmoney")
+	lower := strings.ToLower(querySymbol)
 	market, ok := symbolMarket[lower]
 	if !ok {
 		return nil, fmt.Errorf("unknown eastmoney symbol: %s", symbol)
@@ -134,7 +132,7 @@ func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 
 	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
-		Symbol:           strings.ToUpper(resp.Data.F57),
+		Symbol:           symbol,
 		Name:             resp.Data.F58,
 		Price:            price,
 		OriginalPrice:    price,
@@ -149,7 +147,8 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	secid := convertAShareSymbol(symbol)
+	// symbol is canonical like "600519.SH", normalize for source
+	secid := marketsource.NormalizeForSource(symbol, "CN", "eastmoney")
 
 	var resp eastmoneyResponse
 	r, err := httpClient.R().
@@ -172,12 +171,88 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 
 	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
-		Symbol:           strings.ToUpper(resp.Data.F57),
+		Symbol:           symbol,
 		Name:             resp.Data.F58,
 		Price:            price,
 		OriginalPrice:    price,
 		Currency:         "CNY",
 		OriginalCurrency: "CNY",
+	}, nil
+}
+
+func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
+	if httpClient == nil {
+		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
+	}
+
+	// symbol is canonical like "AAPL.US", normalize for source
+	secid := marketsource.NormalizeForSource(symbol, "US", "eastmoney")
+
+	var resp eastmoneyResponse
+	r, err := httpClient.R().
+		SetQueryParam("secid", secid).
+		SetQueryParam("fields", "f43,f57,f58,f59").
+		SetResult(&resp).
+		Get("http://push2.eastmoney.com/api/qt/stock/get")
+	if err != nil {
+		return nil, fmt.Errorf("eastmoney US stock request failed: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("eastmoney US stock returned status %d", r.StatusCode())
+	}
+
+	if resp.RC != 0 || resp.Data == nil {
+		return nil, fmt.Errorf("eastmoney no data for US stock %s", symbol)
+	}
+
+	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+
+	slog.Info("eastmoney US stock price fetched from API", "symbol", symbol, "price", price)
+	return &marketsource.Quote{
+		Symbol:           symbol,
+		Name:             resp.Data.F58,
+		Price:            price,
+		OriginalPrice:    price,
+		Currency:         "USD",
+		OriginalCurrency: "USD",
+	}, nil
+}
+
+func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
+	if httpClient == nil {
+		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
+	}
+
+	// symbol is canonical like "00700.HK", normalize for source
+	secid := marketsource.NormalizeForSource(symbol, "HK", "eastmoney")
+
+	var resp eastmoneyResponse
+	r, err := httpClient.R().
+		SetQueryParam("secid", secid).
+		SetQueryParam("fields", "f43,f57,f58,f59").
+		SetResult(&resp).
+		Get("http://push2.eastmoney.com/api/qt/stock/get")
+	if err != nil {
+		return nil, fmt.Errorf("eastmoney HK stock request failed: %w", err)
+	}
+	if r.IsError() {
+		return nil, fmt.Errorf("eastmoney HK stock returned status %d", r.StatusCode())
+	}
+
+	if resp.RC != 0 || resp.Data == nil {
+		return nil, fmt.Errorf("eastmoney no data for HK stock %s", symbol)
+	}
+
+	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+
+	slog.Info("eastmoney HK stock price fetched from API", "symbol", symbol, "price", price)
+	return &marketsource.Quote{
+		Symbol:           symbol,
+		Name:             resp.Data.F58,
+		Price:            price,
+		OriginalPrice:    price,
+		Currency:         "HKD",
+		OriginalCurrency: "HKD",
 	}, nil
 }
 
@@ -198,8 +273,11 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
+	// code is canonical like "001811.CNOF", extract base code for API
+	queryCode := marketsource.NormalizeForSource(code, "FUND", "eastmoney")
+
 	r, err := httpClient.R().
-		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", code))
+		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", queryCode))
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney fund request failed: %w", err)
 	}
@@ -230,7 +308,7 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 
 	slog.Info("eastmoney fund price fetched from API", "code", code, "price", price)
 	return &marketsource.Quote{
-		Symbol:           resp.FundCode,
+		Symbol:           code,
 		Name:             resp.Name,
 		Price:            price,
 		OriginalPrice:    price,

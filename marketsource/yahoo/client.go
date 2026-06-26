@@ -3,8 +3,6 @@ package yahoo
 import (
 	"fmt"
 	"log/slog"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -12,14 +10,7 @@ import (
 	"portfolio-management/marketsource"
 )
 
-var (
-	httpClient *resty.Client
-	aShareRe   = regexp.MustCompile(`^\d{6}$`)
-	shTagRe    = regexp.MustCompile(`^SH\d{6}$`)
-	szTagRe    = regexp.MustCompile(`^SZ\d{6}$`)
-	hkTagRe    = regexp.MustCompile(`^HK\d{4,5}$`)
-	hkCodeRe   = regexp.MustCompile(`^\d{4,5}$`)
-)
+var httpClient *resty.Client
 
 func Init() {
 	httpClient = resty.New().
@@ -47,7 +38,7 @@ func (c *Client) SupportedMarkets() []string {
 }
 
 func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
-	return fetchQuote(symbol)
+	return fetchQuote(symbol, market)
 }
 
 func (c *Client) FetchExchangeRate(pair string) (float64, error) {
@@ -68,43 +59,11 @@ type yahooChartResponse struct {
 	} `json:"chart"`
 }
 
-func ConvertSymbol(symbol string) string {
-	s := strings.ToUpper(symbol)
-	if aShareRe.MatchString(s) {
-		if s[0] == '5' || s[0] == '6' {
-			return s + ".SS"
-		}
-		if s[0] == '0' || s[0] == '2' || s[0] == '3' {
-			return s + ".SZ"
-		}
-		if strings.HasPrefix(s, "159") {
-			return s + ".SZ"
-		}
-		if strings.HasPrefix(s, "127") || strings.HasPrefix(s, "128") {
-			return s + ".SZ"
-		}
-		return s + ".SS"
-	}
-	if shTagRe.MatchString(s) {
-		return s[2:] + ".SS"
-	}
-	if szTagRe.MatchString(s) {
-		return s[2:] + ".SZ"
-	}
-	if hkTagRe.MatchString(s) {
-		return s[2:] + ".HK"
-	}
-	if hkCodeRe.MatchString(s) {
-		return s + ".HK"
-	}
-	return s
-}
-
-func fetchQuote(symbol string) (*marketsource.Quote, error) {
+func fetchQuote(symbol, market string) (*marketsource.Quote, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
 	}
-	querySymbol := ConvertSymbol(symbol)
+	querySymbol := marketsource.NormalizeForSource(symbol, market, "yahoo")
 
 	var result yahooChartResponse
 	resp, err := httpClient.R().
@@ -138,7 +97,7 @@ func fetchQuote(symbol string) (*marketsource.Quote, error) {
 
 	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
 	return &marketsource.Quote{
-		Symbol:           meta.Symbol,
+		Symbol:           symbol,
 		Name:             name,
 		Price:            meta.RegularMarketPrice,
 		OriginalPrice:    meta.RegularMarketPrice,

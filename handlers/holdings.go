@@ -106,6 +106,11 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// Normalize symbol to canonical format (e.g., 600519.SH, AAPL.US)
+		if input.Symbol != "" && input.Market != "" {
+			input.Symbol = marketsource.NormalizeSymbol(input.Symbol, input.Market)
+		}
+
 		if input.AssetId == "" {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId is required"})
 			return

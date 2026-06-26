@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -195,8 +196,8 @@ func GetMarketSources(router *marketsource.Router) app.HandlerFunc {
 		}
 
 		c.JSON(consts.StatusOK, map[string]any{
-			"available":  router.AvailableSources(),
-			"config":     router.GetUserConfig(user.UserID),
+			"available":   router.AvailableSources(),
+			"config":      router.GetUserConfig(user.UserID),
 			"sourceNames": router.SourceNames(),
 		})
 	}
@@ -215,6 +216,8 @@ func UpdateMarketSources(router *marketsource.Router) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
+
+		slog.Info("updating market sources", "userId", user.UserID, "body", body)
 
 		if err := router.UpdateUserConfig(user.UserID, body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})

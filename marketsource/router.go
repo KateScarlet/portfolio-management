@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"portfolio-management/models"
 	"sync"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 type cachedEntry struct {
 	data      any
+	source    string
 	fetchedAt time.Time
 }
 
@@ -36,11 +38,11 @@ func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
 		db:      db,
 		sources: sources,
 		defaults: map[string][]string{
-			"US":             {"yahoo"},
-			"HK":             {"yahoo"},
-			"CRYPTO":         {"yahoo"},
+			"US":             {"eastmoney", "sina", "yahoo"},
+			"HK":             {"eastmoney", "tencent", "sina", "yahoo"},
+			"CRYPTO":         {"coingecko", "yahoo"},
 			"COMMODITY_INTL": {"yahoo"},
-			"CN":             {"eastmoney", "yahoo"},
+			"CN":             {"eastmoney", "tencent", "sina", "yahoo"},
 			"FUND":           {"eastmoney"},
 			"COMMODITY_CN":   {"eastmoney"},
 		},
@@ -53,12 +55,15 @@ func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 	if v, ok := r.quoteCache.Load(cacheKey); ok {
 		e := v.(*cachedEntry)
 		if time.Since(e.fetchedAt) < r.cacheTTL {
+			slog.Info("price fetched from cache", "source", e.source, "symbol", symbol, "market", market)
 			return e.data.(*Quote), nil
 		}
 		r.quoteCache.Delete(cacheKey)
 	}
 
 	sources := r.resolveSources(userID, market)
+
+	slog.Info("fetching quote", "userId", userID, "symbol", symbol, "market", market, "sources", sources)
 
 	var lastErr error
 	for _, name := range sources {
@@ -73,7 +78,8 @@ func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 			lastErr = err
 			continue
 		}
-		r.quoteCache.Store(cacheKey, &cachedEntry{data: q, fetchedAt: time.Now()})
+		slog.Info("price fetched", "source", name, "symbol", symbol, "market", market)
+		r.quoteCache.Store(cacheKey, &cachedEntry{data: q, source: name, fetchedAt: time.Now()})
 		return q, nil
 	}
 
@@ -87,6 +93,7 @@ func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
 	if v, ok := r.rateCache.Load(pair); ok {
 		e := v.(*cachedEntry)
 		if time.Since(e.fetchedAt) < r.cacheTTL {
+			slog.Info("exchange rate fetched from cache", "source", e.source, "pair", pair)
 			return e.data.(float64), nil
 		}
 		r.rateCache.Delete(pair)
@@ -110,7 +117,8 @@ func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
 			lastErr = err
 			continue
 		}
-		r.rateCache.Store(pair, &cachedEntry{data: rate, fetchedAt: time.Now()})
+		slog.Info("exchange rate fetched", "source", name, "pair", pair)
+		r.rateCache.Store(pair, &cachedEntry{data: rate, source: name, fetchedAt: time.Now()})
 		return rate, nil
 	}
 
@@ -173,37 +181,51 @@ func (r *Router) UpdateUserConfig(userID string, config map[string][]string) err
 	if err != nil {
 		return err
 	}
-	setting := map[string]any{
-		"key":          "marketSources",
-		"value":        string(data),
-		"user_id":      userID,
-		"portfolio_id": "",
+	setting := models.Setting{
+		Key:         "marketSources",
+		Value:       string(data),
+		UserID:      userID,
+		PortfolioID: "",
 	}
-	result := r.db.Table("settings").
-		Where("`key` = ? AND user_id = ? AND portfolio_id = ?", "marketSources", userID, "").
-		Assign(map[string]any{"value": string(data)}).
-		FirstOrCreate(&setting)
+
+	// Try to find existing record first
+	var existing models.Setting
+	result := r.db.Where("key = ? AND user_id = ? AND portfolio_id = ?", "marketSources", userID, "").First(&existing)
+	if result.Error == nil {
+		// Update existing record
+		result = r.db.Model(&existing).Update("value", string(data))
+	} else {
+		// Create new record
+		result = r.db.Create(&setting)
+	}
 	if result.Error != nil {
 		return result.Error
 	}
+	slog.Info("market source config saved", "userId", userID, "config", string(data))
 	r.userCache.Delete(userID)
+	// Clear quote cache so next sync uses new source order
+	r.quoteCache = sync.Map{}
 	return nil
 }
 
 func (r *Router) resolveSources(userID, market string) []string {
 	if market == "" {
+		slog.Debug("resolveSources: no market, using all sources")
 		return r.allSourceNames()
 	}
 	if userID != "" {
 		if cfg := r.loadUserConfig(userID); cfg != nil {
 			if sources, ok := cfg[market]; ok && len(sources) > 0 {
+				slog.Info("resolveSources: using user config", "userId", userID, "market", market, "sources", sources)
 				return sources
 			}
 		}
 	}
 	if sources, ok := r.defaults[market]; ok {
+		slog.Info("resolveSources: using defaults", "market", market, "sources", sources)
 		return sources
 	}
+	slog.Info("resolveSources: using all sources", "market", market)
 	return r.allSourceNames()
 }
 
@@ -228,16 +250,24 @@ func (r *Router) loadUserConfig(userID string) map[string][]string {
 	err := r.db.Table("settings").
 		Where("`key` = ? AND user_id = ? AND portfolio_id = ?", "marketSources", userID, "").
 		Pluck("value", &value).Error
-	if err != nil || value == "" {
+	if err != nil {
+		slog.Error("failed to load user config from db", "userId", userID, "error", err)
+		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
+		return nil
+	}
+	if value == "" {
+		slog.Debug("no user config found in db", "userId", userID)
 		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
 		return nil
 	}
 
 	var cfg map[string][]string
 	if err := json.Unmarshal([]byte(value), &cfg); err != nil {
+		slog.Error("failed to unmarshal user config", "userId", userID, "error", err)
 		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
 		return nil
 	}
+	slog.Debug("loaded user config", "userId", userID, "config", cfg)
 	r.userCache.Store(userID, &userConfigEntry{config: cfg, fetchedAt: time.Now()})
 	return cfg
 }
