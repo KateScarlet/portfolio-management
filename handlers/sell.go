@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -182,23 +183,17 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 			var af models.AvailableFund
 			err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, currency).First(&af).Error
-			switch err {
-			case nil:
+			switch {
+			case err == nil:
 				newFundsAmount = af.Amount + realizedValue
 				if err := tx.Model(&af).Update("amount", newFundsAmount).Error; err != nil {
 					tx.Rollback()
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return
 				}
-			case gorm.ErrRecordNotFound:
+			case errors.Is(err, gorm.ErrRecordNotFound):
 				newFundsAmount = realizedValue
-				if err := tx.Create(&models.AvailableFund{
-					ID:          uuid.New().String(),
-					UserID:      user.UserID,
-					PortfolioID: portfolioID,
-					Currency:    currency,
-					Amount:      newFundsAmount,
-				}).Error; err != nil {
+				if err := tx.Create(&models.AvailableFund{ID: uuid.New().String(), UserID: user.UserID, PortfolioID: portfolioID, Currency: currency, Amount: newFundsAmount}).Error; err != nil {
 					tx.Rollback()
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return

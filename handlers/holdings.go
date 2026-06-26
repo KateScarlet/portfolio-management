@@ -205,7 +205,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					fundsAmount := 0.0
 					if err == nil {
 						fundsAmount = af.Amount
-					} else if err != gorm.ErrRecordNotFound {
+					} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 						return err
 					}
 

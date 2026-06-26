@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"portfolio-management/marketsource"
@@ -188,7 +189,8 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 			}).Error
 		})
 		if err != nil {
-			httpErr, ok := err.(*httpError)
+			httpErr := &httpError{}
+			ok := errors.As(err, &httpErr)
 			if ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {
@@ -281,7 +283,8 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			}).Error
 		})
 		if err != nil {
-			httpErr, ok := err.(*httpError)
+			httpErr := &httpError{}
+			ok := errors.As(err, &httpErr)
 			if ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {
@@ -366,7 +369,8 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			}).Error
 		})
 		if err != nil {
-			httpErr, ok := err.(*httpError)
+			httpErr := &httpError{}
+			ok := errors.As(err, &httpErr)
 			if ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {

@@ -7,13 +7,13 @@ import (
 )
 
 type mockSource struct {
-	name            string
-	markets         []string
-	quoteCalls      atomic.Int32
-	exchangeCalls   atomic.Int32
+	name          string
+	markets       []string
+	quoteCalls    atomic.Int32
+	exchangeCalls atomic.Int32
 }
 
-func (m *mockSource) Name() string            { return m.name }
+func (m *mockSource) Name() string               { return m.name }
 func (m *mockSource) SupportedMarkets() []string { return m.markets }
 func (m *mockSource) FetchQuote(symbol, market string) (*Quote, error) {
 	m.quoteCalls.Add(1)
