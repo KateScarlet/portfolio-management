@@ -35,7 +35,8 @@ func TestIsFuturesSymbol(t *testing.T) {
 
 func TestFetchQuote_UnknownSymbol(t *testing.T) {
 	Init()
-	_, err := FetchQuote("UNKNOWN")
+	c := &Client{}
+	_, err := c.FetchQuote("UNKNOWN", "COMMODITY_CN")
 	if err == nil {
 		t.Fatal("expected error for unknown symbol")
 	}

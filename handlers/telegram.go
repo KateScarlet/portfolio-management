@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"portfolio-management/telegram"
@@ -14,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
+func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			BotToken string `json:"botToken"`
@@ -92,7 +93,7 @@ func TestTelegramMessage(db *gorm.DB) app.HandlerFunc {
 				assets[h.AssetId] += h.Value
 				total += h.Value
 			}
-			principal, _ := CalcPrincipalByUser(db, user.UserID, "CNY")
+			principal, _ := CalcPrincipalByUser(db, user.UserID, "CNY", router)
 
 			assetNames := map[string]string{
 				"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品",

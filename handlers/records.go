@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -35,7 +36,7 @@ func ListRecords(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func CreateRecord(db *gorm.DB) app.HandlerFunc {
+func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
 		if user == nil {
@@ -59,7 +60,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 		if displayCurrency == "" {
 			displayCurrency = "CNY"
 		}
-		if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+		if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -91,7 +92,7 @@ func CreateRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		principal, err := CalcPrincipal(db, portfolioID, displayCurrency)
+		principal, err := CalcPrincipal(db, portfolioID, displayCurrency, router)
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return

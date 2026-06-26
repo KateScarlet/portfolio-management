@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"portfolio-management/marketsource"
 	"portfolio-management/models"
 	"portfolio-management/telegram"
-	"portfolio-management/yahoo"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +22,7 @@ type cachedTelegram struct {
 
 type Notifier struct {
 	db              *gorm.DB
+	router          *marketsource.Router
 	mu              sync.RWMutex
 	prevPrices      map[string]map[string]float64
 	lastDriftAlert  map[string]time.Time
@@ -29,9 +30,10 @@ type Notifier struct {
 	telegramClients map[string]*cachedTelegram
 }
 
-func NewNotifier(db *gorm.DB) *Notifier {
+func NewNotifier(db *gorm.DB, router *marketsource.Router) *Notifier {
 	return &Notifier{
 		db:              db,
+		router:          router,
 		prevPrices:      make(map[string]map[string]float64),
 		lastDriftAlert:  make(map[string]time.Time),
 		lastSummaryTime: make(map[string]time.Time),
@@ -198,7 +200,7 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 		h := &holdings[i]
 		if h.Currency != "" && h.Currency != "CNY" {
 			pair := h.Currency + "CNY"
-			rate, err := yahoo.FetchExchangeRate(pair)
+			rate, err := n.router.ExchangeRate(userID, pair)
 			if err == nil {
 				h.Value *= rate
 			}
@@ -317,7 +319,7 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 		h := &holdings[i]
 		if h.Currency != "" && h.Currency != "CNY" {
 			pair := h.Currency + "CNY"
-			rate, err := yahoo.FetchExchangeRate(pair)
+			rate, err := n.router.ExchangeRate(userID, pair)
 			if err != nil {
 				slog.Error("failed to fetch exchange rate for summary", "pair", pair, "error", err)
 				continue
@@ -356,7 +358,7 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 			principal += amount
 			continue
 		}
-		rate, err := yahoo.FetchExchangeRate(currency + "CNY")
+		rate, err := n.router.ExchangeRate(userID, currency+"CNY")
 		if err == nil {
 			principal += amount * rate
 		}

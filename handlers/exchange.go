@@ -3,13 +3,13 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"portfolio-management/yahoo"
+	"portfolio-management/marketsource"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
 
-func GetExchange() app.HandlerFunc {
+func GetExchange(router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		pair := c.Param("pair")
 		if pair == "" {
@@ -17,7 +17,7 @@ func GetExchange() app.HandlerFunc {
 			return
 		}
 
-		rate, err := yahoo.FetchExchangeRate(pair)
+		rate, err := router.ExchangeRate("", pair)
 		if err != nil {
 			slog.Error("failed to fetch exchange rate", "pair", pair, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"portfolio-management/yahoo"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -26,7 +26,7 @@ type SummaryResponse struct {
 	Portfolios []PortfolioSummaryItem `json:"portfolios"`
 }
 
-func GetSummary(db *gorm.DB) app.HandlerFunc {
+func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
 		if user == nil {
@@ -57,7 +57,7 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 				return
 			}
 
-			if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
@@ -79,7 +79,7 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 				amt := f.Amount
 				if f.Currency != displayCurrency && f.Currency != "" {
 					pair := f.Currency + displayCurrency
-					rate, err := yahoo.FetchExchangeRate(pair)
+					rate, err := router.ExchangeRate(user.UserID, pair)
 					if err != nil {
 						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 						return
@@ -89,7 +89,7 @@ func GetSummary(db *gorm.DB) app.HandlerFunc {
 				fundsTotal += amt
 			}
 
-			principal, err := CalcPrincipal(db, p.ID, displayCurrency)
+			principal, err := CalcPrincipal(db, p.ID, displayCurrency, router)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return

@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"portfolio-management/marketsource"
 	"portfolio-management/models"
 	"sync"
 	"testing"
@@ -22,6 +23,10 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+func setupTestRouter(db *gorm.DB) *marketsource.Router {
+	return marketsource.NewRouter(db, map[string]marketsource.MarketSource{})
+}
+
 func TestSyncStatus(t *testing.T) {
 	status := SyncStatus{
 		LastSyncAt: time.Now(),
@@ -36,7 +41,7 @@ func TestSyncStatus(t *testing.T) {
 
 func TestPriceScheduler_New(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 	if s.ticker != nil {
 		t.Error("expected ticker to be nil after Stop")
@@ -45,7 +50,7 @@ func TestPriceScheduler_New(t *testing.T) {
 
 func TestPriceScheduler_GetStatusForPortfolio_Unknown(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 	status := s.GetStatusForPortfolio("nonexistent", "nonexistent-portfolio")
 	if status.Syncing {
@@ -58,7 +63,7 @@ func TestPriceScheduler_GetStatusForPortfolio_Unknown(t *testing.T) {
 
 func TestPriceScheduler_StopIdempotent(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 	s.Stop()
 	if s.ticker != nil {
@@ -68,7 +73,7 @@ func TestPriceScheduler_StopIdempotent(t *testing.T) {
 
 func TestPriceScheduler_TriggerSyncForPortfolio(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 
 	if !s.TriggerSyncForPortfolio("user1", "portfolio1") {
@@ -84,7 +89,7 @@ func TestPriceScheduler_TriggerSyncForPortfolio(t *testing.T) {
 
 func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 
 	const goroutines = 100
@@ -115,7 +120,7 @@ func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 
 func TestPriceScheduler_ConcurrentTriggerSyncForPortfolioSync_NoDuplicateStates(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 
 	const goroutines = 50
@@ -142,7 +147,7 @@ func TestPriceScheduler_ConcurrentTriggerSyncForPortfolioSync_NoDuplicateStates(
 
 func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 
 	const goroutines = 50
@@ -169,10 +174,10 @@ func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 
 func TestPriceScheduler_SetNotifier(t *testing.T) {
 	db := setupTestDB(t)
-	s := New(db)
+	s := New(db, setupTestRouter(db))
 	s.Stop()
 
-	n := NewNotifier(db)
+	n := NewNotifier(db, setupTestRouter(db))
 	s.SetNotifier(n)
 	if s.notifier != n {
 		t.Error("expected notifier to be set")

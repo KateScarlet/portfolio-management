@@ -3,14 +3,13 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"portfolio-management/eastmoney"
-	"portfolio-management/yahoo"
+	"portfolio-management/marketsource"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
 
-func GetPrice() app.HandlerFunc {
+func GetPrice(router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		symbol := c.Param("symbol")
 		if symbol == "" {
@@ -20,20 +19,7 @@ func GetPrice() app.HandlerFunc {
 
 		market := c.Query("market")
 
-		var result any
-		var err error
-		switch market {
-		case "FUND":
-			result, err = eastmoney.FetchFundQuote(symbol)
-		case "CN":
-			result, err = eastmoney.FetchAShareQuote(symbol)
-		default:
-			if eastmoney.IsFuturesSymbol(symbol) {
-				result, err = eastmoney.FetchQuote(symbol)
-			} else {
-				result, err = yahoo.FetchQuote(symbol)
-			}
-		}
+		result, err := router.FetchQuote("", symbol, market)
 		if err != nil {
 			slog.Error("failed to fetch quote", "symbol", symbol, "market", market, "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

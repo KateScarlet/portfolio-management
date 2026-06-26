@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"portfolio-management/scheduler"
@@ -182,5 +183,44 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		}
 
 		c.JSON(consts.StatusOK, body)
+	}
+}
+
+func GetMarketSources(router *marketsource.Router) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		c.JSON(consts.StatusOK, map[string]any{
+			"available":  router.AvailableSources(),
+			"config":     router.GetUserConfig(user.UserID),
+			"sourceNames": router.SourceNames(),
+		})
+	}
+}
+
+func UpdateMarketSources(router *marketsource.Router) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		var body map[string][]string
+		if err := c.BindAndValidate(&body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if err := router.UpdateUserConfig(user.UserID, body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
 	}
 }

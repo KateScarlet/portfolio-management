@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"portfolio-management/yahoo"
 	"strconv"
 	"time"
 
@@ -25,14 +25,14 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) error {
+func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, router *marketsource.Router, userID string) error {
 	for i := range holdings {
 		h := &holdings[i]
 		if h.Currency == "" || h.Currency == targetCurrency {
 			continue
 		}
 		pair := h.Currency + targetCurrency
-		rate, err := yahoo.FetchExchangeRate(pair)
+		rate, err := router.ExchangeRate(userID, pair)
 		if err != nil {
 			return fmt.Errorf("获取 %s 汇率失败: %w", pair, err)
 		}
@@ -50,7 +50,7 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string) e
 	return nil
 }
 
-func ListHoldings(db *gorm.DB) app.HandlerFunc {
+func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
 		if user == nil {
@@ -71,7 +71,7 @@ func ListHoldings(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if displayCurrency := c.Query("currency"); displayCurrency != "" {
-			if err := convertHoldingsCurrency(holdings, displayCurrency); err != nil {
+			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}

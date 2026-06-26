@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"os"
 	"portfolio-management/db"
-	"portfolio-management/eastmoney"
 	"portfolio-management/handlers"
+	"portfolio-management/marketsource"
+	"portfolio-management/marketsource/eastmoney"
+	"portfolio-management/marketsource/yahoo"
 	"portfolio-management/middleware"
 	"portfolio-management/scheduler"
-	"portfolio-management/yahoo"
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -63,8 +64,13 @@ func main() {
 	yahoo.Init()
 	eastmoney.Init()
 
-	priceScheduler := scheduler.New(database)
-	notifier := scheduler.NewNotifier(database)
+	router := marketsource.NewRouter(database, map[string]marketsource.MarketSource{
+		"yahoo":     &yahoo.Client{},
+		"eastmoney": &eastmoney.Client{},
+	})
+
+	priceScheduler := scheduler.New(database, router)
+	notifier := scheduler.NewNotifier(database, router)
 	priceScheduler.SetNotifier(notifier)
 
 	h.POST("/api/auth/login", handlers.Login(database, cfg))
@@ -86,20 +92,23 @@ func main() {
 	oidcAdmin.GET("/webauthn-config", handlers.GetWebAuthnConfig(cfg))
 	oidcAdmin.PUT("/webauthn-config", handlers.UpdateWebAuthnConfig(cfg))
 
-	h.GET("/api/price/:symbol", handlers.GetPrice())
-	h.GET("/api/exchange/:pair", handlers.GetExchange())
+	h.GET("/api/price/:symbol", handlers.GetPrice(router))
+	h.GET("/api/exchange/:pair", handlers.GetExchange(router))
 
 	api := h.Group("/api")
 	api.Use(middleware.AuthRequired())
+
+	api.GET("/settings/market-sources", handlers.GetMarketSources(router))
+	api.PUT("/settings/market-sources", handlers.UpdateMarketSources(router))
 
 	api.GET("/portfolios", handlers.ListPortfolios(database))
 	api.POST("/portfolios", handlers.CreatePortfolio(database))
 	api.PATCH("/portfolios/:id", handlers.UpdatePortfolio(database))
 	api.DELETE("/portfolios/:id", handlers.DeletePortfolio(database))
 
-	api.GET("/summary", handlers.GetSummary(database))
+	api.GET("/summary", handlers.GetSummary(database, router))
 
-	api.POST("/telegram/test", handlers.TestTelegramMessage(database))
+	api.POST("/telegram/test", handlers.TestTelegramMessage(database, router))
 
 	api.POST("/webauthn/register/start", handlers.WebAuthnRegisterStart(database, cfg))
 	api.POST("/webauthn/register/finish", handlers.WebAuthnRegisterFinish(database, cfg))
@@ -110,14 +119,14 @@ func main() {
 	pf.GET("/sync/status", handlers.GetSyncStatus(database, priceScheduler))
 	pf.POST("/sync/trigger", handlers.TriggerSync(database, priceScheduler))
 
-	pf.GET("/holdings", handlers.ListHoldings(database))
+	pf.GET("/holdings", handlers.ListHoldings(database, router))
 	pf.POST("/holdings", handlers.CreateHolding(database))
 	pf.PATCH("/holdings/:id", handlers.UpdateHolding(database))
 	pf.DELETE("/holdings/:id", handlers.DeleteHolding(database))
 	pf.POST("/holdings/:id/sell", handlers.SellHolding(database))
 
 	pf.GET("/records", handlers.ListRecords(database))
-	pf.POST("/records", handlers.CreateRecord(database))
+	pf.POST("/records", handlers.CreateRecord(database, router))
 	pf.DELETE("/records/:id", handlers.DeleteRecord(database))
 
 	pf.GET("/settings", handlers.ListSettings(database))

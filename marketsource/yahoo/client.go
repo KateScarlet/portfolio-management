@@ -5,27 +5,24 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+
+	"portfolio-management/marketsource"
 )
 
 var (
-	client   *resty.Client
-	aShareRe = regexp.MustCompile(`^\d{6}$`)
-	shTagRe  = regexp.MustCompile(`^SH\d{6}$`)
-	szTagRe  = regexp.MustCompile(`^SZ\d{6}$`)
-	hkTagRe  = regexp.MustCompile(`^HK\d{4,5}$`)
-	hkCodeRe = regexp.MustCompile(`^\d{4,5}$`)
-
-	rateCache   sync.Map
-	quoteCache  sync.Map
-	cacheExpiry = 5 * time.Minute
+	httpClient *resty.Client
+	aShareRe   = regexp.MustCompile(`^\d{6}$`)
+	shTagRe    = regexp.MustCompile(`^SH\d{6}$`)
+	szTagRe    = regexp.MustCompile(`^SZ\d{6}$`)
+	hkTagRe    = regexp.MustCompile(`^HK\d{4,5}$`)
+	hkCodeRe   = regexp.MustCompile(`^\d{4,5}$`)
 )
 
 func Init() {
-	client = resty.New().
+	httpClient = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
 		SetTimeout(10 * time.Second).
@@ -41,52 +38,23 @@ func Init() {
 		})
 }
 
-type cachedRate struct {
-	rate      float64
-	fetchedAt time.Time
+type Client struct{}
+
+func (c *Client) Name() string { return "雅虎财经" }
+
+func (c *Client) SupportedMarkets() []string {
+	return []string{"US", "HK", "COMMODITY_INTL", "CRYPTO", "CN"}
 }
 
-type cachedQuote struct {
-	result    *PriceResult
-	fetchedAt time.Time
+func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
+	return fetchQuote(symbol)
 }
 
-func getCachedRate(pair string) (float64, bool) {
-	if v, ok := rateCache.Load(pair); ok {
-		c := v.(*cachedRate)
-		if time.Since(c.fetchedAt) < cacheExpiry {
-			return c.rate, true
-		}
-		rateCache.Delete(pair)
-	}
-	return 0, false
+func (c *Client) FetchExchangeRate(pair string) (float64, error) {
+	return fetchExchangeRate(pair)
 }
 
-func setCachedRate(pair string, rate float64) {
-	rateCache.Store(pair, &cachedRate{rate: rate, fetchedAt: time.Now()})
-}
-
-func getCachedQuote(symbol string) (*PriceResult, bool) {
-	if v, ok := quoteCache.Load(symbol); ok {
-		c := v.(*cachedQuote)
-		if time.Since(c.fetchedAt) < cacheExpiry {
-			return c.result, true
-		}
-		quoteCache.Delete(symbol)
-	}
-	return nil, false
-}
-
-func setCachedQuote(symbol string, result *PriceResult) {
-	quoteCache.Store(symbol, &cachedQuote{result: result, fetchedAt: time.Now()})
-}
-
-func ClearRateCache() {
-	rateCache = sync.Map{}
-	quoteCache = sync.Map{}
-}
-
-type YahooChartResponse struct {
+type yahooChartResponse struct {
 	Chart struct {
 		Result []struct {
 			Meta struct {
@@ -100,37 +68,21 @@ type YahooChartResponse struct {
 	} `json:"chart"`
 }
 
-type PriceResult struct {
-	Symbol           string  `json:"symbol"`
-	Name             string  `json:"name"`
-	Price            float64 `json:"price"`
-	OriginalPrice    float64 `json:"originalPrice"`
-	Currency         string  `json:"currency"`
-	OriginalCurrency string  `json:"originalCurrency"`
-	Unit             string  `json:"unit"`
-}
-
 func ConvertSymbol(symbol string) string {
 	s := strings.ToUpper(symbol)
 	if aShareRe.MatchString(s) {
-		// Shanghai: 5xxxxx (funds/ETFs), 6xxxxx (stocks)
 		if s[0] == '5' || s[0] == '6' {
 			return s + ".SS"
 		}
-		// Shenzhen: 0xxxxx (stocks), 2xxxxx (B-shares), 3xxxxx (ChiNext)
 		if s[0] == '0' || s[0] == '2' || s[0] == '3' {
 			return s + ".SZ"
 		}
-		// Shenzhen ETFs: 159xxx
 		if strings.HasPrefix(s, "159") {
 			return s + ".SZ"
 		}
-		// Shenzhen convertible bonds: 127xxx, 128xxx
 		if strings.HasPrefix(s, "127") || strings.HasPrefix(s, "128") {
 			return s + ".SZ"
 		}
-		// All other 6-digit codes (1xxxxx, 4xxxxx, 7xxxxx, 8xxxxx, 9xxxxx)
-		// default to Shanghai, which has more bond/convertible listings
 		return s + ".SS"
 	}
 	if shTagRe.MatchString(s) {
@@ -142,26 +94,20 @@ func ConvertSymbol(symbol string) string {
 	if hkTagRe.MatchString(s) {
 		return s[2:] + ".HK"
 	}
-	// HK stocks: 4-5 digit codes without prefix
 	if hkCodeRe.MatchString(s) {
 		return s + ".HK"
 	}
 	return s
 }
 
-func FetchQuote(symbol string) (*PriceResult, error) {
-	if client == nil {
+func fetchQuote(symbol string) (*marketsource.Quote, error) {
+	if httpClient == nil {
 		return nil, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
 	}
 	querySymbol := ConvertSymbol(symbol)
 
-	if cached, ok := getCachedQuote(querySymbol); ok {
-		slog.Info("price fetched from cache", "symbol", symbol, "querySymbol", querySymbol)
-		return cached, nil
-	}
-
-	var result YahooChartResponse
-	resp, err := client.R().
+	var result yahooChartResponse
+	resp, err := httpClient.R().
 		SetQueryParam("range", "1d").
 		SetQueryParam("interval", "1d").
 		SetResult(&result).
@@ -190,35 +136,24 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		name = meta.Symbol
 	}
 
-	currency := meta.Currency
-	price := meta.RegularMarketPrice
-	originalPrice := meta.RegularMarketPrice
-
-	priceResult := &PriceResult{
+	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
+	return &marketsource.Quote{
 		Symbol:           meta.Symbol,
 		Name:             name,
-		Price:            price,
-		OriginalPrice:    originalPrice,
-		Currency:         currency,
-		OriginalCurrency: currency,
-	}
-	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
-	setCachedQuote(querySymbol, priceResult)
-	return priceResult, nil
+		Price:            meta.RegularMarketPrice,
+		OriginalPrice:    meta.RegularMarketPrice,
+		Currency:         meta.Currency,
+		OriginalCurrency: meta.Currency,
+	}, nil
 }
 
-func FetchExchangeRate(pair string) (float64, error) {
-	if rate, ok := getCachedRate(pair); ok {
-		slog.Info("exchange rate fetched from cache", "pair", pair)
-		return rate, nil
-	}
-
-	if client == nil {
+func fetchExchangeRate(pair string) (float64, error) {
+	if httpClient == nil {
 		return 0, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
 	}
 	fxSymbol := pair + "=X"
-	var result YahooChartResponse
-	resp, err := client.R().
+	var result yahooChartResponse
+	resp, err := httpClient.R().
 		SetQueryParam("range", "1d").
 		SetQueryParam("interval", "1d").
 		SetResult(&result).
@@ -240,6 +175,5 @@ func FetchExchangeRate(pair string) (float64, error) {
 	}
 
 	slog.Info("exchange rate fetched from API", "pair", pair)
-	setCachedRate(pair, rate)
 	return rate, nil
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"portfolio-management/yahoo"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -15,15 +15,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string) (float64, error) {
-	return calcPrincipalByQuery(db, db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency)
+func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string, router *marketsource.Router) (float64, error) {
+	return calcPrincipalByQuery(db, db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string) (float64, error) {
-	return calcPrincipalByQuery(db, db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency)
+func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string, router *marketsource.Router) (float64, error) {
+	return calcPrincipalByQuery(db, db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string) (float64, error) {
+func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string, router *marketsource.Router) (float64, error) {
 	var txs []models.FundTransaction
 	if err := query.Find(&txs).Error; err != nil {
 		return 0, err
@@ -44,7 +44,7 @@ func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string) (f
 			total += amount
 			continue
 		}
-		rate, err := yahoo.FetchExchangeRate(currency + targetCurrency)
+		rate, err := router.ExchangeRate("", currency+targetCurrency)
 		if err != nil {
 			return 0, fmt.Errorf("获取 %s 汇率失败: %w", currency+targetCurrency, err)
 		}

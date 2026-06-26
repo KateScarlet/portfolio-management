@@ -6,6 +6,7 @@ import type {
 } from "@simplewebauthn/browser"
 import {
   Holding,
+  MarketSourceConfig,
   Portfolio,
   PortfolioRecord,
   PortfolioSummary,
@@ -390,4 +391,17 @@ export async function webAuthnListCredentials(): Promise<WebAuthnCredentialInfo[
 
 export async function webAuthnDeleteCredential(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/webauthn/credentials/${id}`, { method: "DELETE" })
+}
+
+export async function fetchMarketSources(): Promise<MarketSourceConfig> {
+  return request<MarketSourceConfig>("/api/settings/market-sources")
+}
+
+export async function updateMarketSources(
+  config: Record<string, string[]>,
+): Promise<{ status: string }> {
+  return request<{ status: string }>("/api/settings/market-sources", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  })
 }

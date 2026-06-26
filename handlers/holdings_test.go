@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
@@ -16,6 +17,10 @@ import (
 func setupHoldingsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	return setupTestDB(t)
+}
+
+func testRouter() *marketsource.Router {
+	return marketsource.NewRouter(nil, map[string]marketsource.MarketSource{})
 }
 
 func newUserCtx(method, path string, body any) *app.RequestContext {
@@ -42,7 +47,7 @@ func TestListHoldings_Empty(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	c := newUserCtx("GET", "/api/holdings", nil)
 
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
@@ -61,7 +66,7 @@ func TestListHoldings_ReturnsUserHoldings(t *testing.T) {
 	createTestHolding(t, db, 10, 100, 900)
 
 	c := newUserCtx("GET", "/api/holdings", nil)
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
@@ -95,7 +100,7 @@ func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 		Role:     "user",
 	})
 
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	var holdings []models.Holding
 	json.Unmarshal(c.Response.Body(), &holdings)
@@ -110,7 +115,7 @@ func TestListHoldings_Unauthorized(t *testing.T) {
 	c.Request.SetRequestURI("/api/holdings")
 	c.Request.Header.SetMethod("GET")
 
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 401 {
 		t.Errorf("expected 401, got %d", c.Response.StatusCode())
@@ -584,7 +589,7 @@ func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "CNY", Value: 1000, Cost: 800, Price: 100, CostPrice: 80},
 	}
-	convertHoldingsCurrency(holdings, "CNY")
+	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
 	if holdings[0].Value != 1000 {
 		t.Errorf("expected value unchanged at 1000, got %.2f", holdings[0].Value)
 	}
@@ -597,7 +602,7 @@ func TestConvertHoldingsCurrency_EmptyCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "", Value: 500, Cost: 400, Price: 50, CostPrice: 40},
 	}
-	convertHoldingsCurrency(holdings, "CNY")
+	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
 	if holdings[0].Value != 500 {
 		t.Errorf("expected value unchanged at 500, got %.2f", holdings[0].Value)
 	}
@@ -608,7 +613,7 @@ func TestListHoldings_WithCurrencyParam(t *testing.T) {
 	createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
 
 	c := newUserCtx("GET", "/api/holdings?currency=CNY", nil)
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	// Exchange rate fetch fails in test environment (no Yahoo API), expect 500
 	if c.Response.StatusCode() != 500 {
@@ -621,7 +626,7 @@ func TestListHoldings_WithoutCurrencyParam_OriginalValues(t *testing.T) {
 	createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
 
 	c := newUserCtx("GET", "/api/holdings", nil)
-	ListHoldings(db)(context.Background(), c)
+	ListHoldings(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())

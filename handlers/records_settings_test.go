@@ -97,7 +97,7 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	})
 
 	c := newUserCtx("POST", "/api/records", nil)
-	CreateRecord(db)(context.Background(), c)
+	CreateRecord(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 201 {
 		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
@@ -129,7 +129,7 @@ func TestCreateRecord_NoHoldings(t *testing.T) {
 	db := setupRecordsTestDB(t)
 
 	c := newUserCtx("POST", "/api/records", nil)
-	CreateRecord(db)(context.Background(), c)
+	CreateRecord(db, testRouter())(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
 		t.Errorf("expected 400, got %d", c.Response.StatusCode())

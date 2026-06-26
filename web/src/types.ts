@@ -217,3 +217,19 @@ export const CRYPTO_SYMBOLS = [
   { symbol: "AVAX-USD", name: "Avalanche" },
   { symbol: "LINK-USD", name: "Chainlink" },
 ] as const
+
+export const MARKET_OPTIONS = [
+  { code: "US", name: "美股" },
+  { code: "CN", name: "A股" },
+  { code: "HK", name: "港股" },
+  { code: "FUND", name: "场外基金" },
+  { code: "COMMODITY_CN", name: "商品(国内)" },
+  { code: "COMMODITY_INTL", name: "商品(国际)" },
+  { code: "CRYPTO", name: "加密货币" },
+] as const
+
+export interface MarketSourceConfig {
+  available: Record<string, string[]>
+  config: Record<string, string[]> | null
+  sourceNames: Record<string, string>
+}

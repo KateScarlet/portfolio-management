@@ -7,16 +7,15 @@ import (
 	"math"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+
+	"portfolio-management/marketsource"
 )
 
 var (
-	client      *resty.Client
-	quoteCache  sync.Map
-	cacheExpiry = 5 * time.Minute
+	httpClient *resty.Client
 
 	fundCodeRe = regexp.MustCompile(`^\d{6}$`)
 
@@ -35,21 +34,6 @@ var (
 	}
 )
 
-type cachedQuote struct {
-	result    *PriceResult
-	fetchedAt time.Time
-}
-
-type PriceResult struct {
-	Symbol           string  `json:"symbol"`
-	Name             string  `json:"name"`
-	Price            float64 `json:"price"`
-	OriginalPrice    float64 `json:"originalPrice"`
-	Currency         string  `json:"currency"`
-	OriginalCurrency string  `json:"originalCurrency"`
-	Unit             string  `json:"unit"`
-}
-
 type eastmoneyResponse struct {
 	RC   int `json:"rc"`
 	Data *struct {
@@ -61,7 +45,7 @@ type eastmoneyResponse struct {
 }
 
 func Init() {
-	client = resty.New().
+	httpClient = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
 		SetTimeout(30 * time.Second).
@@ -77,28 +61,48 @@ func Init() {
 		})
 }
 
+type Client struct{}
+
+func (c *Client) Name() string { return "东方财富" }
+
+func (c *Client) SupportedMarkets() []string {
+	return []string{"CN", "FUND", "COMMODITY_CN"}
+}
+
+func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
+	switch market {
+	case "FUND":
+		return fetchFundQuote(symbol)
+	case "CN":
+		return fetchAShareQuote(symbol)
+	default:
+		return fetchCommodityQuote(symbol)
+	}
+}
+
+func (c *Client) FetchExchangeRate(pair string) (float64, error) {
+	return 0, marketsource.ErrNotSupported
+}
+
 func IsFuturesSymbol(symbol string) bool {
 	_, ok := symbolMarket[strings.ToLower(symbol)]
 	return ok
 }
 
-func getCachedQuote(symbol string) (*PriceResult, bool) {
-	if v, ok := quoteCache.Load(symbol); ok {
-		c := v.(*cachedQuote)
-		if time.Since(c.fetchedAt) < cacheExpiry {
-			return c.result, true
-		}
-		quoteCache.Delete(symbol)
+func IsFundCode(code string) bool {
+	return fundCodeRe.MatchString(code)
+}
+
+func convertAShareSymbol(code string) string {
+	s := strings.ToUpper(code)
+	if s[0] == '6' || s[0] == '5' || s[0] == '7' || s[0] == '9' {
+		return "1." + s
 	}
-	return nil, false
+	return "0." + s
 }
 
-func setCachedQuote(symbol string, result *PriceResult) {
-	quoteCache.Store(symbol, &cachedQuote{result: result, fetchedAt: time.Now()})
-}
-
-func FetchQuote(symbol string) (*PriceResult, error) {
-	if client == nil {
+func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
+	if httpClient == nil {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
@@ -108,13 +112,8 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		return nil, fmt.Errorf("unknown eastmoney symbol: %s", symbol)
 	}
 
-	if cached, ok := getCachedQuote(lower); ok {
-		slog.Info("eastmoney price fetched from cache", "symbol", symbol)
-		return cached, nil
-	}
-
 	var resp eastmoneyResponse
-	r, err := client.R().
+	r, err := httpClient.R().
 		SetQueryParam("secid", fmt.Sprintf("%d.%s", market, lower)).
 		SetQueryParam("fields", "f43,f57,f58,f59").
 		SetResult(&resp).
@@ -133,7 +132,8 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
 	unit := symbolUnit[lower]
 
-	result := &PriceResult{
+	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
+	return &marketsource.Quote{
 		Symbol:           strings.ToUpper(resp.Data.F57),
 		Name:             resp.Data.F58,
 		Price:            price,
@@ -141,43 +141,18 @@ func FetchQuote(symbol string) (*PriceResult, error) {
 		Currency:         "CNY",
 		OriginalCurrency: "CNY",
 		Unit:             unit,
-	}
-
-	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
-	setCachedQuote(lower, result)
-	return result, nil
+	}, nil
 }
 
-func ClearCache() {
-	quoteCache = sync.Map{}
-}
-
-func IsFundCode(code string) bool {
-	return fundCodeRe.MatchString(code)
-}
-
-func convertAShareSymbol(code string) string {
-	s := strings.ToUpper(code)
-	if s[0] == '6' || s[0] == '5' || s[0] == '7' || s[0] == '9' {
-		return "1." + s
-	}
-	return "0." + s
-}
-
-func FetchAShareQuote(symbol string) (*PriceResult, error) {
-	if client == nil {
+func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
+	if httpClient == nil {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
 	secid := convertAShareSymbol(symbol)
-	cacheKey := "cn:" + secid
-	if cached, ok := getCachedQuote(cacheKey); ok {
-		slog.Info("eastmoney A-share price fetched from cache", "symbol", symbol)
-		return cached, nil
-	}
 
 	var resp eastmoneyResponse
-	r, err := client.R().
+	r, err := httpClient.R().
 		SetQueryParam("secid", secid).
 		SetQueryParam("fields", "f43,f57,f58,f59").
 		SetResult(&resp).
@@ -195,18 +170,15 @@ func FetchAShareQuote(symbol string) (*PriceResult, error) {
 
 	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
 
-	result := &PriceResult{
+	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
+	return &marketsource.Quote{
 		Symbol:           strings.ToUpper(resp.Data.F57),
 		Name:             resp.Data.F58,
 		Price:            price,
 		OriginalPrice:    price,
 		Currency:         "CNY",
 		OriginalCurrency: "CNY",
-	}
-
-	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
-	setCachedQuote(cacheKey, result)
-	return result, nil
+	}, nil
 }
 
 type fundGZResponse struct {
@@ -221,18 +193,12 @@ type fundGZResponse struct {
 
 var jsonpRe = regexp.MustCompile(`^jsonpgz\((.*)\);$`)
 
-func FetchFundQuote(code string) (*PriceResult, error) {
-	if client == nil {
+func fetchFundQuote(code string) (*marketsource.Quote, error) {
+	if httpClient == nil {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	cacheKey := "fund:" + code
-	if cached, ok := getCachedQuote(cacheKey); ok {
-		slog.Info("eastmoney fund price fetched from cache", "code", code)
-		return cached, nil
-	}
-
-	r, err := client.R().
+	r, err := httpClient.R().
 		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", code))
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney fund request failed: %w", err)
@@ -262,16 +228,13 @@ func FetchFundQuote(code string) (*PriceResult, error) {
 		return nil, fmt.Errorf("no price for fund %s", code)
 	}
 
-	result := &PriceResult{
+	slog.Info("eastmoney fund price fetched from API", "code", code, "price", price)
+	return &marketsource.Quote{
 		Symbol:           resp.FundCode,
 		Name:             resp.Name,
 		Price:            price,
 		OriginalPrice:    price,
 		Currency:         "CNY",
 		OriginalCurrency: "CNY",
-	}
-
-	slog.Info("eastmoney fund price fetched from API", "code", code, "price", price)
-	setCachedQuote(cacheKey, result)
-	return result, nil
+	}, nil
 }

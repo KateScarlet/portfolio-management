@@ -3,9 +3,8 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
-	"portfolio-management/eastmoney"
+	"portfolio-management/marketsource"
 	"portfolio-management/models"
-	"portfolio-management/yahoo"
 	"strconv"
 	"sync"
 	"time"
@@ -21,6 +20,7 @@ type SyncStatus struct {
 
 type PriceScheduler struct {
 	db       *gorm.DB
+	router   *marketsource.Router
 	ticker   *time.Ticker
 	stopCh   chan struct{}
 	mu       sync.RWMutex
@@ -40,9 +40,10 @@ func syncKey(userID, portfolioID string) string {
 	return userID + ":" + portfolioID
 }
 
-func New(db *gorm.DB) *PriceScheduler {
+func New(db *gorm.DB, router *marketsource.Router) *PriceScheduler {
 	s := &PriceScheduler{
 		db:     db,
+		router: router,
 		stopCh: make(chan struct{}),
 		states: make(map[string]*syncState),
 	}
@@ -137,7 +138,7 @@ func (s *PriceScheduler) syncAllPortfolios() {
 
 type syncResult struct {
 	holding *models.Holding
-	result  *yahoo.PriceResult
+	result  *marketsource.Quote
 	err     error
 }
 
@@ -197,24 +198,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 				<-sem
 				wg.Done()
 			}()
-			var result *yahoo.PriceResult
-			var err error
-			switch h.Market {
-			case "FUND":
-				var r *eastmoney.PriceResult
-				r, err = eastmoney.FetchFundQuote(h.Symbol)
-				if err == nil {
-					result = &yahoo.PriceResult{Symbol: r.Symbol, Name: r.Name, Price: r.Price, Currency: r.Currency}
-				}
-			case "CN":
-				var r *eastmoney.PriceResult
-				r, err = eastmoney.FetchAShareQuote(h.Symbol)
-				if err == nil {
-					result = &yahoo.PriceResult{Symbol: r.Symbol, Name: r.Name, Price: r.Price, Currency: r.Currency}
-				}
-			default:
-				result, err = yahoo.FetchQuote(h.Symbol)
-			}
+			result, err := s.router.FetchQuote(userID, h.Symbol, h.Market)
 			if err != nil {
 				results <- syncResult{holding: h, result: nil, err: err}
 			} else {
@@ -297,8 +281,7 @@ func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) boo
 	}
 	s.mu.Unlock()
 
-	yahoo.ClearRateCache()
-	eastmoney.ClearCache()
+	s.router.ClearAllCaches()
 	go s.syncPortfolio(userID, portfolioID, state)
 	return true
 }
@@ -313,8 +296,7 @@ func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string)
 	}
 	s.mu.Unlock()
 
-	yahoo.ClearRateCache()
-	eastmoney.ClearCache()
+	s.router.ClearAllCaches()
 	s.syncPortfolio(userID, portfolioID, state)
 
 	state.mu.Lock()
