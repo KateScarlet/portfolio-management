@@ -6,35 +6,28 @@ import (
 	"fmt"
 	"log/slog"
 	"portfolio-management/models"
-	"sync"
 	"time"
 
+	"github.com/jellydator/ttlcache/v3"
 	"gorm.io/gorm"
 )
 
-type cachedEntry struct {
-	data      any
-	source    string
-	fetchedAt time.Time
-}
-
 type userConfigEntry struct {
-	config    map[string][]string
-	fetchedAt time.Time
+	config map[string][]string
 }
 
 type Router struct {
 	db         *gorm.DB
 	sources    map[string]MarketSource
 	defaults   map[string][]string
-	quoteCache sync.Map
-	rateCache  sync.Map
-	userCache  sync.Map
+	quoteCache *ttlcache.Cache[string, *Quote]
+	rateCache  *ttlcache.Cache[string, float64]
+	userCache  *ttlcache.Cache[string, *userConfigEntry]
 	cacheTTL   time.Duration
 }
 
 func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
-	return &Router{
+	r := &Router{
 		db:      db,
 		sources: sources,
 		defaults: map[string][]string{
@@ -48,17 +41,21 @@ func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
 		},
 		cacheTTL: 5 * time.Minute,
 	}
+	r.quoteCache = ttlcache.New[string, *Quote]()
+	r.rateCache = ttlcache.New[string, float64]()
+	r.userCache = ttlcache.New[string, *userConfigEntry]()
+	go r.quoteCache.Start()
+	go r.rateCache.Start()
+	go r.userCache.Start()
+	return r
 }
 
 func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 	cacheKey := symbol + ":" + market
-	if v, ok := r.quoteCache.Load(cacheKey); ok {
-		e := v.(*cachedEntry)
-		if time.Since(e.fetchedAt) < r.cacheTTL {
-			slog.Info("price fetched from cache", "source", e.source, "symbol", symbol, "market", market)
-			return e.data.(*Quote), nil
-		}
-		r.quoteCache.Delete(cacheKey)
+	if item := r.quoteCache.Get(cacheKey); item != nil {
+		q := item.Value()
+		slog.Info("price fetched from cache", "source", "cache", "symbol", symbol, "market", market)
+		return q, nil
 	}
 
 	sources := r.resolveSources(userID, market)
@@ -79,7 +76,7 @@ func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 			continue
 		}
 		slog.Info("price fetched", "source", name, "symbol", symbol, "market", market)
-		r.quoteCache.Store(cacheKey, &cachedEntry{data: q, source: name, fetchedAt: time.Now()})
+		r.quoteCache.Set(cacheKey, q, r.cacheTTL)
 		return q, nil
 	}
 
@@ -90,13 +87,9 @@ func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 }
 
 func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
-	if v, ok := r.rateCache.Load(pair); ok {
-		e := v.(*cachedEntry)
-		if time.Since(e.fetchedAt) < r.cacheTTL {
-			slog.Info("exchange rate fetched from cache", "source", e.source, "pair", pair)
-			return e.data.(float64), nil
-		}
-		r.rateCache.Delete(pair)
+	if item := r.rateCache.Get(pair); item != nil {
+		slog.Info("exchange rate fetched from cache", "source", "cache", "pair", pair)
+		return item.Value(), nil
 	}
 
 	sources := r.resolveSources(userID, "")
@@ -118,7 +111,7 @@ func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
 			continue
 		}
 		slog.Info("exchange rate fetched", "source", name, "pair", pair)
-		r.rateCache.Store(pair, &cachedEntry{data: rate, source: name, fetchedAt: time.Now()})
+		r.rateCache.Set(pair, rate, r.cacheTTL)
 		return rate, nil
 	}
 
@@ -129,9 +122,9 @@ func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
 }
 
 func (r *Router) ClearAllCaches() {
-	r.quoteCache = sync.Map{}
-	r.rateCache = sync.Map{}
-	r.userCache = sync.Map{}
+	r.quoteCache.DeleteAll()
+	r.rateCache.DeleteAll()
+	r.userCache.DeleteAll()
 }
 
 func (r *Router) SourceNames() map[string]string {
@@ -203,8 +196,7 @@ func (r *Router) UpdateUserConfig(userID string, config map[string][]string) err
 	}
 	slog.Info("market source config saved", "userId", userID, "config", string(data))
 	r.userCache.Delete(userID)
-	// Clear quote cache so next sync uses new source order
-	r.quoteCache = sync.Map{}
+	r.quoteCache.DeleteAll()
 	return nil
 }
 
@@ -238,12 +230,8 @@ func (r *Router) allSourceNames() []string {
 }
 
 func (r *Router) loadUserConfig(userID string) map[string][]string {
-	if v, ok := r.userCache.Load(userID); ok {
-		e := v.(*userConfigEntry)
-		if time.Since(e.fetchedAt) < time.Minute {
-			return e.config
-		}
-		r.userCache.Delete(userID)
+	if item := r.userCache.Get(userID); item != nil {
+		return item.Value().config
 	}
 
 	var value string
@@ -252,23 +240,23 @@ func (r *Router) loadUserConfig(userID string) map[string][]string {
 		Pluck("value", &value).Error
 	if err != nil {
 		slog.Error("failed to load user config from db", "userId", userID, "error", err)
-		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
+		r.userCache.Set(userID, &userConfigEntry{config: nil}, time.Minute)
 		return nil
 	}
 	if value == "" {
 		slog.Debug("no user config found in db", "userId", userID)
-		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
+		r.userCache.Set(userID, &userConfigEntry{config: nil}, time.Minute)
 		return nil
 	}
 
 	var cfg map[string][]string
 	if err := json.Unmarshal([]byte(value), &cfg); err != nil {
 		slog.Error("failed to unmarshal user config", "userId", userID, "error", err)
-		r.userCache.Store(userID, &userConfigEntry{config: nil, fetchedAt: time.Now()})
+		r.userCache.Set(userID, &userConfigEntry{config: nil}, time.Minute)
 		return nil
 	}
 	slog.Debug("loaded user config", "userId", userID, "config", cfg)
-	r.userCache.Store(userID, &userConfigEntry{config: cfg, fetchedAt: time.Now()})
+	r.userCache.Set(userID, &userConfigEntry{config: cfg}, time.Minute)
 	return cfg
 }
 
