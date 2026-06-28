@@ -3,7 +3,7 @@ set shell := ["brush", "-c"]
 # 默认构建全部
 default: build
 
-go_binary := "server"
+go_binary := "bin/server"
 frontend_dir := "web"
 dist_dir := frontend_dir / "dist"
 
@@ -12,11 +12,11 @@ build: build-frontend build-go build-go-windows
 
 # 构建 Go 后端
 build-go:
-    go build -trimpath -ldflags="-s -w" -o {{go_binary}} .
+    go build -trimpath -ldflags="-s -w" -o {{go_binary}} ./cmd/server
 
 # 交叉编译 Windows 版本 (amd64)
 build-go-windows:
-    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o {{go_binary}}.exe .
+    GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o {{go_binary}}.exe ./cmd/server
 
 # 构建前端
 build-frontend:
@@ -40,9 +40,8 @@ dev-frontend:
 
 # 清理构建产物 + database
 clean:
-    rm -f {{go_binary}}
+    rm -rf bin/
     rm -rf {{dist_dir}}
-    rm -f portfolio.db
 
 # 整理 Go 依赖
 tidy:

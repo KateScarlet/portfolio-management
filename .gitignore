@@ -4,8 +4,7 @@
 *.dll
 *.so
 *.dylib
-server
-server.exe
+bin/
 tmp/
 
 # Go test binary

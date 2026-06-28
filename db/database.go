@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"portfolio-management/models"
 	"time"
 
@@ -16,8 +17,31 @@ import (
 	"gorm.io/gorm"
 )
 
-const ConfigDir = "config"
-const ConfigFile = "config/config.yaml"
+var baseDir string
+
+func BaseDir() string {
+	if baseDir != "" {
+		return baseDir
+	}
+	execPath, err := os.Executable()
+	if err != nil {
+		panic("failed to get executable path: " + err.Error())
+	}
+	return filepath.Dir(execPath)
+}
+
+// SetBaseDir overrides the base directory (for testing)
+func SetBaseDir(dir string) {
+	baseDir = dir
+}
+
+func ConfigDir() string {
+	return filepath.Join(BaseDir(), "config")
+}
+
+func ConfigFile() string {
+	return filepath.Join(BaseDir(), "config", "config.yaml")
+}
 
 type Config struct {
 	JWTSecret    string `mapstructure:"jwtSecret"` //nolint:gosec // Config field, not exposed
@@ -43,11 +67,11 @@ type Config struct {
 func LoadConfig() *Config {
 	v := viper.GetViper()
 
-	v.SetConfigFile(ConfigFile)
+	v.SetConfigFile(ConfigFile())
 	v.SetConfigType("yaml")
 
 	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.dsn", "portfolio.db")
+	v.SetDefault("database.dsn", filepath.Join(BaseDir(), "data", "portfolio.db"))
 
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
@@ -96,8 +120,10 @@ func Init(cfg *Config) (*gorm.DB, error) {
 		if dbType == "postgres" {
 			dsn = "postgres://localhost:5432/portfolio?sslmode=disable"
 		} else {
-			dsn = "portfolio.db"
+			dsn = filepath.Join(BaseDir(), "data", "portfolio.db")
 		}
+	} else if dbType == "sqlite" && !filepath.IsAbs(dsn) {
+		dsn = filepath.Join(BaseDir(), dsn)
 	}
 
 	switch dbType {
@@ -109,6 +135,12 @@ func Init(cfg *Config) (*gorm.DB, error) {
 }
 
 func initSQLite(dsn string) (*gorm.DB, error) {
+	if dir := filepath.Dir(dsn); dir != "." {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		}
+	}
+
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -265,13 +297,13 @@ func generateID() string {
 
 // IsSetupMode checks if config file exists
 func IsSetupMode() bool {
-	_, err := os.Stat(ConfigFile)
+	_, err := os.Stat(ConfigFile())
 	return os.IsNotExist(err)
 }
 
 // SaveConfig writes the configuration to config file
 func SaveConfig(cfg *Config) error {
-	if err := os.MkdirAll(ConfigDir, 0o750); err != nil {
+	if err := os.MkdirAll(ConfigDir(), 0o750); err != nil {
 		return err
 	}
 
@@ -287,7 +319,7 @@ func SaveConfig(cfg *Config) error {
 	v.Set("webauthn.enabled", cfg.WebAuthn.Enabled)
 	v.Set("webauthn.rpid", cfg.WebAuthn.RPID)
 	v.Set("webauthn.rpOrigins", cfg.WebAuthn.RPOrigins)
-	v.SetConfigFile(ConfigFile)
+	v.SetConfigFile(ConfigFile())
 	v.SetConfigType("yaml")
 	return v.WriteConfig()
 }

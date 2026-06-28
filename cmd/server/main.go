@@ -1,12 +1,12 @@
 package main
 
 import (
-	"embed"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"portfolio-management/db"
+	"portfolio-management"
 	"portfolio-management/handlers"
 	"portfolio-management/marketsource"
 	"portfolio-management/marketsource/coingecko"
@@ -22,9 +22,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
 	"github.com/hertz-contrib/cors"
 )
-
-//go:embed web/dist/*
-var frontendFS embed.FS
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -160,7 +157,7 @@ func main() {
 }
 
 func serveFrontend(h *server.Hertz) {
-	subFS, err := fs.Sub(frontendFS, "web/dist")
+	subFS, err := fs.Sub(frontend.FS, "web/dist")
 	if err != nil {
 		slog.Error("failed to create sub filesystem", "error", err)
 		panic("Failed to create sub filesystem: " + err.Error())

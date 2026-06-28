@@ -8,11 +8,8 @@ import (
 
 func TestIsSetupMode_NoConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
+	SetBaseDir(dir)
+	defer SetBaseDir("")
 
 	if !IsSetupMode() {
 		t.Error("expected setup mode when config file doesn't exist")
@@ -21,16 +18,13 @@ func TestIsSetupMode_NoConfig(t *testing.T) {
 
 func TestIsSetupMode_WithConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
+	SetBaseDir(dir)
+	defer SetBaseDir("")
 
-	if err := os.MkdirAll("config", 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "config"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("config/config.yaml", []byte("jwtSecret: test"), 0o640); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "config", "config.yaml"), []byte("jwtSecret: test"), 0o640); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,11 +35,8 @@ func TestIsSetupMode_WithConfig(t *testing.T) {
 
 func TestSaveAndLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
+	SetBaseDir(dir)
+	defer SetBaseDir("")
 
 	cfg := &Config{
 		JWTSecret: "test-secret-123",
@@ -57,7 +48,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
-	data, err := os.ReadFile(ConfigFile)
+	data, err := os.ReadFile(ConfigFile())
 	if err != nil {
 		t.Fatalf("config file not created: %v", err)
 	}
@@ -65,7 +56,6 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		t.Error("config file is empty")
 	}
 
-	// Verify the file contains our settings
 	content := string(data)
 	if !contains(content, "test-secret-123") {
 		t.Error("config file missing jwtSecret")
@@ -77,18 +67,15 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
+	SetBaseDir(dir)
+	defer SetBaseDir("")
 
 	cfg := &Config{JWTSecret: "secret"}
 	if err := SaveConfig(cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
-	info, err := os.Stat("config")
+	info, err := os.Stat(filepath.Join(dir, "config"))
 	if err != nil {
 		t.Fatal("config directory not created")
 	}
@@ -133,11 +120,12 @@ func TestInit_SQLite(t *testing.T) {
 
 func TestInit_NilConfig(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(dir); err != nil {
+	SetBaseDir(dir)
+	defer SetBaseDir("")
+
+	if err := os.MkdirAll(filepath.Join(dir, "data"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(origDir) //nolint:errcheck // test cleanup
 
 	db, err := Init(nil)
 	if err != nil {

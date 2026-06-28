@@ -4,8 +4,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - app-config:/app/config
-      - app-data:/app/data
+      - app-config:/app/bin/config
+      - app-data:/app/bin/data
     environment:
       - TZ=Asia/Shanghai
     restart: unless-stopped

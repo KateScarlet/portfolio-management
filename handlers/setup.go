@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"path/filepath"
 	"portfolio-management/db"
 	"time"
 
@@ -38,7 +39,7 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 			if body.DatabaseType == "postgres" {
 				body.DatabaseDSN = "postgres://localhost:5432/portfolio?sslmode=disable"
 			} else {
-				body.DatabaseDSN = "portfolio.db"
+				body.DatabaseDSN = filepath.Join(db.BaseDir(), "data", "portfolio.db")
 			}
 		}
 

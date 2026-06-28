@@ -14,12 +14,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend /app/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/server ./cmd/server
 
 # ---- Runtime ----
 FROM chainguard/wolfi-base AS runtime
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
-COPY --from=backend /app/server .
+COPY --from=backend /app/bin/server .
 EXPOSE 3000
 ENTRYPOINT ["./server"]

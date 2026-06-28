@@ -9,7 +9,7 @@ tmp_dir = "tmp"
 
 [build]
   # 构建的命令
-  cmd = "go build -o ./tmp/main ."
+  cmd = "go build -o ./tmp/main ./cmd/server"
   # 构建的二进制文件
   bin = "./tmp/main"
   # 完整的跟踪监控目录
@@ -37,4 +37,4 @@ tmp_dir = "tmp"
 
 [misc]
   # 清除 tmp 目录
-  clean_on_exit = true
+  clean_on_exit = false
