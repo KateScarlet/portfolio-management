@@ -1,5 +1,5 @@
 # ---- Build frontend ----
-FROM node:24.17 AS frontend
+FROM node:24.18 AS frontend
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
