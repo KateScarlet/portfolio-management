@@ -34,8 +34,8 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		var portfolios []models.Portfolio
-		if err := db.Where("user_id = ?", user.UserID).Find(&portfolios).Error; err != nil {
+		portfolios, err := gorm.G[models.Portfolio](db).Where("user_id = ?", user.UserID).Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -51,8 +51,8 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		for _, p := range portfolios {
-			var holdings []models.Holding
-			if err := db.Where("portfolio_id = ?", p.ID).Find(&holdings).Error; err != nil {
+			holdings, err := gorm.G[models.Holding](db).Where("portfolio_id = ?", p.ID).Find(ctx)
+			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
@@ -70,8 +70,8 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 
 			var fundsTotal float64
-			var funds []models.AvailableFund
-			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, p.ID).Find(&funds).Error; err != nil {
+			funds, err := gorm.G[models.AvailableFund](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, p.ID).Find(ctx)
+			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}

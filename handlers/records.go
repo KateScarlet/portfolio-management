@@ -34,8 +34,8 @@ func ListRecords(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var records []models.PortfolioRecord
-		if err := db.Where("portfolio_id = ?", portfolioID).Order("timestamp DESC").Find(&records).Error; err != nil {
+		records, err := gorm.G[models.PortfolioRecord](db).Where("portfolio_id = ?", portfolioID).Order("timestamp DESC").Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -63,8 +63,8 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		var holdings []models.Holding
-		if err := db.Where("portfolio_id = ?", portfolioID).Find(&holdings).Error; err != nil {
+		holdings, err := gorm.G[models.Holding](db).Where("portfolio_id = ?", portfolioID).Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -122,7 +122,7 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			Principal:   principal,
 		}
 
-		if err := db.Create(&record).Error; err != nil {
+		if err := gorm.G[models.PortfolioRecord](db).Create(ctx, &record); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -152,12 +152,12 @@ func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 		}
 
 		id := c.Param("id")
-		result := db.Where("portfolio_id = ?", portfolioID).Delete(&models.PortfolioRecord{}, "id = ?", id)
-		if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+		rows, err := gorm.G[models.PortfolioRecord](db).Where("portfolio_id = ? AND id = ?", portfolioID, id).Delete(ctx)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		if result.RowsAffected == 0 {
+		if rows == 0 {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Record not found"})
 			return
 		}

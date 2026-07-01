@@ -83,8 +83,8 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
 				return
 			}
-			var holdings []models.Holding
-			if err := db.Where("user_id = ?", user.UserID).Find(&holdings).Error; err != nil {
+			holdings, err := gorm.G[models.Holding](db).Where("user_id = ?", user.UserID).Find(ctx)
+			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
 				return
 			}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
@@ -34,8 +35,8 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var settings []models.Setting
-		if err := db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error; err != nil {
+		settings, err := gorm.G[models.Setting](db).Where("portfolio_id = ?", portfolioID).Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -92,15 +93,26 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			}
 		}
 
-		setting := models.Setting{Key: key, Value: body.Value, UserID: user.UserID, PortfolioID: portfolioID}
-		result := db.Where(models.Setting{Key: key, UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: body.Value}).FirstOrCreate(&setting)
-		if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
+		err = upsertSetting(db, ctx, key, body.Value, user.UserID, portfolioID)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 
 		c.JSON(consts.StatusOK, map[string]string{"key": key, "value": body.Value})
 	}
+}
+
+func upsertSetting(db *gorm.DB, ctx context.Context, key, value, userID, portfolioID string) error {
+	_, err := gorm.G[models.Setting](db).Where("key = ? AND user_id = ? AND portfolio_id = ?", key, userID, portfolioID).First(ctx)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return gorm.G[models.Setting](db).Create(ctx, &models.Setting{Key: key, Value: value, UserID: userID, PortfolioID: portfolioID})
+	}
+	if err != nil {
+		return err
+	}
+	_, err = gorm.G[models.Setting](db).Where("key = ? AND user_id = ? AND portfolio_id = ?", key, userID, portfolioID).Update(ctx, "value", value)
+	return err
 }
 
 func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
@@ -123,8 +135,7 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var funds []models.AvailableFund
-		db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(&funds)
+		funds, _ := gorm.G[models.AvailableFund](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(ctx)
 
 		result := make([]map[string]any, 0, len(funds))
 		for _, f := range funds {
@@ -195,8 +206,7 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 
 		err = db.Transaction(func(tx *gorm.DB) error {
 			for key, value := range body {
-				setting := models.Setting{Key: key, Value: value, UserID: user.UserID, PortfolioID: portfolioID}
-				if err := tx.Where(models.Setting{Key: key, UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {
+				if err := upsertSetting(tx, ctx, key, value, user.UserID, portfolioID); err != nil {
 					return err
 				}
 			}

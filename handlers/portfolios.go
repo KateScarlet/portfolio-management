@@ -20,8 +20,8 @@ func ListPortfolios(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var portfolios []models.Portfolio
-		if err := db.Where("user_id = ?", user.UserID).Order("is_default DESC, created_at ASC").Find(&portfolios).Error; err != nil {
+		portfolios, err := gorm.G[models.Portfolio](db).Where("user_id = ?", user.UserID).Order("is_default DESC, created_at ASC").Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -55,7 +55,7 @@ func CreatePortfolio(db *gorm.DB) app.HandlerFunc {
 			CreatedAt:   time.Now().UnixMilli(),
 		}
 
-		if err := db.Create(&portfolio).Error; err != nil {
+		if err := gorm.G[models.Portfolio](db).Create(ctx, &portfolio); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -73,8 +73,8 @@ func UpdatePortfolio(db *gorm.DB) app.HandlerFunc {
 		}
 
 		id := c.Param("id")
-		var portfolio models.Portfolio
-		if err := db.Where("user_id = ? AND id = ?", user.UserID, id).First(&portfolio).Error; err != nil {
+		portfolio, err := gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Portfolio not found"})
 			return
 		}
@@ -101,12 +101,12 @@ func UpdatePortfolio(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if err := db.Model(&portfolio).Updates(updates).Error; err != nil {
+		if _, err := gorm.G[map[string]any](db).Table("portfolios").Where("user_id = ? AND id = ?", user.UserID, id).Updates(ctx, updates); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 
-		db.Where("user_id = ? AND id = ?", user.UserID, id).First(&portfolio)
+		portfolio, _ = gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		c.JSON(consts.StatusOK, portfolio)
 	}
 }
@@ -121,8 +121,8 @@ func DeletePortfolio(db *gorm.DB) app.HandlerFunc {
 
 		id := c.Param("id")
 
-		var portfolio models.Portfolio
-		if err := db.Where("user_id = ? AND id = ?", user.UserID, id).First(&portfolio).Error; err != nil {
+		portfolio, err := gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "Portfolio not found"})
 			return
 		}
@@ -139,23 +139,23 @@ func DeletePortfolio(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("portfolio_id = ?", id).Delete(&models.Holding{}).Error; err != nil {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if _, err := gorm.G[models.Holding](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("portfolio_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
+			if _, err := gorm.G[models.PortfolioRecord](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("portfolio_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+			if _, err := gorm.G[models.Setting](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("portfolio_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
+			if _, err := gorm.G[models.AvailableFund](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("portfolio_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
+			if _, err := gorm.G[models.FundTransaction](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Delete(&portfolio).Error; err != nil {
+			if _, err := gorm.G[models.Portfolio](tx).Where("id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
 			return nil

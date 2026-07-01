@@ -44,8 +44,8 @@ func Login(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		var user models.User
-		if err := db.Where("username = ?", body.Username).First(&user).Error; err != nil {
+		user, err := gorm.G[models.User](db).Where("username = ?", body.Username).First(ctx)
+		if err != nil {
 			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "用户名或密码错误"})
 			return
 		}
@@ -87,8 +87,8 @@ func Me(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var user models.User
-		if err := db.Where("id = ?", claims.UserID).First(&user).Error; err != nil {
+		user, err := gorm.G[models.User](db).Where("id = ?", claims.UserID).First(ctx)
+		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return
 		}
@@ -141,7 +141,7 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			CreatedAt: time.Now().UnixMilli(),
 		}
 
-		if err := db.Create(&user).Error; err != nil {
+		if err := gorm.G[models.User](db).Create(ctx, &user); err != nil {
 			c.JSON(consts.StatusConflict, map[string]string{"error": "用户名已存在"})
 			return
 		}
@@ -161,8 +161,8 @@ func Register(db *gorm.DB) app.HandlerFunc {
 
 func ListUsers(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		var users []models.User
-		if err := db.Find(&users).Error; err != nil {
+		users, err := gorm.G[models.User](db).Find(ctx)
+		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -190,32 +190,32 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 		}
 
 		err := db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("user_id = ?", id).Delete(&models.Holding{}).Error; err != nil {
+			if _, err := gorm.G[models.Holding](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.PortfolioRecord{}).Error; err != nil {
+			if _, err := gorm.G[models.PortfolioRecord](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.Setting{}).Error; err != nil {
+			if _, err := gorm.G[models.Setting](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.AvailableFund{}).Error; err != nil {
+			if _, err := gorm.G[models.AvailableFund](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.FundTransaction{}).Error; err != nil {
+			if _, err := gorm.G[models.FundTransaction](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.Portfolio{}).Error; err != nil {
+			if _, err := gorm.G[models.Portfolio](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			if err := tx.Where("user_id = ?", id).Delete(&models.WebAuthnCredential{}).Error; err != nil {
+			if _, err := gorm.G[models.WebAuthnCredential](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
-			result := tx.Delete(&models.User{}, "id = ?", id)
-			if result.Error != nil {
-				return result.Error
+			rows, err := gorm.G[models.User](tx).Where("id = ?", id).Delete(ctx)
+			if err != nil {
+				return err
 			}
-			if result.RowsAffected == 0 {
+			if rows == 0 {
 				return ErrUserNotFound
 			}
 			return nil
@@ -247,7 +247,7 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		CreatedAt: time.Now().UnixMilli(),
 	}
 
-	if err := db.Create(&user).Error; err != nil {
+	if err := gorm.G[models.User](db).Create(context.Background(), &user); err != nil {
 		return err
 	}
 
@@ -267,16 +267,17 @@ func ensureDefaultPortfolio(db *gorm.DB, userID string) error {
 		IsDefault: true,
 		CreatedAt: time.Now().UnixMilli(),
 	}
-	if err := db.Create(&portfolio).Error; err != nil {
+	ctx := context.Background()
+	if err := gorm.G[models.Portfolio](db).Create(ctx, &portfolio); err != nil {
 		return err
 	}
-	if err := db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+	if _, err := gorm.G[models.Holding](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
-	if err := db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+	if _, err := gorm.G[models.PortfolioRecord](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
-	if err := db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+	if _, err := gorm.G[models.Setting](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
 	return nil
