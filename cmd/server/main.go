@@ -20,7 +20,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
-	"github.com/hertz-contrib/cors"
 )
 
 func main() {
@@ -32,13 +31,6 @@ func main() {
 	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	h := server.Default(server.WithHostPorts(":3000"))
-
-	h.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		AllowCredentials: true,
-	}))
 
 	h.GET("/api/setup/status", handlers.SetupStatus())
 	h.POST("/api/setup/complete", handlers.SetupComplete(h))
