@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"portfolio-management/models"
@@ -159,9 +158,6 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	migrateToMultiPortfolio(db)
-	migrateAvailableFunds(db)
-
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
@@ -198,9 +194,6 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	migrateToMultiPortfolio(db)
-	migrateAvailableFunds(db)
-
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
@@ -217,74 +210,6 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
 
 	return db, nil
-}
-
-// migrateToMultiPortfolio creates a default portfolio for existing users
-// and links their holdings, records, and settings to it.
-func migrateToMultiPortfolio(db *gorm.DB) {
-	var count int64
-	db.Model(&models.Holding{}).Where("portfolio_id = '' OR portfolio_id IS NULL").Count(&count)
-	if count == 0 {
-		return
-	}
-
-	slog.Info("migrating to multi-portfolio: found holdings without portfolio_id", "count", count)
-
-	var userIDs []string
-	db.Model(&models.Holding{}).Where("portfolio_id = '' OR portfolio_id IS NULL").Distinct("user_id").Pluck("user_id", &userIDs)
-
-	for _, userID := range userIDs {
-		portfolioID := generateID()
-
-		portfolio := models.Portfolio{
-			ID:        portfolioID,
-			UserID:    userID,
-			Name:      "默认组合",
-			IsDefault: true,
-			CreatedAt: time.Now().UnixMilli(),
-		}
-		if err := db.Create(&portfolio).Error; err != nil {
-			slog.Error("failed to create default portfolio during migration", "userId", userID, "error", err)
-			continue
-		}
-
-		db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
-		db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
-		db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolioID)
-
-		slog.Info("migrated user to default portfolio", "userId", userID, "portfolioId", portfolioID)
-	}
-}
-
-// migrateAvailableFunds moves the old single availableFunds setting
-// into the new available_funds table with currency=CNY.
-func migrateAvailableFunds(db *gorm.DB) {
-	var settings []models.Setting
-	if err := db.Where("`key` = ? AND portfolio_id != ''", "availableFunds").Find(&settings).Error; err != nil {
-		return
-	}
-	if len(settings) == 0 {
-		return
-	}
-	slog.Info("migrating availableFunds to available_funds table", "count", len(settings))
-	for _, s := range settings {
-		var amount float64
-		if _, err := fmt.Sscanf(s.Value, "%f", &amount); err != nil {
-			continue
-		}
-		af := models.AvailableFund{
-			ID:          generateID(),
-			UserID:      s.UserID,
-			PortfolioID: s.PortfolioID,
-			Currency:    "CNY",
-			Amount:      amount,
-		}
-		db.Where(models.AvailableFund{UserID: s.UserID, PortfolioID: s.PortfolioID, Currency: "CNY"}).
-			Assign(models.AvailableFund{Amount: amount}).
-			FirstOrCreate(&af)
-		db.Delete(&models.Setting{}, "`key` = ? AND user_id = ? AND portfolio_id = ?", "availableFunds", s.UserID, s.PortfolioID)
-	}
-	slog.Info("availableFunds migration complete")
 }
 
 func generateID() string {
