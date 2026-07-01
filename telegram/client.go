@@ -26,13 +26,6 @@ func NewClient(token, chatID string) (*Client, error) {
 	return &Client{bot: bot, chatID: cid}, nil
 }
 
-func NewClientFromSettings(token, chatID string) (*Client, error) {
-	if token == "" || chatID == "" {
-		return nil, fmt.Errorf("telegram bot token and chat ID are required")
-	}
-	return NewClient(token, chatID)
-}
-
 func (c *Client) BotName() string {
 	return c.bot.Self.UserName
 }

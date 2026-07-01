@@ -93,10 +93,6 @@ func IsFuturesSymbol(symbol string) bool {
 	return ok
 }
 
-func IsFundCode(code string) bool {
-	return fundCodeRe.MatchString(code)
-}
-
 func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
