@@ -189,11 +189,11 @@ func GetOIDCConfig(cfg *db.Config) app.HandlerFunc {
 func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			Enabled      *bool  `json:"enabled"`
-			Issuer       string `json:"issuer"`
-			ClientID     string `json:"clientID"`
-			ClientSecret string `json:"clientSecret"` //nolint:gosec // Request body field
-			RedirectURL  string `json:"redirectURL"`
+			Enabled      *bool   `json:"enabled"`
+			Issuer       *string `json:"issuer"`
+			ClientID     *string `json:"clientID"`
+			ClientSecret *string `json:"clientSecret"` //nolint:gosec // Request body field
+			RedirectURL  *string `json:"redirectURL"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -203,10 +203,18 @@ func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 		if body.Enabled != nil {
 			cfg.OIDC.Enabled = *body.Enabled
 		}
-		cfg.OIDC.Issuer = body.Issuer
-		cfg.OIDC.ClientID = body.ClientID
-		cfg.OIDC.ClientSecret = body.ClientSecret
-		cfg.OIDC.RedirectURL = body.RedirectURL
+		if body.Issuer != nil {
+			cfg.OIDC.Issuer = *body.Issuer
+		}
+		if body.ClientID != nil {
+			cfg.OIDC.ClientID = *body.ClientID
+		}
+		if body.ClientSecret != nil {
+			cfg.OIDC.ClientSecret = *body.ClientSecret
+		}
+		if body.RedirectURL != nil {
+			cfg.OIDC.RedirectURL = *body.RedirectURL
+		}
 
 		if err := db.SaveConfig(cfg); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存配置失败"})
@@ -244,9 +252,9 @@ func GetWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			Enabled   *bool    `json:"enabled"`
-			RPID      string   `json:"rpid"`
-			RPOrigins []string `json:"rpOrigins"`
+			Enabled   *bool     `json:"enabled"`
+			RPID      *string   `json:"rpid"`
+			RPOrigins *[]string `json:"rpOrigins"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -256,8 +264,12 @@ func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 		if body.Enabled != nil {
 			cfg.WebAuthn.Enabled = *body.Enabled
 		}
-		cfg.WebAuthn.RPID = body.RPID
-		cfg.WebAuthn.RPOrigins = body.RPOrigins
+		if body.RPID != nil {
+			cfg.WebAuthn.RPID = *body.RPID
+		}
+		if body.RPOrigins != nil {
+			cfg.WebAuthn.RPOrigins = *body.RPOrigins
+		}
 
 		if err := db.SaveConfig(cfg); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存配置失败"})

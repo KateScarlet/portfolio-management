@@ -135,7 +135,11 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		funds, _ := gorm.G[models.AvailableFund](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(ctx)
+		funds, err := gorm.G[models.AvailableFund](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(ctx)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 
 		result := make([]map[string]any, 0, len(funds))
 		for _, f := range funds {
