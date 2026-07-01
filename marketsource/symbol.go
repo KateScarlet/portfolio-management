@@ -324,7 +324,7 @@ func getExpectedSuffix(market string) string {
 	case "US":
 		return ".US"
 	case "CRYPTO":
-		return ".USD"
+		return ".CC"
 	case "FUND":
 		return ".CNOF"
 	case "COMMODITY_CN":

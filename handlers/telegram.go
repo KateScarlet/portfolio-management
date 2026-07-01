@@ -84,7 +84,10 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 			var holdings []models.Holding
-			_ = db.Where("user_id = ?", user.UserID).Find(&holdings).Error
+			if err := db.Where("user_id = ?", user.UserID).Find(&holdings).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
+				return
+			}
 
 			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
 			var total float64
@@ -93,7 +96,11 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				assets[h.AssetId] += h.Value
 				total += h.Value
 			}
-			principal, _ := CalcPrincipalByUser(db, user.UserID, "CNY", router)
+			principal, err := CalcPrincipalByUser(db, user.UserID, "CNY", router)
+			if err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "计算累计投入失败: " + err.Error()})
+				return
+			}
 
 			assetNames := map[string]string{
 				"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品",

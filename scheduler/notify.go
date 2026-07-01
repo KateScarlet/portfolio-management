@@ -43,7 +43,9 @@ func NewNotifier(db *gorm.DB, router *marketsource.Router) *Notifier {
 
 func (n *Notifier) loadPortfolioSettings(portfolioID string) map[string]string {
 	var settings []models.Setting
-	_ = n.db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error
+	if err := n.db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error; err != nil {
+		slog.Error("failed to load portfolio settings", "portfolioId", portfolioID, "error", err)
+	}
 	result := make(map[string]string, len(settings))
 	for i := range settings {
 		result[settings[i].Key] = settings[i].Value
@@ -53,7 +55,9 @@ func (n *Notifier) loadPortfolioSettings(portfolioID string) map[string]string {
 
 func (n *Notifier) loadUserTelegramConfig(userID string) (token, chatID, enabled string) {
 	var settings []models.Setting
-	_ = n.db.Where("user_id = ? AND `key` IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')", userID).Find(&settings).Error
+	if err := n.db.Where("user_id = ? AND `key` IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')", userID).Find(&settings).Error; err != nil {
+		slog.Error("failed to load user telegram config", "userId", userID, "error", err)
+	}
 	for _, s := range settings {
 		switch s.Key {
 		case "telegramBotToken":
@@ -343,7 +347,9 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 	}
 
 	var txs []models.FundTransaction
-	_ = n.db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}).Find(&txs).Error
+	if err := n.db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}).Find(&txs).Error; err != nil {
+		slog.Error("failed to load fund transactions for summary", "portfolioId", portfolioID, "error", err)
+	}
 	byCurrency := make(map[string]float64)
 	for _, tx := range txs {
 		if tx.Type == "transfer_in" {

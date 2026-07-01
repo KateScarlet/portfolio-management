@@ -244,7 +244,7 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		Username:  username,
 		Password:  string(hashedPassword),
 		Role:      role,
-		CreatedAt: time.Now().Unix(),
+		CreatedAt: time.Now().UnixMilli(),
 	}
 
 	if err := db.Create(&user).Error; err != nil {
@@ -270,9 +270,15 @@ func ensureDefaultPortfolio(db *gorm.DB, userID string) error {
 	if err := db.Create(&portfolio).Error; err != nil {
 		return err
 	}
-	db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
-	db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
-	db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID)
+	if err := db.Model(&models.Holding{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&models.PortfolioRecord{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&models.Setting{}).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update("portfolio_id", portfolio.ID).Error; err != nil {
+		return err
+	}
 	return nil
 }
 
