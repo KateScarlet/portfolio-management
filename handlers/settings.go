@@ -23,7 +23,13 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -50,7 +56,13 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -100,7 +112,13 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -133,7 +151,13 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -169,7 +193,7 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 			}
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			for key, value := range body {
 				setting := models.Setting{Key: key, Value: value, UserID: user.UserID, PortfolioID: portfolioID}
 				if err := tx.Where(models.Setting{Key: key, UserID: user.UserID, PortfolioID: portfolioID}).Assign(models.Setting{Value: value}).FirstOrCreate(&setting).Error; err != nil {

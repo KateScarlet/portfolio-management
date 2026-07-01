@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"log/slog"
 )
 
 type httpError struct {
@@ -59,7 +60,13 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -95,7 +102,13 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -151,7 +164,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 		var created bool
 		var result models.Holding
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
@@ -275,7 +288,13 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -417,7 +436,13 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -436,8 +461,10 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func userOwnsPortfolio(db *gorm.DB, userID, portfolioID string) bool {
+func userOwnsPortfolio(db *gorm.DB, userID, portfolioID string) (bool, error) {
 	var count int64
-	db.Model(&models.Portfolio{}).Where("id = ? AND user_id = ?", portfolioID, userID).Count(&count)
-	return count > 0
+	if err := db.Model(&models.Portfolio{}).Where("id = ? AND user_id = ?", portfolioID, userID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"log/slog"
 )
 
 func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string, router *marketsource.Router) (float64, error) {
@@ -63,7 +64,13 @@ func ListFundTransactions(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -94,7 +101,13 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -117,7 +130,7 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := addAvailableFund(tx, user.UserID, portfolioID, body.Currency, body.Amount); err != nil {
 				return err
 			}
@@ -150,7 +163,13 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -173,7 +192,7 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := deductAvailableFund(tx, user.UserID, portfolioID, body.Currency, body.Amount); err != nil {
 				return err
 			}
@@ -212,7 +231,13 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -243,12 +268,18 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能划转到同一个组合"})
 			return
 		}
-		if !userOwnsPortfolio(db, user.UserID, body.TargetPortfolioID) {
+		ownsTarget, err := userOwnsPortfolio(db, user.UserID, body.TargetPortfolioID)
+		if err != nil {
+			slog.Error("failed to check target portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !ownsTarget {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问目标组合"})
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := deductAvailableFund(tx, user.UserID, portfolioID, body.Currency, body.Amount); err != nil {
 				return err
 			}
@@ -306,7 +337,13 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		if !userOwnsPortfolio(db, user.UserID, portfolioID) {
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
 			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
 			return
 		}
@@ -348,7 +385,7 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := deductAvailableFund(tx, user.UserID, portfolioID, body.FromCurrency, body.FromAmount); err != nil {
 				return err
 			}
