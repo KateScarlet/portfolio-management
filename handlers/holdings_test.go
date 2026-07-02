@@ -131,14 +131,14 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 		Currency: "CNY", Amount: 10000,
 	})
 	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "AAPL",
-		"name":           "Apple",
-		"shares":         10,
-		"price":          150,
-		"costPrice":      140,
-		"cost":           1400,
-		"value":          1500,
+		"assetId":   "stocks",
+		"symbol":    "AAPL",
+		"name":      "Apple",
+		"shares":    10,
+		"price":     150,
+		"costPrice": 140,
+		"cost":      1400,
+		"value":     1500,
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 
@@ -231,16 +231,15 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 	})
 
 	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "VTI",
-		"shares":         10,
-		"price":          100,
-		"costPrice":      100,
-		"cost":           1000,
-		"value":          1000,
-		"fee":            5,
-		"currency":       "CNY",
-
+		"assetId":   "stocks",
+		"symbol":    "VTI",
+		"shares":    10,
+		"price":     100,
+		"costPrice": 100,
+		"cost":      1000,
+		"value":     1000,
+		"fee":       5,
+		"currency":  "CNY",
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -268,14 +267,13 @@ func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 	})
 
 	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "VTI",
-		"shares":         10,
-		"price":          100,
-		"costPrice":      100,
-		"cost":           1000,
-		"value":          1000,
-
+		"assetId":   "stocks",
+		"symbol":    "VTI",
+		"shares":    10,
+		"price":     100,
+		"costPrice": 100,
+		"cost":      1000,
+		"value":     1000,
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -293,16 +291,15 @@ func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 	})
 
 	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "SPY",
-		"shares":         5,
-		"price":          500,
-		"costPrice":      480,
-		"cost":           2400,
-		"value":          2500,
-		"fee":            10,
-		"currency":       "USD",
-
+		"assetId":   "stocks",
+		"symbol":    "SPY",
+		"shares":    5,
+		"price":     500,
+		"costPrice": 480,
+		"cost":      2400,
+		"value":     2500,
+		"fee":       10,
+		"currency":  "USD",
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -333,16 +330,15 @@ func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
 	})
 
 	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "SPY",
-		"shares":         5,
-		"price":          500,
-		"costPrice":      480,
-		"cost":           2400,
-		"value":          2500,
-		"fee":            10,
-		"currency":       "USD",
-
+		"assetId":   "stocks",
+		"symbol":    "SPY",
+		"shares":    5,
+		"price":     500,
+		"costPrice": 480,
+		"cost":      2400,
+		"value":     2500,
+		"fee":       10,
+		"currency":  "USD",
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
