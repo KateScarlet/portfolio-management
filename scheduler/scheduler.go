@@ -22,19 +22,22 @@ type SyncStatus struct {
 type PriceScheduler struct {
 	db       *gorm.DB
 	router   *marketsource.Router
-	ticker   *time.Ticker
-	stopCh   chan struct{}
 	mu       sync.RWMutex
 	states   map[string]*syncState
 	notifier *Notifier
+	eventBus *EventBus
+	stopCh   chan struct{}
+	stopped  bool
 }
 
 type syncState struct {
-	interval    time.Duration
-	lastSyncAt  time.Time
-	lastSyncErr string
-	syncing     bool
-	mu          sync.Mutex
+	interval        time.Duration
+	lastSyncAt      time.Time
+	lastSyncErr     string
+	syncing         bool
+	timer           *time.Timer
+	scheduleVersion uint64
+	mu              sync.Mutex
 }
 
 func syncKey(userID, portfolioID string) string {
@@ -45,8 +48,8 @@ func New(db *gorm.DB, router *marketsource.Router) *PriceScheduler {
 	s := &PriceScheduler{
 		db:     db,
 		router: router,
-		stopCh: make(chan struct{}),
 		states: make(map[string]*syncState),
+		stopCh: make(chan struct{}),
 	}
 	s.Start()
 	return s
@@ -54,47 +57,38 @@ func New(db *gorm.DB, router *marketsource.Router) *PriceScheduler {
 
 func (s *PriceScheduler) Start() {
 	s.mu.Lock()
-	if s.ticker != nil {
-		s.mu.Unlock()
-		return
+	if s.stopped {
+		s.stopped = false
+		s.stopCh = make(chan struct{})
 	}
-	slog.Info("scheduler starting")
-	s.ticker = time.NewTicker(1 * time.Minute)
-	stopCh := s.stopCh
-	ticker := s.ticker
 	s.mu.Unlock()
 
-	go s.run(ticker, stopCh)
+	slog.Info("scheduler starting")
+	s.loadAndScheduleAll()
 }
 
 func (s *PriceScheduler) Stop() {
 	s.mu.Lock()
-	if s.ticker == nil {
+	if s.stopped {
 		s.mu.Unlock()
 		return
 	}
-	s.ticker.Stop()
-	s.ticker = nil
-	if s.stopCh != nil {
-		close(s.stopCh)
+	s.stopped = true
+	close(s.stopCh)
+	for key, state := range s.states {
+		state.mu.Lock()
+		if state.timer != nil {
+			state.timer.Stop()
+			state.timer = nil
+		}
+		state.mu.Unlock()
+		delete(s.states, key)
 	}
-	s.stopCh = make(chan struct{})
 	s.mu.Unlock()
 	slog.Info("scheduler stopped")
 }
 
-func (s *PriceScheduler) run(ticker *time.Ticker, stopCh <-chan struct{}) {
-	for {
-		select {
-		case <-ticker.C:
-			s.syncAllPortfolios()
-		case <-stopCh:
-			return
-		}
-	}
-}
-
-func (s *PriceScheduler) syncAllPortfolios() {
+func (s *PriceScheduler) loadAndScheduleAll() {
 	var portfolios []models.Portfolio
 	if err := s.db.Find(&portfolios).Error; err != nil {
 		slog.Error("failed to query portfolios", "error", err)
@@ -102,39 +96,112 @@ func (s *PriceScheduler) syncAllPortfolios() {
 	}
 
 	for _, p := range portfolios {
-		var setting models.Setting
-		if err := s.db.Where("`key` = ? AND portfolio_id = ?", "syncInterval", p.ID).First(&setting).Error; err != nil {
-			continue
-		}
+		s.schedulePortfolio(p.UserID, p.ID)
+	}
+}
 
-		interval, err := strconv.Atoi(setting.Value)
-		if err != nil || interval <= 0 {
-			continue
-		}
+func (s *PriceScheduler) schedulePortfolio(userID, portfolioID string) {
+	var setting models.Setting
+	if err := s.db.Where("`key` = ? AND portfolio_id = ?", "syncInterval", portfolioID).First(&setting).Error; err != nil {
+		return
+	}
 
-		key := syncKey(p.UserID, p.ID)
-		s.mu.Lock()
-		state, exists := s.states[key]
-		if !exists {
-			state = &syncState{
-				interval: time.Duration(interval) * time.Minute,
-			}
-			s.states[key] = state
-		} else {
-			state.mu.Lock()
-			state.interval = time.Duration(interval) * time.Minute
-			state.mu.Unlock()
-		}
-		s.mu.Unlock()
+	interval, err := strconv.Atoi(setting.Value)
+	if err != nil || interval <= 0 {
+		s.stopSchedule(userID, portfolioID)
+		return
+	}
 
+	key := syncKey(userID, portfolioID)
+	s.mu.Lock()
+	state, exists := s.states[key]
+	if !exists {
+		state = &syncState{
+			interval: time.Duration(interval) * time.Minute,
+		}
+		s.states[key] = state
+	} else {
 		state.mu.Lock()
-		shouldSync := time.Since(state.lastSyncAt) >= state.interval && !state.syncing
+		state.interval = time.Duration(interval) * time.Minute
 		state.mu.Unlock()
+	}
+	s.mu.Unlock()
 
-		if shouldSync {
-			go s.syncPortfolio(p.UserID, p.ID, state)
+	state.mu.Lock()
+	if state.timer != nil {
+		state.timer.Stop()
+	}
+
+	state.scheduleVersion++
+	version := state.scheduleVersion
+
+	var delay time.Duration
+	if state.lastSyncAt.IsZero() {
+		delay = 0
+	} else {
+		elapsed := time.Since(state.lastSyncAt)
+		if elapsed >= state.interval {
+			delay = 0
+		} else {
+			delay = state.interval - elapsed
 		}
 	}
+
+	state.timer = time.AfterFunc(delay, func() {
+		s.syncAndReschedule(userID, portfolioID, state, version)
+	})
+	state.mu.Unlock()
+
+	slog.Info("scheduled portfolio sync", "userId", userID, "portfolioId", portfolioID, "delay", delay)
+}
+
+func (s *PriceScheduler) stopSchedule(userID, portfolioID string) {
+	key := syncKey(userID, portfolioID)
+	s.mu.Lock()
+	state, exists := s.states[key]
+	if exists {
+		state.mu.Lock()
+		if state.timer != nil {
+			state.timer.Stop()
+			state.timer = nil
+		}
+		state.mu.Unlock()
+		delete(s.states, key)
+	}
+	s.mu.Unlock()
+
+	if exists {
+		slog.Info("stopped portfolio sync", "userId", userID, "portfolioId", portfolioID)
+	}
+}
+
+func (s *PriceScheduler) syncAndReschedule(userID, portfolioID string, state *syncState, version uint64) {
+	s.mu.RLock()
+	stopped := s.stopped
+	s.mu.RUnlock()
+	if stopped {
+		return
+	}
+
+	s.syncPortfolio(userID, portfolioID, state)
+
+	state.mu.Lock()
+	if state.scheduleVersion != version {
+		state.mu.Unlock()
+		return
+	}
+	if state.timer != nil && !s.isStopped() {
+		state.timer = time.AfterFunc(state.interval, func() {
+			s.syncAndReschedule(userID, portfolioID, state, version)
+		})
+	}
+	state.mu.Unlock()
+}
+
+func (s *PriceScheduler) isStopped() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.stopped
 }
 
 type syncResult struct {
@@ -148,14 +215,16 @@ const (
 	fetchRateLimit     = 50 * time.Millisecond
 )
 
-func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) {
+func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) bool {
 	state.mu.Lock()
 	if state.syncing {
 		state.mu.Unlock()
-		return
+		return false
 	}
 	state.syncing = true
 	state.mu.Unlock()
+
+	s.publishEvent(userID, portfolioID, EventSyncStarted, SyncStartedData{})
 
 	defer func() {
 		state.mu.Lock()
@@ -171,7 +240,8 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 		state.lastSyncErr = err.Error()
 		state.mu.Unlock()
 		slog.Error("failed to query holdings", "userId", userID, "portfolioId", portfolioID, "error", err)
-		return
+		s.publishEvent(userID, portfolioID, EventSyncFailed, SyncFailedData{Error: err.Error()})
+		return true
 	}
 
 	if len(holdings) == 0 {
@@ -179,8 +249,14 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 		state.mu.Lock()
 		state.lastSyncAt = time.Now()
 		state.lastSyncErr = ""
+		lastSyncAt := state.lastSyncAt
 		state.mu.Unlock()
-		return
+		s.publishEvent(userID, portfolioID, EventSyncCompleted, SyncCompletedData{
+			LastSyncAt:  lastSyncAt,
+			SyncedCount: 0,
+			FailedCount: 0,
+		})
+		return true
 	}
 
 	synced := 0
@@ -243,33 +319,43 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 	} else {
 		state.lastSyncErr = ""
 	}
+	lastSyncAt := state.lastSyncAt
+	lastSyncErr := state.lastSyncErr
 	state.mu.Unlock()
 
 	slog.Info("sync completed", "userId", userID, "portfolioId", portfolioID, "synced", synced, "failed", failed)
 
+	if lastSyncErr != "" {
+		s.publishEvent(userID, portfolioID, EventSyncFailed, SyncFailedData{Error: lastSyncErr})
+	} else {
+		s.publishEvent(userID, portfolioID, EventSyncCompleted, SyncCompletedData{
+			LastSyncAt:  lastSyncAt,
+			SyncedCount: synced,
+			FailedCount: failed,
+		})
+	}
+
+	var updates []HoldingUpdate
+	for symbol, price := range syncedPrices {
+		for _, h := range holdings {
+			if h.Symbol == symbol {
+				updates = append(updates, HoldingUpdate{
+					Symbol: symbol,
+					Price:  price.InexactFloat64(),
+					Value:  h.Shares.Mul(price).InexactFloat64(),
+				})
+				break
+			}
+		}
+	}
+	if len(updates) > 0 {
+		s.publishEvent(userID, portfolioID, EventPriceUpdated, PriceUpdatedData{Holdings: updates})
+	}
+
 	if s.notifier != nil {
 		s.notifier.NotifyAfterSync(userID, portfolioID, holdings, syncedPrices)
 	}
-}
-
-func (s *PriceScheduler) GetStatusForPortfolio(userID, portfolioID string) SyncStatus {
-	key := syncKey(userID, portfolioID)
-	s.mu.RLock()
-	state, exists := s.states[key]
-	s.mu.RUnlock()
-
-	if !exists {
-		return SyncStatus{}
-	}
-
-	state.mu.Lock()
-	defer state.mu.Unlock()
-
-	return SyncStatus{
-		LastSyncAt:  state.lastSyncAt,
-		LastSyncErr: state.lastSyncErr,
-		Syncing:     state.syncing,
-	}
+	return true
 }
 
 func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) bool {
@@ -309,6 +395,27 @@ func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string)
 	}, true
 }
 
+// UpdateSchedule reschedules sync for a portfolio (called when settings change)
+func (s *PriceScheduler) UpdateSchedule(userID, portfolioID string) {
+	s.schedulePortfolio(userID, portfolioID)
+}
+
 func (s *PriceScheduler) SetNotifier(n *Notifier) {
 	s.notifier = n
+}
+
+func (s *PriceScheduler) SetEventBus(eb *EventBus) {
+	s.eventBus = eb
+}
+
+func (s *PriceScheduler) publishEvent(userID, portfolioID, eventType string, data interface{}) {
+	if s.eventBus == nil {
+		return
+	}
+	s.eventBus.Publish(userID, Event{
+		Type:        eventType,
+		PortfolioID: portfolioID,
+		Data:        data,
+		Timestamp:   time.Now(),
+	})
 }

@@ -184,10 +184,6 @@ export async function fetchFundTransactions(
   )
 }
 
-export async function fetchSyncStatus(pid: string): Promise<SyncStatus> {
-  return request<SyncStatus>(`/api/portfolios/${pid}/sync/status`)
-}
-
 export async function triggerSync(pid: string): Promise<SyncStatus> {
   return request<SyncStatus>(`/api/portfolios/${pid}/sync/trigger`, { method: "POST" })
 }

@@ -71,6 +71,10 @@ func main() {
 	notifier := scheduler.NewNotifier(database, router)
 	priceScheduler.SetNotifier(notifier)
 
+	eventBus := scheduler.NewEventBus()
+	priceScheduler.SetEventBus(eventBus)
+	sseHandler := handlers.NewSSEHandler(eventBus)
+
 	h.POST("/api/auth/login", handlers.Login(database, cfg))
 	h.POST("/api/auth/logout", handlers.Logout(cfg))
 	h.GET("/api/auth/me", middleware.AuthRequired(), handlers.Me(database))
@@ -93,6 +97,7 @@ func main() {
 	api := h.Group("/api")
 	api.Use(middleware.AuthRequired())
 
+	api.GET("/events", sseHandler.Handle)
 	api.GET("/price/:symbol", handlers.GetPrice(router))
 	api.GET("/exchange/:pair", handlers.GetExchange(router))
 
@@ -114,7 +119,6 @@ func main() {
 	api.DELETE("/webauthn/credentials/:id", handlers.WebAuthnDeleteCredential(database))
 
 	pf := api.Group("/portfolios/:pid")
-	pf.GET("/sync/status", handlers.GetSyncStatus(database, priceScheduler))
 	pf.POST("/sync/trigger", handlers.TriggerSync(database, priceScheduler))
 
 	pf.GET("/holdings", handlers.ListHoldings(database, router))

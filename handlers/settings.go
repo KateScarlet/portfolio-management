@@ -99,6 +99,10 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
+		if key == "syncInterval" {
+			s.UpdateSchedule(user.UserID, portfolioID)
+		}
+
 		c.JSON(consts.StatusOK, map[string]string{"key": key, "value": body.Value})
 	}
 }
@@ -219,6 +223,10 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
+		}
+
+		if _, ok := body["syncInterval"]; ok {
+			s.UpdateSchedule(user.UserID, portfolioID)
 		}
 
 		c.JSON(consts.StatusOK, body)

@@ -43,21 +43,8 @@ func TestPriceScheduler_New(t *testing.T) {
 	db := setupTestDB(t)
 	s := New(db, setupTestRouter(db))
 	s.Stop()
-	if s.ticker != nil {
-		t.Error("expected ticker to be nil after Stop")
-	}
-}
-
-func TestPriceScheduler_GetStatusForPortfolio_Unknown(t *testing.T) {
-	db := setupTestDB(t)
-	s := New(db, setupTestRouter(db))
-	s.Stop()
-	status := s.GetStatusForPortfolio("nonexistent", "nonexistent-portfolio")
-	if status.Syncing {
-		t.Error("expected Syncing to be false")
-	}
-	if !status.LastSyncAt.IsZero() {
-		t.Error("expected LastSyncAt to be zero")
+	if !s.stopped {
+		t.Error("expected scheduler to be stopped after Stop")
 	}
 }
 
@@ -66,8 +53,8 @@ func TestPriceScheduler_StopIdempotent(t *testing.T) {
 	s := New(db, setupTestRouter(db))
 	s.Stop()
 	s.Stop()
-	if s.ticker != nil {
-		t.Error("expected ticker to be nil after double Stop")
+	if !s.stopped {
+		t.Error("expected scheduler to be stopped after double Stop")
 	}
 }
 
@@ -78,12 +65,6 @@ func TestPriceScheduler_TriggerSyncForPortfolio(t *testing.T) {
 
 	if !s.TriggerSyncForPortfolio("user1", "portfolio1") {
 		t.Error("expected first trigger to succeed")
-	}
-	time.Sleep(50 * time.Millisecond)
-
-	status := s.GetStatusForPortfolio("user1", "portfolio1")
-	if status.LastSyncAt.IsZero() {
-		t.Error("expected LastSyncAt to be set after sync")
 	}
 }
 

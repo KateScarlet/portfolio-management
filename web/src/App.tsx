@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Decimal from "decimal.js"
 import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
+import { useSSE } from "./hooks/useSSE"
 import {
   Settings,
   SyncStatus,
@@ -14,6 +15,7 @@ import {
   AvailableFund,
   FundTransaction,
 } from "./types"
+import type { SSEEvent, SyncCompletedData, SyncFailedData, PriceUpdatedData } from "./types/events"
 import * as api from "./api"
 import { toDecimal } from "./utils"
 import Dashboard from "./components/Dashboard"
@@ -60,6 +62,53 @@ export default function App() {
     const rate = exchangeRates[f.currency]
     return rate ? sum + toDecimal(f.amount).times(rate).toNumber() : sum
   }, 0)
+
+  const handleSSEEvent = useCallback(
+    (event: SSEEvent) => {
+      if (event.portfolioId !== currentPortfolio?.id) return
+
+      switch (event.type) {
+        case "sync.started":
+          setSyncStatus((prev) => (prev ? { ...prev, syncing: true } : null))
+          break
+
+        case "sync.completed": {
+          const data = event.data as SyncCompletedData
+          setSyncStatus({
+            syncing: false,
+            lastSyncAt: data.lastSyncAt,
+            lastSyncErr: "",
+          })
+          break
+        }
+
+        case "sync.failed": {
+          const data = event.data as SyncFailedData
+          setSyncStatus((prev) =>
+            prev ? { ...prev, syncing: false, lastSyncErr: data.error } : null
+          )
+          break
+        }
+
+        case "price.updated": {
+          const data = event.data as PriceUpdatedData
+          setHoldings((prev) =>
+            prev.map((h) => {
+              const updated = data.holdings.find((u) => u.symbol === h.symbol)
+              return updated ? { ...h, price: String(updated.price), value: String(updated.value) } : h
+            })
+          )
+          break
+        }
+      }
+    },
+    [currentPortfolio?.id, setHoldings]
+  )
+
+  useSSE({
+    onEvent: handleSSEEvent,
+    enabled: !!user && !!currentPortfolio,
+  })
 
   useEffect(() => {
     api
@@ -161,40 +210,7 @@ export default function App() {
       .catch(console.error)
     api.fetchAvailableFunds(currentPortfolio.id).then(setAvailableFunds).catch(console.error)
     api.fetchFundTransactions(currentPortfolio.id).then(setFundTransactions).catch(console.error)
-    api.fetchSyncStatus(currentPortfolio.id).then(setSyncStatus).catch(console.error)
   }, [currentPortfolio])
-
-  const prevSyncingRef = useRef(false)
-  const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollSyncStatusRef = useRef<() => void>(() => {})
-
-  const pollSyncStatus = useCallback(() => {
-    if (!currentPortfolio) return
-    api
-      .fetchSyncStatus(currentPortfolio.id)
-      .then((status) => {
-        if (prevSyncingRef.current && !status.syncing && currentPortfolio) {
-          api.fetchHoldings(currentPortfolio.id).then(setHoldings).catch(console.error)
-        }
-        prevSyncingRef.current = status.syncing
-        setSyncStatus(status)
-        if (syncPollRef.current) clearInterval(syncPollRef.current)
-        syncPollRef.current = setInterval(pollSyncStatusRef.current, status.syncing ? 2000 : 30000)
-      })
-      .catch(console.error)
-  }, [setHoldings, currentPortfolio])
-
-  useEffect(() => {
-    pollSyncStatusRef.current = pollSyncStatus
-  }, [pollSyncStatus])
-
-  useEffect(() => {
-    if (!user || !currentPortfolio) return
-    syncPollRef.current = setInterval(pollSyncStatus, 30000)
-    return () => {
-      if (syncPollRef.current) clearInterval(syncPollRef.current)
-    }
-  }, [user, currentPortfolio, pollSyncStatus])
 
   const handleSaveSettings = useCallback(
     async (newSettings: Settings) => {
