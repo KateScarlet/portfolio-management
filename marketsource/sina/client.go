@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -72,7 +73,7 @@ func gbkToUTF8(data []byte) string {
 	if len(data) == 0 {
 		return ""
 	}
-	reader := transform.NewReader(strings.NewReader(string(data)), simplifiedchinese.GBK.NewDecoder())
+	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
 	decoded, err := io.ReadAll(reader)
 	if err != nil {
 		return string(data)
