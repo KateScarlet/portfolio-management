@@ -421,48 +421,38 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 }
 
 func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
-	f := amount.InexactFloat64()
-	result := tx.Model(&models.AvailableFund{}).
-		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
-		Update("amount", gorm.Expr("CAST(amount AS REAL) + ?", f))
-	if result.Error != nil {
-		return result.Error
+	var af models.AvailableFund
+	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
+	if err == gorm.ErrRecordNotFound {
+		return tx.Create(&models.AvailableFund{
+			ID:          uuid.New().String(),
+			UserID:      userID,
+			PortfolioID: portfolioID,
+			Currency:    currency,
+			Amount:      amount,
+		}).Error
 	}
-	if result.RowsAffected > 0 {
-		return nil
+	if err != nil {
+		return err
 	}
-	return tx.Create(&models.AvailableFund{
-		ID:          uuid.New().String(),
-		UserID:      userID,
-		PortfolioID: portfolioID,
-		Currency:    currency,
-		Amount:      amount,
-	}).Error
+	newAmount := af.Amount.Add(amount)
+	return tx.Model(&af).Update("amount", newAmount).Error
 }
 
 func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
-	f := amount.InexactFloat64()
-	result := tx.Model(&models.AvailableFund{}).
-		Where("user_id = ? AND portfolio_id = ? AND currency = ? AND CAST(amount AS REAL) >= ?", userID, portfolioID, currency, f).
-		Update("amount", gorm.Expr("CAST(amount AS REAL) - ?", f))
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected > 0 {
-		return nil
-	}
-	var count int64
-	if err := tx.Model(&models.AvailableFund{}).
-		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
-		Count(&count).Error; err != nil {
-		return err
-	}
-	if count == 0 {
+	var af models.AvailableFund
+	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
+	if err == gorm.ErrRecordNotFound {
 		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 余额为 0"}
 	}
-	var af models.AvailableFund
-	tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af)
-	return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + af.Amount.StringFixed(2) + ", 需要 " + amount.StringFixed(2)}
+	if err != nil {
+		return err
+	}
+	if af.Amount.LessThan(amount) {
+		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + af.Amount.StringFixed(2) + ", 需要 " + amount.StringFixed(2)}
+	}
+	newAmount := af.Amount.Sub(amount)
+	return tx.Model(&af).Update("amount", newAmount).Error
 }
 
 func formatDecimal(d decimal.Decimal) string {
