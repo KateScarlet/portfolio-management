@@ -25,7 +25,6 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
   const [manualPrice, setManualPrice] = useState("")
   const [manualShares, setManualShares] = useState("")
   const [isFetching, setIsFetching] = useState(false)
-  const [deductFromCash, setDeductFromCash] = useState(true)
 
   const { showToast } = useToast()
 
@@ -67,7 +66,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           cost: addedCost,
           fee: feeNum,
           date: new Date(date).getTime(),
-          deductFromCash: deductFromCash,
+          deductFromCash: true,
         })
       } catch (e) {
         showToast(e instanceof Error ? e.message : "录入失败", "error")
@@ -119,7 +118,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             cost: sharesNum * finalCostPrice,
             fee: feeNum,
             date: new Date(date).getTime(),
-            deductFromCash: deductFromCash,
+            deductFromCash: true,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
@@ -451,17 +450,6 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
         </div>
 
         <div className="flex flex-col justify-end gap-2">
-          <label className="flex items-center gap-2 cursor-pointer pb-1 h-5.25">
-            <input
-              type="checkbox"
-              checked={deductFromCash}
-              onChange={(e) => setDeductFromCash(e.target.checked)}
-              className="rounded border-[#E9ECEF] text-[#1A1A1A] focus:ring-[#1A1A1A]"
-            />
-            <span className="text-[10px] uppercase tracking-widest text-[#495057] font-bold">
-              从可用资金扣除
-            </span>
-          </label>
           <button
             onClick={handleAdd}
             disabled={isFetching}

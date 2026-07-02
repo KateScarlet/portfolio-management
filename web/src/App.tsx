@@ -241,11 +241,17 @@ export default function App() {
   const handleAddHolding = useCallback(
     async (holding: Omit<Holding, "id">) => {
       await addHolding(holding)
-      if (holding.deductFromCash) {
-        handleRefreshAvailableFunds()
-      }
+      handleRefreshAvailableFunds()
     },
     [addHolding, handleRefreshAvailableFunds]
+  )
+
+  const handleRemoveHolding = useCallback(
+    async (id: string) => {
+      await removeHolding(id)
+      handleRefreshAvailableFunds()
+    },
+    [removeHolding, handleRefreshAvailableFunds]
   )
 
   const handleTriggerSync = useCallback(async () => {
@@ -437,7 +443,7 @@ export default function App() {
             total={total}
             onAddHolding={handleAddHolding}
             onUpdateHolding={updateHolding}
-            onRemoveHolding={removeHolding}
+            onRemoveHolding={handleRemoveHolding}
             onSaveRecord={saveRecord}
             colorScheme={settings.colorScheme}
             displayCurrency={settings.displayCurrency}

@@ -448,13 +448,52 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		id := c.Param("id")
-		result := db.Where("portfolio_id = ?", portfolioID).Delete(&models.Holding{}, "id = ?", id)
-		if result.Error != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": result.Error.Error()})
-			return
-		}
-		if result.RowsAffected == 0 {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
+
+		err = db.Transaction(func(tx *gorm.DB) error {
+			var holding models.Holding
+			if err := tx.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "Holding not found"}
+				}
+				return err
+			}
+
+			refundAmount := holding.Cost + holding.BuyFees()
+			if refundAmount > 0 {
+				currency := holding.Currency
+				if currency == "" {
+					currency = "CNY"
+				}
+				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, refundAmount); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID:          uuid.New().String(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Type:        "delete",
+					Amount:      refundAmount,
+					Currency:    currency,
+					HoldingID:   holding.ID,
+					CreatedAt:   time.Now().UnixMilli(),
+				}).Error; err != nil {
+					return err
+				}
+			}
+
+			if err := tx.Delete(&holding).Error; err != nil {
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			var he *httpError
+			if errors.As(err, &he) {
+				c.JSON(he.status, map[string]string{"error": he.msg})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
 			return
 		}
 		c.JSON(consts.StatusOK, map[string]bool{"success": true})
