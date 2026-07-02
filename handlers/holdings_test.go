@@ -126,6 +126,10 @@ func TestListHoldings_Unauthorized(t *testing.T) {
 
 func TestCreateHolding_NewStockHolding(t *testing.T) {
 	db := setupHoldingsTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: 10000,
+	})
 	body := map[string]any{
 		"assetId":        "stocks",
 		"symbol":         "AAPL",
@@ -135,7 +139,6 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 		"costPrice":      140,
 		"cost":           1400,
 		"value":          1500,
-		"deductFromCash": false,
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 
@@ -158,6 +161,10 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 
 func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 	db := setupHoldingsTestDB(t)
+	db.Create(&models.AvailableFund{
+		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: 10000,
+	})
 	createTestHolding(t, db, 10, 100, 900)
 
 	body := map[string]any{
@@ -233,7 +240,7 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 		"value":          1000,
 		"fee":            5,
 		"currency":       "CNY",
-		"deductFromCash": true,
+
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -268,7 +275,7 @@ func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 		"costPrice":      100,
 		"cost":           1000,
 		"value":          1000,
-		"deductFromCash": true,
+
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -295,7 +302,7 @@ func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 		"value":          2500,
 		"fee":            10,
 		"currency":       "USD",
-		"deductFromCash": true,
+
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
@@ -335,46 +342,13 @@ func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
 		"value":          2500,
 		"fee":            10,
 		"currency":       "USD",
-		"deductFromCash": true,
+
 	}
 	c := newUserCtx("POST", "/api/holdings", body)
 	CreateHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
 		t.Errorf("expected 400 (insufficient USD funds), got %d", c.Response.StatusCode())
-	}
-}
-
-func TestCreateHolding_NoDeduct_PreservesFunds(t *testing.T) {
-	db := setupHoldingsTestDB(t)
-	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "CNY", Amount: 10000,
-	})
-
-	body := map[string]any{
-		"assetId":        "stocks",
-		"symbol":         "VTI",
-		"shares":         10,
-		"price":          100,
-		"costPrice":      100,
-		"cost":           1000,
-		"value":          1000,
-		"fee":            5,
-		"currency":       "CNY",
-		"deductFromCash": false,
-	}
-	c := newUserCtx("POST", "/api/holdings", body)
-	CreateHolding(db)(context.Background(), c)
-
-	if c.Response.StatusCode() != 201 {
-		t.Fatalf("expected 201, got %d", c.Response.StatusCode())
-	}
-
-	var af models.AvailableFund
-	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
-	if af.Amount != 10000 {
-		t.Errorf("expected funds unchanged at 10000, got %.2f", af.Amount)
 	}
 }
 

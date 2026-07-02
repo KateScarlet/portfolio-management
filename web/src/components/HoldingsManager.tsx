@@ -3,6 +3,7 @@ import { ASSET_DEFINITIONS, Holding, HoldingLot, ColorScheme } from "../types"
 import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
+import BuyModal from "./BuyModal"
 import SellModal from "./SellModal"
 import ConfirmDialog from "./ConfirmDialog"
 
@@ -47,6 +48,7 @@ export default function HoldingsManager({
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
+  const [buyingHolding, setBuyingHolding] = useState<Holding | null>(null)
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
 
   const computeCost = useCallback((costPriceStr: string, sharesStr: string) => {
@@ -97,6 +99,19 @@ export default function HoldingsManager({
       setHoldings((prev) =>
         prev.map((h) => {
           if (h.id === soldHolding.id) return soldHolding
+          return h
+        })
+      )
+      onRefreshAvailableFunds()
+    },
+    [setHoldings, onRefreshAvailableFunds]
+  )
+
+  const handleBuyConfirm = useCallback(
+    (updatedHolding: Holding) => {
+      setHoldings((prev) =>
+        prev.map((h) => {
+          if (h.id === updatedHolding.id) return updatedHolding
           return h
         })
       )
@@ -299,6 +314,13 @@ export default function HoldingsManager({
                         className="px-6 py-5 text-right space-x-2"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <button
+                          onClick={() => setBuyingHolding(h)}
+                          className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-green-600 font-bold transition-colors"
+                          title="买入"
+                        >
+                          Buy
+                        </button>
                         {!h.symbol && (
                           <button
                             onClick={() => {
@@ -588,6 +610,15 @@ export default function HoldingsManager({
           displayCurrency={displayCurrency}
           onConfirm={handleSellConfirm}
           onClose={() => setSellingHolding(null)}
+        />
+      )}
+
+      {buyingHolding && (
+        <BuyModal
+          portfolioId={portfolioId}
+          holding={buyingHolding}
+          onConfirm={handleBuyConfirm}
+          onClose={() => setBuyingHolding(null)}
         />
       )}
 

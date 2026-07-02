@@ -90,7 +90,6 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 
 type CreateHoldingInput struct {
 	models.Holding
-	DeductFromCash bool `json:"deductFromCash"`
 }
 
 func CreateHolding(db *gorm.DB) app.HandlerFunc {
@@ -150,17 +149,24 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var newLot models.HoldingLot
-		newLot.ID = uuid.New().String()
-		newLot.Date = input.Date
-		if newLot.Date == 0 {
-			newLot.Date = time.Now().UnixMilli()
+		isRegisterOnly := input.Shares == 0 && input.Cost == 0
+
+		var newLot *models.HoldingLot
+		if !isRegisterOnly {
+			lot := models.HoldingLot{
+				ID:         uuid.New().String(),
+				Date:       input.Date,
+				Shares:     input.Shares,
+				CostPrice:  input.CostPrice,
+				Cost:       input.Cost,
+				ValueAdded: input.Value,
+				Fee:        input.Fee,
+			}
+			if lot.Date == 0 {
+				lot.Date = time.Now().UnixMilli()
+			}
+			newLot = &lot
 		}
-		newLot.Shares = input.Shares
-		newLot.CostPrice = input.CostPrice
-		newLot.Cost = input.Cost
-		newLot.ValueAdded = input.Value
-		newLot.Fee = input.Fee
 
 		var created bool
 		var result models.Holding
@@ -174,7 +180,10 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			if res.Error == nil {
-				existing.Lots = append(existing.Lots, newLot)
+				if isRegisterOnly {
+					return &httpError{status: consts.StatusBadRequest, msg: "该资产已存在"}
+				}
+				existing.Lots = append(existing.Lots, *newLot)
 				if existing.Symbol != "" && input.Price > 0 {
 					existing.Price = input.Price
 				}
@@ -192,10 +201,10 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				input.ID = uuid.New().String()
 				input.UserID = user.UserID
 				input.PortfolioID = portfolioID
-				if input.Lots == nil {
-					input.Lots = models.JSONColumn{newLot}
+				if newLot != nil {
+					input.Lots = models.JSONColumn{*newLot}
 				} else {
-					input.Lots = append(input.Lots, newLot)
+					input.Lots = models.JSONColumn{}
 				}
 				input.RecalcFromLots()
 				created = true
@@ -205,7 +214,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			if input.DeductFromCash {
+			if newLot != nil {
 				addedCost := newLot.Cost + input.Fee
 				if addedCost > 0 {
 					holdingCurrency := input.Currency
@@ -222,7 +231,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 						return err
 					}
 
-					if fundsAmount < addedCost {
+					if math.Round(fundsAmount*100) < math.Round(addedCost*100) {
 						return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %.2f, 需要 %.2f", holdingCurrency, fundsAmount, addedCost)}
 					}
 

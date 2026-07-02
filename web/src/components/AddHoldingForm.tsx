@@ -13,44 +13,13 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
   const [market, setMarket] = useState<"US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO">("US")
   const [symbol, setSymbol] = useState("")
   const [name, setName] = useState("")
-  const [shares, setShares] = useState("")
-  const [costPrice, setCostPrice] = useState("")
-  const [costCurrency, setCostCurrency] = useState("USD")
-  const [value, setValue] = useState("")
-  const [cost, setCost] = useState("")
-  const [fee, setFee] = useState("")
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0])
   const [isManual, setIsManual] = useState(false)
-  const [manualInputMode, setManualInputMode] = useState<"cost" | "priceShares">("cost")
-  const [manualPrice, setManualPrice] = useState("")
-  const [manualShares, setManualShares] = useState("")
   const [isFetching, setIsFetching] = useState(false)
 
   const { showToast } = useToast()
 
   const handleAdd = async () => {
-    const feeNum = parseFloat(fee) || 0
-
     if (isManual) {
-      const val = parseFloat(value)
-      if (isNaN(val) || val <= 0) {
-        showToast("请输入有效的当前总市值", "error")
-        return
-      }
-
-      let addedCost: number
-      if (manualInputMode === "priceShares") {
-        const p = parseFloat(manualPrice)
-        const s = parseFloat(manualShares)
-        if (isNaN(p) || p <= 0 || isNaN(s) || s <= 0) {
-          showToast("请输入有效的单价和份额", "error")
-          return
-        }
-        addedCost = p * s
-      } else {
-        const c = parseFloat(cost)
-        addedCost = isNaN(c) || c <= 0 ? val : c
-      }
       const targetCurrency =
         market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
       try {
@@ -60,27 +29,17 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           name: name.trim() || "手工资产",
           market,
           currency: targetCurrency,
-          shares: manualInputMode === "priceShares" ? parseFloat(manualShares) || 0 : 0,
-          price: manualInputMode === "priceShares" ? parseFloat(manualPrice) || 0 : 0,
-          value: val,
-          cost: addedCost,
-          fee: feeNum,
-          date: new Date(date).getTime(),
-          deductFromCash: true,
+          shares: 0,
+          price: 0,
+          value: 0,
         })
       } catch (e) {
         showToast(e instanceof Error ? e.message : "录入失败", "error")
         return
       }
     } else {
-      const sharesNum = parseFloat(shares)
-      const cPrice = parseFloat(costPrice)
       if (!symbol) {
         showToast("请输入股票/基金代码", "error")
-        return
-      }
-      if (isNaN(sharesNum) || sharesNum <= 0) {
-        showToast("请输入有效的份额", "error")
         return
       }
 
@@ -89,21 +48,8 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
         const data = await api.fetchPrice(symbol, market)
         if (data && data.price) {
           const authoritativeSymbol = data.symbol || symbol.toUpperCase()
-          let finalCostPrice = isNaN(cPrice) || cPrice <= 0 ? data.price : cPrice
-
           const targetCurrency =
             market === "US" || market === "CRYPTO" || market === "COMMODITY_INTL" ? "USD" : market === "HK" ? "HKD" : "CNY"
-
-          if (!isNaN(cPrice) && cPrice > 0 && costCurrency !== targetCurrency) {
-            try {
-              const fxData = await api.fetchExchangeRate(`${costCurrency}${targetCurrency}`)
-              if (fxData && fxData.rate) {
-                finalCostPrice = cPrice * fxData.rate
-              }
-            } catch {
-              showToast("汇率获取失败，使用原始价格", "info")
-            }
-          }
 
           await onAddHolding({
             assetId,
@@ -111,14 +57,9 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             name: name.trim() || data.name || authoritativeSymbol,
             market,
             currency: targetCurrency,
-            shares: sharesNum,
+            shares: 0,
             price: data.price,
-            costPrice: finalCostPrice,
-            value: sharesNum * data.price,
-            cost: sharesNum * finalCostPrice,
-            fee: feeNum,
-            date: new Date(date).getTime(),
-            deductFromCash: true,
+            value: 0,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
@@ -126,11 +67,7 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           return
         }
       } catch (e) {
-        if (e instanceof Error && e.message.includes("可用资金")) {
-          showToast(e.message, "error")
-        } else {
-          showToast("价格获取失败，请尝试手动录入", "error")
-        }
+        showToast("价格获取失败，请尝试手动录入", "error")
         setIsFetching(false)
         return
       } finally {
@@ -181,17 +118,6 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-            购买/录入日期
-          </label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
-          />
-        </div>
 
         {!isManual ? (
           <>
@@ -205,9 +131,6 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
                   const m = e.target.value as "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
                   setMarket(m)
                   setSymbol("")
-                  if (m === "US" || m === "CRYPTO" || m === "COMMODITY_INTL") setCostCurrency("USD")
-                  else if (m === "HK") setCostCurrency("HKD")
-                  else setCostCurrency("CNY")
                 }}
                 className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
               >
@@ -293,161 +216,27 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
                 className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {market === "COMMODITY_CN" ? "买入单价 (选填)" : "买入单价"}
-              </label>
-              <div className="flex w-full">
-                <select
-                  value={costCurrency}
-                  onChange={(e) => setCostCurrency(e.target.value)}
-                  className="px-2 py-2 border border-r-0 border-[#E9ECEF] rounded-l-lg text-xs bg-gray-50 focus:outline-none focus:border-[#1A1A1A] w-17.5"
-                >
-                  <option value="CNY">CNY</option>
-                  <option value="USD">USD</option>
-                  <option value="HKD">HKD</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="均价"
-                  value={costPrice}
-                  onChange={(e) => setCostPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-r-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono min-w-0"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {(market === "COMMODITY_CN" || market === "COMMODITY_INTL")
-                  ? "数量"
-                  : market === "CRYPTO"
-                    ? "数量"
-                    : "份额 (股份)"}
-              </label>
-              <input
-                type="number"
-                placeholder={
-                  market === "COMMODITY_CN" || market === "COMMODITY_INTL" ? "如: 50" : market === "CRYPTO" ? "如: 0.5" : "0"
-                }
-                value={shares}
-                onChange={(e) => setShares(e.target.value)}
-                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-              />
-            </div>
           </>
         ) : (
-          <>
-            <div className="flex flex-col gap-1 md:col-span-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                名称
-              </label>
-              <input
-                type="text"
-                placeholder={
-                  assetId === "commodities"
-                    ? "如: 实物黄金 50g"
-                    : assetId === "cash"
-                      ? "如: 货币基金"
-                      : "如: 某理财产品"
-                }
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
-              />
-            </div>
-            <div className="flex flex-col gap-1 md:col-span-1">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                录入方式
-              </label>
-              <div className="flex gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-[#495057]">
-                  <input
-                    type="radio"
-                    checked={manualInputMode === "cost"}
-                    onChange={() => setManualInputMode("cost")}
-                    className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
-                  />
-                  总成本
-                </label>
-                <label className="flex items-center gap-1.5 text-xs text-[#495057]">
-                  <input
-                    type="radio"
-                    checked={manualInputMode === "priceShares"}
-                    onChange={() => setManualInputMode("priceShares")}
-                    className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
-                  />
-                  单价+份额
-                </label>
-              </div>
-            </div>
-            {manualInputMode === "cost" ? (
-              <div className="flex flex-col gap-1 md:col-span-1">
-                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                  总成本 (选填)
-                </label>
-                <input
-                  type="number"
-                  placeholder="投入本金"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                />
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1 md:col-span-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                    单价
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="买入单价"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                  />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-1">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                    份额
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="数量"
-                    value={manualShares}
-                    onChange={(e) => setManualShares(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                  />
-                </div>
-              </>
-            )}
-            <div className="flex flex-col gap-1 md:col-span-1">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                当前总市值
-              </label>
-              <input
-                type="number"
-                placeholder="最新估值"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-              />
-            </div>
-          </>
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+              名称
+            </label>
+            <input
+              type="text"
+              placeholder={
+                assetId === "commodities"
+                  ? "如: 实物黄金 50g"
+                  : assetId === "cash"
+                    ? "如: 货币基金"
+                    : "如: 某理财产品"
+              }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+            />
+          </div>
         )}
-
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-            手续费 (选填)
-          </label>
-          <input
-            type="number"
-            placeholder="0"
-            value={fee}
-            onChange={(e) => setFee(e.target.value)}
-            className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-          />
-        </div>
 
         <div className="flex flex-col justify-end gap-2">
           <button

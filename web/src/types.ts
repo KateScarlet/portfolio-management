@@ -85,7 +85,6 @@ export interface Holding {
   date?: number // Original purchase date for the lot being added
   fee?: number // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
-  deductFromCash?: boolean // 从现金扣除本金（仅用于创建时传递）
 }
 
 export interface HoldingSnapshot {
