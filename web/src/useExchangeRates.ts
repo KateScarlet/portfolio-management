@@ -28,7 +28,7 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
       unique.map(async (cur) => {
         try {
           const res = await api.fetchExchangeRate(`${cur}${displayCurrency}`)
-          return { currency: cur, rate: res.rate, ok: true }
+          return { currency: cur, rate: Number(res.rate), ok: true }
         } catch {
           return { currency: cur, rate: 0, ok: false }
         }

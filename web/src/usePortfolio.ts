@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { AssetId, Holding, PortfolioRecord } from "./types"
 import * as api from "./api"
+import { toDecimal } from "./utils"
 
 export function usePortfolio(portfolioId: string | null, displayCurrency: string = "CNY") {
   const [holdings, setHoldings] = useState<Holding[]>([])
@@ -37,7 +38,7 @@ export function usePortfolio(portfolioId: string | null, displayCurrency: string
 
   const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
   holdings.forEach((h) => {
-    assets[h.assetId] = (assets[h.assetId] || 0) + (h.value || 0)
+    assets[h.assetId] = (assets[h.assetId] || 0) + toDecimal(h.value).toNumber()
   })
 
   const addHolding = useCallback(

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import Decimal from "decimal.js"
 import { Holding } from "../types"
 import * as api from "../api"
 import { useToast } from "./toast-context"
@@ -29,17 +30,17 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
   const { showToast } = useToast()
 
   const handleConfirm = async () => {
-    const feeNum = parseFloat(buyFee) || 0
+    const feeNum = new Decimal(buyFee || "0")
     const dateMs = new Date(buyDate).getTime()
 
     if (isSymbolBased) {
-      const sharesNum = parseFloat(buyShares)
-      const priceNum = parseFloat(buyPrice)
-      if (isNaN(sharesNum) || sharesNum <= 0) {
+      const sharesNum = new Decimal(buyShares)
+      const priceNum = new Decimal(buyPrice)
+      if (sharesNum.isNegative() || sharesNum.isZero()) {
         showToast("请输入有效的买入份额", "error")
         return
       }
-      if (isNaN(priceNum) || priceNum <= 0) {
+      if (priceNum.isNegative() || priceNum.isZero()) {
         showToast("请输入有效的买入单价", "error")
         return
       }
@@ -50,7 +51,7 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
         try {
           const fxData = await api.fetchExchangeRate(`${costCurrency}${targetCurrency}`)
           if (fxData && fxData.rate) {
-            finalCostPrice = priceNum * fxData.rate
+            finalCostPrice = priceNum.times(new Decimal(fxData.rate))
           }
         } catch {
           showToast("汇率获取失败，使用原始价格", "info")
@@ -59,18 +60,19 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
 
       setSubmitting(true)
       try {
+        const holdingPrice = new Decimal(holding.price)
         const result = await api.createHolding(portfolioId, {
           assetId: holding.assetId,
           symbol: holding.symbol,
           name: holding.name,
           market: holding.market,
           currency: targetCurrency,
-          shares: sharesNum,
-          price: holding.price,
-          costPrice: finalCostPrice,
-          value: sharesNum * holding.price,
-          cost: sharesNum * finalCostPrice,
-          fee: feeNum,
+          shares: sharesNum.toString(),
+          price: holdingPrice.toString(),
+          costPrice: finalCostPrice.toString(),
+          value: sharesNum.times(holdingPrice).toString(),
+          cost: sharesNum.times(finalCostPrice).toString(),
+          fee: feeNum.toString(),
           date: dateMs,
         })
         onConfirm(result)
@@ -81,29 +83,29 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
         setSubmitting(false)
       }
     } else {
-      let addedCost: number
-      let addedShares: number
+      let addedCost: Decimal
+      let addedShares: Decimal
       if (manualInputMode === "priceShares") {
-        const p = parseFloat(manualPrice)
-        const s = parseFloat(manualShares)
-        if (isNaN(p) || p <= 0 || isNaN(s) || s <= 0) {
+        const p = new Decimal(manualPrice)
+        const s = new Decimal(manualShares)
+        if (p.isNegative() || p.isZero() || s.isNegative() || s.isZero()) {
           showToast("请输入有效的单价和份额", "error")
           return
         }
-        addedCost = p * s
+        addedCost = p.times(s)
         addedShares = s
       } else {
-        const c = parseFloat(manualCost)
-        if (isNaN(c) || c <= 0) {
+        const c = new Decimal(manualCost)
+        if (c.isNegative() || c.isZero()) {
           showToast("请输入有效的总成本", "error")
           return
         }
         addedCost = c
-        addedShares = 0
+        addedShares = new Decimal(0)
       }
 
-      const val = parseFloat(manualValue)
-      if (isNaN(val) || val <= 0) {
+      const val = new Decimal(manualValue)
+      if (val.isNegative() || val.isZero()) {
         showToast("请输入有效的当前价值", "error")
         return
       }
@@ -116,11 +118,11 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
           name: holding.name,
           market: holding.market,
           currency: holding.currency || "CNY",
-          shares: addedShares,
-          price: manualInputMode === "priceShares" ? parseFloat(manualPrice) : 0,
-          value: val,
-          cost: addedCost,
-          fee: feeNum,
+          shares: addedShares.toString(),
+          price: manualInputMode === "priceShares" ? new Decimal(manualPrice).toString() : "0",
+          value: val.toString(),
+          cost: addedCost.toString(),
+          fee: feeNum.toString(),
           date: dateMs,
         })
         onConfirm(result)
@@ -158,7 +160,7 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                  买入单价 {holding.price > 0 && `(当前: ${holding.price})`}
+                  买入单价 {holding.price && holding.price !== "0" && `(当前: ${holding.price})`}
                 </label>
                 <div className="flex w-full">
                   <select

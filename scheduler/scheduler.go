@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -184,7 +185,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 
 	synced := 0
 	failed := 0
-	syncedPrices := make(map[string]float64)
+	syncedPrices := make(map[string]decimal.Decimal)
 
 	sem := make(chan struct{}, maxConcurrentFetch)
 	results := make(chan syncResult, len(holdings))
@@ -221,8 +222,8 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 		}
 
 		updates := map[string]any{
-			"price": r.result.Price,
-			"value": gorm.Expr("shares * ?", r.result.Price),
+			"price": r.result.Price.InexactFloat64(),
+			"value": gorm.Expr("CAST(shares AS REAL) * ?", r.result.Price.InexactFloat64()),
 		}
 		if err := s.db.Model(&models.Holding{}).Where("id = ? AND portfolio_id = ?", r.holding.ID, portfolioID).Updates(updates).Error; err != nil {
 			slog.Error("failed to update holding", "userId", userID, "portfolioId", portfolioID, "id", r.holding.ID, "error", err)

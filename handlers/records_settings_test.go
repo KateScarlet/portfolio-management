@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -26,9 +27,9 @@ func createTestRecord(t *testing.T, db *gorm.DB, timestamp int64) string {
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Timestamp:   timestamp,
-		Assets:      models.AssetMapColumn{"stocks": 1000, "bonds": 500},
-		Total:       1500,
-		Principal:   1400,
+		Assets:      models.AssetMapColumn{"stocks": decimal.NewFromInt(1000), "bonds": decimal.NewFromInt(500)},
+		Total:       decimal.NewFromInt(1500),
+		Principal:   decimal.NewFromInt(1400),
 	}
 	if err := db.Create(&r).Error; err != nil {
 		t.Fatal(err)
@@ -92,8 +93,8 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	// Need holdings for CreateRecord to work
 	db.Create(&models.Holding{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID, AssetId: "stocks",
-		Symbol: "AAPL", Shares: 10, Price: 100, Value: 1000, Cost: 900,
-		Lots: models.JSONColumn{{ID: uuid.New().String(), Shares: 10, Cost: 900, ValueAdded: 1000}},
+		Symbol: "AAPL", Shares: decimal.NewFromInt(10), Price: decimal.NewFromInt(100), Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(900),
+		Lots: models.JSONColumn{{ID: uuid.New().String(), Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(900), ValueAdded: decimal.NewFromInt(1000)}},
 	})
 
 	c := newUserCtx("POST", "/api/records", nil)
@@ -105,11 +106,11 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 
 	var record models.PortfolioRecord
 	json.Unmarshal(c.Response.Body(), &record)
-	if record.Total != 1000 {
-		t.Errorf("expected total 1000, got %f", record.Total)
+	if !record.Total.Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected total 1000, got %s", record.Total)
 	}
-	if record.Assets["stocks"] != 1000 {
-		t.Errorf("expected stocks 1000, got %f", record.Assets["stocks"])
+	if !record.Assets["stocks"].Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected stocks 1000, got %s", record.Assets["stocks"])
 	}
 	if len(record.Holdings) != 1 {
 		t.Fatalf("expected 1 holding snapshot, got %d", len(record.Holdings))
@@ -117,11 +118,11 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	if record.Holdings[0].Symbol != "AAPL" {
 		t.Errorf("expected symbol AAPL, got %s", record.Holdings[0].Symbol)
 	}
-	if record.Holdings[0].Value != 1000 {
-		t.Errorf("expected holding value 1000, got %f", record.Holdings[0].Value)
+	if !record.Holdings[0].Value.Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected holding value 1000, got %s", record.Holdings[0].Value)
 	}
-	if record.Holdings[0].Cost != 900 {
-		t.Errorf("expected holding cost 900, got %f", record.Holdings[0].Cost)
+	if !record.Holdings[0].Cost.Equal(decimal.NewFromInt(900)) {
+		t.Errorf("expected holding cost 900, got %s", record.Holdings[0].Cost)
 	}
 }
 
@@ -240,7 +241,7 @@ func TestGetAvailableFunds_WithValue(t *testing.T) {
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
-		Amount:      50000.50,
+		Amount:      decimal.NewFromFloat(50000.50),
 	})
 
 	c := newUserCtx("GET", "/api/funds", nil)
@@ -260,11 +261,11 @@ func TestGetAvailableFunds_MultipleCurrencies(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "CNY", Amount: 10000,
+		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "USD", Amount: 5000,
+		Currency: "USD", Amount: decimal.NewFromInt(5000),
 	})
 
 	c := newUserCtx("GET", "/api/funds", nil)
@@ -281,11 +282,11 @@ func TestGetAvailableFunds_HidesZeroAmount(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "CNY", Amount: 0,
+		Currency: "CNY", Amount: decimal.Zero,
 	})
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "USD", Amount: 100,
+		Currency: "USD", Amount: decimal.NewFromInt(100),
 	})
 
 	c := newUserCtx("GET", "/api/funds", nil)
@@ -313,14 +314,14 @@ func TestTransferIn_Success(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
-	if af.Amount != 3000 {
-		t.Errorf("expected 3000, got %.2f", af.Amount)
+	if !af.Amount.Equal(decimal.NewFromInt(3000)) {
+		t.Errorf("expected 3000, got %s", af.Amount)
 	}
 
 	var tx models.FundTransaction
 	db.Where("portfolio_id = ? AND type = ?", testPortfolioID, "transfer_in").First(&tx)
-	if tx.Amount != 3000 || tx.Currency != "USD" {
-		t.Errorf("expected transaction 3000 USD, got %.2f %s", tx.Amount, tx.Currency)
+	if !tx.Amount.Equal(decimal.NewFromInt(3000)) || tx.Currency != "USD" {
+		t.Errorf("expected transaction 3000 USD, got %s %s", tx.Amount, tx.Currency)
 	}
 }
 
@@ -328,7 +329,7 @@ func TestTransferOut_InsufficientFunds(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "HKD", Amount: 100,
+		Currency: "HKD", Amount: decimal.NewFromInt(100),
 	})
 
 	c := newUserCtx("POST", "/api/funds/transfer-out", map[string]any{"currency": "HKD", "amount": 200})
@@ -343,7 +344,7 @@ func TestTransferOut_Success(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "HKD", Amount: 100,
+		Currency: "HKD", Amount: decimal.NewFromInt(100),
 	})
 
 	c := newUserCtx("POST", "/api/funds/transfer-out", map[string]any{"currency": "HKD", "amount": 50, "note": "withdraw"})
@@ -355,8 +356,8 @@ func TestTransferOut_Success(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
-	if af.Amount != 50 {
-		t.Errorf("expected 50, got %.2f", af.Amount)
+	if !af.Amount.Equal(decimal.NewFromInt(50)) {
+		t.Errorf("expected 50, got %s", af.Amount)
 	}
 }
 

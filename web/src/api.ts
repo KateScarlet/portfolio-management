@@ -119,8 +119,8 @@ export async function updateSettings(
 
 export async function fetchAvailableFunds(
   pid: string
-): Promise<{ currency: string; amount: number }[]> {
-  return request<{ currency: string; amount: number }[]>(`/api/portfolios/${pid}/funds`)
+): Promise<{ currency: string; amount: string }[]> {
+  return request<{ currency: string; amount: string }[]>(`/api/portfolios/${pid}/funds`)
 }
 
 export async function transferInFunds(
@@ -205,7 +205,7 @@ export async function fetchPrice(symbol: string, market?: string): Promise<{
   return request(`/api/price/${encodeURIComponent(symbol)}${params}`)
 }
 
-export async function fetchExchangeRate(pair: string): Promise<{ rate: number }> {
+export async function fetchExchangeRate(pair: string): Promise<{ rate: string }> {
   return request(`/api/exchange/${encodeURIComponent(pair)}`)
 }
 

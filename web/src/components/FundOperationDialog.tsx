@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react"
 import { Portfolio } from "../types"
 import * as api from "../api"
+import { toDecimal } from "../utils"
 import { useToast } from "./toast-context"
 import { ArrowLeftRight } from "lucide-react"
 
@@ -56,10 +57,10 @@ export default function FundOperationDialog({
     try {
       const res = await api.fetchExchangeRate(`${currency}${toCurrency}`)
       if (res && res.rate) {
-        setExchangeRate(res.rate.toFixed(4))
+        setExchangeRate(toDecimal(res.rate).toFixed(4))
         const amt = parseFloat(amount)
         if (!isNaN(amt) && amt > 0) {
-          setToAmount((amt * res.rate).toFixed(2))
+          setToAmount(toDecimal(amt).times(res.rate).toFixed(2))
         }
       }
     } catch {

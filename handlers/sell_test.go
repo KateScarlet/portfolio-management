@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/route/param"
 	"github.com/google/uuid"
 	"github.com/libtnb/sqlite"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -38,6 +39,9 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) string {
 	t.Helper()
+	dShares := decimal.NewFromFloat(shares)
+	dPrice := decimal.NewFromFloat(price)
+	dCost := decimal.NewFromFloat(cost)
 	id := uuid.New().String()
 	var lots models.JSONColumn
 	if shares > 0 {
@@ -45,11 +49,11 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 			{
 				ID:         uuid.New().String(),
 				Date:       1000000,
-				Shares:     shares,
-				CostPrice:  cost / shares,
-				Cost:       cost,
-				ValueAdded: shares * price,
-				Fee:        0,
+				Shares:     dShares,
+				CostPrice:  dCost.Div(dShares),
+				Cost:       dCost,
+				ValueAdded: dShares.Mul(dPrice),
+				Fee:        decimal.Zero,
 			},
 		}
 	} else {
@@ -57,10 +61,10 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 			{
 				ID:         uuid.New().String(),
 				Date:       1000000,
-				Shares:     0,
-				Cost:       cost,
-				ValueAdded: price,
-				Fee:        0,
+				Shares:     decimal.Zero,
+				Cost:       dCost,
+				ValueAdded: dPrice,
+				Fee:        decimal.Zero,
 			},
 		}
 	}
@@ -71,14 +75,14 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		AssetId:     "stocks",
 		Symbol:      "TEST",
 		Name:        "Test Stock",
-		Shares:      shares,
-		Price:       price,
-		Value:       shares * price,
-		Cost:        cost,
+		Shares:      dShares,
+		Price:       dPrice,
+		Value:       dShares.Mul(dPrice),
+		Cost:        dCost,
 		Lots:        lots,
 	}
 	if shares > 0 {
-		h.CostPrice = cost / shares
+		h.CostPrice = dCost.Div(dShares)
 	}
 	if err := db.Create(&h).Error; err != nil {
 		t.Fatal(err)
@@ -106,7 +110,7 @@ func TestSell_FeeExceedsProceeds_ShareBased(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 600})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.NewFromInt(600)})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
@@ -125,10 +129,10 @@ func TestSell_FeeExceedsProceeds_ValueBased(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHolding(t, db, 0, 0, 400)
 	db.Model(&models.Holding{}).Where("id = ?", id).Updates(map[string]any{
-		"value": 500, "shares": 0, "price": 0,
+		"value": decimal.NewFromInt(500), "shares": decimal.Zero, "price": decimal.Zero,
 	})
 
-	c := newCtx(id, SellRequest{Value: 300, Fee: 300})
+	c := newCtx(id, SellRequest{Value: decimal.NewFromInt(300), Fee: decimal.NewFromInt(300)})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
@@ -140,7 +144,7 @@ func TestSell_FeeJustUnderProceeds_ShouldPass(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 499})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.NewFromInt(499)})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
@@ -152,7 +156,7 @@ func TestSell_FeeEqualsProceeds_ShouldFail(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 500})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.NewFromInt(500)})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 400 {
@@ -164,7 +168,7 @@ func TestSell_ZeroFee_ShouldPass(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 0})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.Zero})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
@@ -178,10 +182,10 @@ func TestSell_ProceedsGoToCorrectCurrencyFund(t *testing.T) {
 
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "USD", Amount: 1000,
+		Currency: "USD", Amount: decimal.NewFromInt(1000),
 	})
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 0})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.Zero})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
@@ -190,9 +194,9 @@ func TestSell_ProceedsGoToCorrectCurrencyFund(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
-	expected := 1500.0 // 1000 + 5*100
-	if af.Amount != expected {
-		t.Errorf("expected USD funds %.2f, got %.2f", expected, af.Amount)
+	expected := decimal.NewFromInt(1500) // 1000 + 5*100
+	if !af.Amount.Equal(expected) {
+		t.Errorf("expected USD funds %s, got %s", expected, af.Amount)
 	}
 
 	var cnCount int64
@@ -206,7 +210,7 @@ func TestSell_ProceedsGoToCNYFundByDefault(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHoldingWithCurrency(t, db, "CNY", 10, 100, 900)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 100, Fee: 10})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(100), Fee: decimal.NewFromInt(10)})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
@@ -215,9 +219,9 @@ func TestSell_ProceedsGoToCNYFundByDefault(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
-	expected := 490.0 // 5*100 - 10
-	if af.Amount != expected {
-		t.Errorf("expected CNY funds %.2f, got %.2f", expected, af.Amount)
+	expected := decimal.NewFromInt(490) // 5*100 - 10
+	if !af.Amount.Equal(expected) {
+		t.Errorf("expected CNY funds %s, got %s", expected, af.Amount)
 	}
 }
 
@@ -225,7 +229,7 @@ func TestSell_NewCurrencyFundCreatedOnSell(t *testing.T) {
 	db := setupTestDB(t)
 	id := createTestHoldingWithCurrency(t, db, "HKD", 10, 200, 1800)
 
-	c := newCtx(id, SellRequest{Shares: 5, Price: 200, Fee: 0})
+	c := newCtx(id, SellRequest{Shares: decimal.NewFromInt(5), Price: decimal.NewFromInt(200), Fee: decimal.Zero})
 	SellHolding(db)(context.Background(), c)
 
 	if c.Response.StatusCode() != 200 {
@@ -234,23 +238,26 @@ func TestSell_NewCurrencyFundCreatedOnSell(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
-	if af.Amount != 1000 {
-		t.Errorf("expected HKD funds 1000, got %.2f", af.Amount)
+	if !af.Amount.Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected HKD funds 1000, got %s", af.Amount)
 	}
 }
 
 func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, shares, price, cost float64) string {
 	t.Helper()
+	dShares := decimal.NewFromFloat(shares)
+	dPrice := decimal.NewFromFloat(price)
+	dCost := decimal.NewFromFloat(cost)
 	id := uuid.New().String()
 	lots := models.JSONColumn{
 		{
 			ID:         uuid.New().String(),
 			Date:       1000000,
-			Shares:     shares,
-			CostPrice:  cost / shares,
-			Cost:       cost,
-			ValueAdded: shares * price,
-			Fee:        0,
+			Shares:     dShares,
+			CostPrice:  dCost.Div(dShares),
+			Cost:       dCost,
+			ValueAdded: dShares.Mul(dPrice),
+			Fee:        decimal.Zero,
 		},
 	}
 	h := models.Holding{
@@ -261,11 +268,11 @@ func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, s
 		Symbol:      "TEST",
 		Name:        "Test Stock",
 		Currency:    currency,
-		Shares:      shares,
-		Price:       price,
-		Value:       shares * price,
-		Cost:        cost,
-		CostPrice:   cost / shares,
+		Shares:      dShares,
+		Price:       dPrice,
+		Value:       dShares.Mul(dPrice),
+		Cost:        dCost,
+		CostPrice:   dCost.Div(dShares),
 		Lots:        lots,
 	}
 	if err := db.Create(&h).Error; err != nil {

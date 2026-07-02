@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/shopspring/decimal"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 
@@ -64,8 +64,8 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	return parseQuote(body, symbol, market)
 }
 
-func (c *Client) FetchExchangeRate(pair string) (float64, error) {
-	return 0, marketsource.ErrNotSupported
+func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	return decimal.Zero, marketsource.ErrNotSupported
 }
 
 func gbkToUTF8(data []byte) string {
@@ -104,7 +104,7 @@ func parseQuote(body, originalSymbol, market string) (*marketsource.Quote, error
 	}
 
 	var name string
-	var price float64
+	var price decimal.Decimal
 	var currency string
 
 	switch market {
@@ -113,10 +113,9 @@ func parseQuote(body, originalSymbol, market string) (*marketsource.Quote, error
 			return nil, fmt.Errorf("sina A-share response too short")
 		}
 		name = fields[0]
-		priceStr := fields[3]
-		p, err := strconv.ParseFloat(priceStr, 64)
-		if err != nil || p <= 0 {
-			return nil, fmt.Errorf("sina invalid A-share price for %s: %s", originalSymbol, priceStr)
+		p, err := decimal.NewFromString(fields[3])
+		if err != nil || !p.IsPositive() {
+			return nil, fmt.Errorf("sina invalid A-share price for %s: %s", originalSymbol, fields[3])
 		}
 		price = p
 		currency = "CNY"
@@ -125,10 +124,9 @@ func parseQuote(body, originalSymbol, market string) (*marketsource.Quote, error
 			return nil, fmt.Errorf("sina HK response too short")
 		}
 		name = fields[1]
-		priceStr := fields[6]
-		p, err := strconv.ParseFloat(priceStr, 64)
-		if err != nil || p <= 0 {
-			return nil, fmt.Errorf("sina invalid HK price for %s: %s", originalSymbol, priceStr)
+		p, err := decimal.NewFromString(fields[6])
+		if err != nil || !p.IsPositive() {
+			return nil, fmt.Errorf("sina invalid HK price for %s: %s", originalSymbol, fields[6])
 		}
 		price = p
 		currency = "HKD"
@@ -137,10 +135,9 @@ func parseQuote(body, originalSymbol, market string) (*marketsource.Quote, error
 			return nil, fmt.Errorf("sina US response too short")
 		}
 		name = fields[0]
-		priceStr := fields[1]
-		p, err := strconv.ParseFloat(priceStr, 64)
-		if err != nil || p <= 0 {
-			return nil, fmt.Errorf("sina invalid US price for %s: %s", originalSymbol, priceStr)
+		p, err := decimal.NewFromString(fields[1])
+		if err != nil || !p.IsPositive() {
+			return nil, fmt.Errorf("sina invalid US price for %s: %s", originalSymbol, fields[1])
 		}
 		price = p
 		currency = "USD"

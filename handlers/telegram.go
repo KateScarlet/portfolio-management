@@ -12,6 +12,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -89,12 +90,12 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 
-			assets := map[string]float64{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
-			var total float64
+			assets := map[string]decimal.Decimal{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
+			total := decimal.Zero
 			for i := range holdings {
 				h := &holdings[i]
-				assets[h.AssetId] += h.Value
-				total += h.Value
+				assets[h.AssetId] = assets[h.AssetId].Add(h.Value)
+				total = total.Add(h.Value)
 			}
 			principal, err := CalcPrincipalByUser(db, user.UserID, "CNY", router)
 			if err != nil {
@@ -110,21 +111,21 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			lines := []string{
 				fmt.Sprintf("📊 <b>投资组合摘要</b> — %s", now.Format("2006-01-02")),
 				"",
-				fmt.Sprintf("总资产: ¥%.0f", total),
-				fmt.Sprintf("累计投入: ¥%.0f", principal),
+				fmt.Sprintf("总资产: ¥%s", total.StringFixed(0)),
+				fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(0)),
 			}
-			if principal > 0 {
-				pnl := (total - principal) / principal * 100
-				lines = append(lines, fmt.Sprintf("累计收益: %+.1f%%", pnl))
+			if principal.IsPositive() {
+				pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
+				lines = append(lines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(1)))
 			}
 			lines = append(lines, "")
 
 			for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
-				pct := 0.0
-				if total > 0 {
-					pct = assets[id] / total * 100
+				pct := decimal.Zero
+				if total.IsPositive() {
+					pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 				}
-				lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
+				lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(0)))
 			}
 			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/shopspring/decimal"
 
 	"portfolio-management/marketsource"
 )
@@ -41,7 +42,7 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	return fetchQuote(symbol, market)
 }
 
-func (c *Client) FetchExchangeRate(pair string) (float64, error) {
+func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	return fetchExchangeRate(pair)
 }
 
@@ -95,20 +96,22 @@ func fetchQuote(symbol, market string) (*marketsource.Quote, error) {
 		name = meta.Symbol
 	}
 
+	price := decimal.NewFromFloat(meta.RegularMarketPrice)
+
 	slog.Info("price fetched from API", "symbol", symbol, "querySymbol", querySymbol)
 	return &marketsource.Quote{
 		Symbol:           symbol,
 		Name:             name,
-		Price:            meta.RegularMarketPrice,
-		OriginalPrice:    meta.RegularMarketPrice,
+		Price:            price,
+		OriginalPrice:    price,
 		Currency:         meta.Currency,
 		OriginalCurrency: meta.Currency,
 	}, nil
 }
 
-func fetchExchangeRate(pair string) (float64, error) {
+func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 	if httpClient == nil {
-		return 0, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
+		return decimal.Zero, fmt.Errorf("yahoo client not initialized, call yahoo.Init() first")
 	}
 	fxSymbol := pair + "=X"
 	var result yahooChartResponse
@@ -118,19 +121,19 @@ func fetchExchangeRate(pair string) (float64, error) {
 		SetResult(&result).
 		Get(fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s", fxSymbol))
 	if err != nil {
-		return 0, fmt.Errorf("exchange rate request failed: %w", err)
+		return decimal.Zero, fmt.Errorf("exchange rate request failed: %w", err)
 	}
 	if resp.IsError() {
-		return 0, fmt.Errorf("exchange rate returned status %d", resp.StatusCode())
+		return decimal.Zero, fmt.Errorf("exchange rate returned status %d", resp.StatusCode())
 	}
 
 	if len(result.Chart.Result) == 0 {
-		return 0, fmt.Errorf("no exchange rate for %s", pair)
+		return decimal.Zero, fmt.Errorf("no exchange rate for %s", pair)
 	}
 
-	rate := result.Chart.Result[0].Meta.RegularMarketPrice
-	if rate == 0 {
-		return 0, fmt.Errorf("zero exchange rate for %s", pair)
+	rate := decimal.NewFromFloat(result.Chart.Result[0].Meta.RegularMarketPrice)
+	if rate.IsZero() {
+		return decimal.Zero, fmt.Errorf("zero exchange rate for %s", pair)
 	}
 
 	slog.Info("exchange rate fetched from API", "pair", pair)

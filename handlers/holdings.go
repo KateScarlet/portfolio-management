@@ -5,16 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"strconv"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"log/slog"
 )
@@ -37,14 +36,14 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, r
 		if err != nil {
 			return fmt.Errorf("获取 %s 汇率失败: %w", pair, err)
 		}
-		h.Value *= rate
-		h.Cost *= rate
-		h.CostPrice *= rate
+		h.Value = h.Value.Mul(rate)
+		h.Cost = h.Cost.Mul(rate)
+		h.CostPrice = h.CostPrice.Mul(rate)
 		for j := range h.Lots {
-			h.Lots[j].Fee *= rate
-			h.Lots[j].Cost *= rate
-			h.Lots[j].CostPrice *= rate
-			h.Lots[j].ValueAdded *= rate
+			h.Lots[j].Fee = h.Lots[j].Fee.Mul(rate)
+			h.Lots[j].Cost = h.Lots[j].Cost.Mul(rate)
+			h.Lots[j].CostPrice = h.Lots[j].CostPrice.Mul(rate)
+			h.Lots[j].ValueAdded = h.Lots[j].ValueAdded.Mul(rate)
 		}
 		h.Currency = targetCurrency
 	}
@@ -118,7 +117,6 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// Normalize symbol to canonical format (e.g., 600519.SH, AAPL.US)
 		if input.Symbol != "" && input.Market != "" {
 			input.Symbol = marketsource.NormalizeSymbol(input.Symbol, input.Market)
 		}
@@ -132,24 +130,24 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid assetId"})
 			return
 		}
-		if input.Shares < 0 {
+		if input.Shares.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "shares cannot be negative"})
 			return
 		}
-		if input.Cost < 0 {
+		if input.Cost.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "cost cannot be negative"})
 			return
 		}
-		if input.CostPrice < 0 {
+		if input.CostPrice.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "costPrice cannot be negative"})
 			return
 		}
-		if input.Fee < 0 {
+		if input.Fee.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fee cannot be negative"})
 			return
 		}
 
-		isRegisterOnly := input.Shares == 0 && input.Cost == 0
+		isRegisterOnly := input.Shares.IsZero() && input.Cost.IsZero()
 
 		var newLot *models.HoldingLot
 		if !isRegisterOnly {
@@ -184,7 +182,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					return &httpError{status: consts.StatusBadRequest, msg: "该资产已存在"}
 				}
 				existing.Lots = append(existing.Lots, *newLot)
-				if existing.Symbol != "" && input.Price > 0 {
+				if existing.Symbol != "" && input.Price.IsPositive() {
 					existing.Price = input.Price
 				}
 				existing.RecalcFromLots()
@@ -215,8 +213,8 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			if newLot != nil {
-				addedCost := newLot.Cost + input.Fee
-				if addedCost > 0 {
+				addedCost := newLot.Cost.Add(input.Fee)
+				if addedCost.IsPositive() {
 					holdingCurrency := input.Currency
 					if holdingCurrency == "" {
 						holdingCurrency = "CNY"
@@ -224,24 +222,24 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 					var af models.AvailableFund
 					err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, holdingCurrency).First(&af).Error
-					fundsAmount := 0.0
+					fundsAmount := decimal.Zero
 					if err == nil {
 						fundsAmount = af.Amount
 					} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 						return err
 					}
 
-					if math.Round(fundsAmount*100) < math.Round(addedCost*100) {
-						return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %.2f, 需要 %.2f", holdingCurrency, fundsAmount, addedCost)}
+					if fundsAmount.LessThan(addedCost) {
+						return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %s, 需要 %s", holdingCurrency, fundsAmount.StringFixed(2), addedCost.StringFixed(2))}
 					}
 
-					newAmount := fundsAmount - addedCost
+					newAmount := fundsAmount.Sub(addedCost)
 					if err == nil {
 						if err := tx.Model(&af).Update("amount", newAmount).Error; err != nil {
 							return err
 						}
 					} else {
-						if newAmount > 0 {
+						if newAmount.IsPositive() {
 							if err := tx.Create(&models.AvailableFund{
 								ID:          uuid.New().String(),
 								UserID:      user.UserID,
@@ -350,15 +348,15 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 						if lots[i].ID == "" {
 							lots[i].ID = uuid.New().String()
 						}
-						if lots[i].Shares < 0 {
+						if lots[i].Shares.IsNegative() {
 							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot shares cannot be negative"})
 							return
 						}
-						if lots[i].Cost < 0 {
+						if lots[i].Cost.IsNegative() {
 							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot cost cannot be negative"})
 							return
 						}
-						if lots[i].Fee < 0 {
+						if lots[i].Fee.IsNegative() {
 							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot fee cannot be negative"})
 							return
 						}
@@ -370,9 +368,9 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					holding.Lots = lots
 					priceBefore := holding.Price
 					holding.RecalcFromLots()
-					if holding.Symbol != "" && priceBefore > 0 {
+					if holding.Symbol != "" && priceBefore.IsPositive() {
 						holding.Price = priceBefore
-						holding.Value = holding.Shares * holding.Price
+						holding.Value = holding.Shares.Mul(holding.Price)
 					}
 					if err := db.Save(&holding).Error; err != nil {
 						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -385,14 +383,20 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
-			newVal, err := strconv.ParseFloat(fmt.Sprint(newValue), 64)
-			if err != nil {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid value"})
-				return
+			var newVal decimal.Decimal
+			switch v := newValue.(type) {
+			case string:
+				newVal, _ = decimal.NewFromString(v)
+			case float64:
+				newVal = decimal.NewFromFloat(v)
+			case json.Number:
+				newVal, _ = decimal.NewFromString(v.String())
+			default:
+				newVal, _ = decimal.NewFromString(fmt.Sprint(newValue))
 			}
 			oldVal := holding.Value
-			if math.Abs(newVal-oldVal) > 1e-9 && len(holding.Lots) > 0 {
-				diff := newVal - oldVal
+			if !newVal.Equal(oldVal) && len(holding.Lots) > 0 {
+				diff := newVal.Sub(oldVal)
 				lastBuyIdx := -1
 				for i := len(holding.Lots) - 1; i >= 0; i-- {
 					if holding.Lots[i].Type != "sell" {
@@ -405,7 +409,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					return
 				}
 				err := db.Transaction(func(tx *gorm.DB) error {
-					holding.Lots[lastBuyIdx].ValueAdded += diff
+					holding.Lots[lastBuyIdx].ValueAdded = holding.Lots[lastBuyIdx].ValueAdded.Add(diff)
 					holding.RecalcFromLots()
 					return tx.Save(&holding).Error
 				})
@@ -467,8 +471,8 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			refundAmount := holding.Cost + holding.BuyFees()
-			if refundAmount > 0 {
+			refundAmount := holding.Cost.Add(holding.BuyFees())
+			if refundAmount.IsPositive() {
 				currency := holding.Currency
 				if currency == "" {
 					currency = "CNY"

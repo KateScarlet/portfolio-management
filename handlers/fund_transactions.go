@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -13,44 +12,45 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"log/slog"
 )
 
-func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string, router *marketsource.Router) (float64, error) {
+func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	return calcPrincipalByQuery(db, db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string, router *marketsource.Router) (float64, error) {
+func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	return calcPrincipalByQuery(db, db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string, router *marketsource.Router) (float64, error) {
+func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	var txs []models.FundTransaction
 	if err := query.Find(&txs).Error; err != nil {
-		return 0, err
+		return decimal.Zero, err
 	}
 
-	byCurrency := make(map[string]float64)
+	byCurrency := make(map[string]decimal.Decimal)
 	for _, tx := range txs {
 		if tx.Type == "transfer_in" {
-			byCurrency[tx.Currency] += tx.Amount
+			byCurrency[tx.Currency] = byCurrency[tx.Currency].Add(tx.Amount)
 		} else {
-			byCurrency[tx.Currency] -= tx.Amount
+			byCurrency[tx.Currency] = byCurrency[tx.Currency].Sub(tx.Amount)
 		}
 	}
 
-	var total float64
+	total := decimal.Zero
 	for currency, amount := range byCurrency {
-		if currency == targetCurrency || amount == 0 {
-			total += amount
+		if currency == targetCurrency || amount.IsZero() {
+			total = total.Add(amount)
 			continue
 		}
 		rate, err := router.ExchangeRate("", currency+targetCurrency)
 		if err != nil {
-			return 0, fmt.Errorf("获取 %s 汇率失败: %w", currency+targetCurrency, err)
+			return decimal.Zero, fmt.Errorf("获取 %s 汇率失败: %w", currency+targetCurrency, err)
 		}
-		total += amount * rate
+		total = total.Add(amount.Mul(rate))
 	}
 	return total, nil
 }
@@ -113,9 +113,9 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			Currency string  `json:"currency"`
-			Amount   float64 `json:"amount"`
-			Note     string  `json:"note"`
+			Currency string          `json:"currency"`
+			Amount   decimal.Decimal `json:"amount"`
+			Note     string          `json:"note"`
 		}
 		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -125,7 +125,7 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
 			return
 		}
-		if body.Amount <= 0 {
+		if !body.Amount.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
 			return
 		}
@@ -175,9 +175,9 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			Currency string  `json:"currency"`
-			Amount   float64 `json:"amount"`
-			Note     string  `json:"note"`
+			Currency string          `json:"currency"`
+			Amount   decimal.Decimal `json:"amount"`
+			Note     string          `json:"note"`
 		}
 		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -187,7 +187,7 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
 			return
 		}
-		if body.Amount <= 0 {
+		if !body.Amount.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
 			return
 		}
@@ -243,10 +243,10 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			Currency          string  `json:"currency"`
-			Amount            float64 `json:"amount"`
-			TargetPortfolioID string  `json:"targetPortfolioId"`
-			Note              string  `json:"note"`
+			Currency          string          `json:"currency"`
+			Amount            decimal.Decimal `json:"amount"`
+			TargetPortfolioID string          `json:"targetPortfolioId"`
+			Note              string          `json:"note"`
 		}
 		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -256,7 +256,7 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
 			return
 		}
-		if body.Amount <= 0 {
+		if !body.Amount.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
 			return
 		}
@@ -349,11 +349,11 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 		}
 
 		var body struct {
-			FromCurrency string  `json:"fromCurrency"`
-			ToCurrency   string  `json:"toCurrency"`
-			FromAmount   float64 `json:"fromAmount"`
-			ToAmount     float64 `json:"toAmount"`
-			ExchangeRate float64 `json:"exchangeRate"`
+			FromCurrency string          `json:"fromCurrency"`
+			ToCurrency   string          `json:"toCurrency"`
+			FromAmount   decimal.Decimal `json:"fromAmount"`
+			ToAmount     decimal.Decimal `json:"toAmount"`
+			ExchangeRate decimal.Decimal `json:"exchangeRate"`
 		}
 		if err := c.BindJSON(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -367,20 +367,20 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "源币种和目标币种不能相同"})
 			return
 		}
-		if body.FromAmount <= 0 {
+		if !body.FromAmount.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fromAmount must be positive"})
 			return
 		}
-		if body.ToAmount <= 0 {
+		if !body.ToAmount.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "toAmount must be positive"})
 			return
 		}
-		if body.ExchangeRate <= 0 {
+		if !body.ExchangeRate.IsPositive() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "exchangeRate must be positive"})
 			return
 		}
-		expectedTo := body.FromAmount * body.ExchangeRate
-		if math.Abs(expectedTo-body.ToAmount) > 0.01 {
+		expectedTo := body.FromAmount.Mul(body.ExchangeRate)
+		if expectedTo.Sub(body.ToAmount).Abs().GreaterThan(decimal.NewFromFloat(0.01)) {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "汇率与金额不一致"})
 			return
 		}
@@ -420,10 +420,11 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount float64) error {
+func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
+	f := amount.InexactFloat64()
 	result := tx.Model(&models.AvailableFund{}).
 		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
-		Update("amount", gorm.Expr("amount + ?", amount))
+		Update("amount", gorm.Expr("CAST(amount AS REAL) + ?", f))
 	if result.Error != nil {
 		return result.Error
 	}
@@ -439,10 +440,11 @@ func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount 
 	}).Error
 }
 
-func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount float64) error {
+func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
+	f := amount.InexactFloat64()
 	result := tx.Model(&models.AvailableFund{}).
-		Where("user_id = ? AND portfolio_id = ? AND currency = ? AND amount >= ?", userID, portfolioID, currency, amount).
-		Update("amount", gorm.Expr("amount - ?", amount))
+		Where("user_id = ? AND portfolio_id = ? AND currency = ? AND CAST(amount AS REAL) >= ?", userID, portfolioID, currency, f).
+		Update("amount", gorm.Expr("CAST(amount AS REAL) - ?", f))
 	if result.Error != nil {
 		return result.Error
 	}
@@ -460,9 +462,9 @@ func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amou
 	}
 	var af models.AvailableFund
 	tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af)
-	return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + formatFloat(af.Amount) + ", 需要 " + formatFloat(amount)}
+	return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + af.Amount.StringFixed(2) + ", 需要 " + amount.StringFixed(2)}
 }
 
-func formatFloat(f float64) string {
-	return fmt.Sprintf("%.2f", f)
+func formatDecimal(d decimal.Decimal) string {
+	return d.StringFixed(2)
 }

@@ -30,6 +30,6 @@ func GetExchange(router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		c.JSON(consts.StatusOK, map[string]float64{"rate": rate})
+		c.JSON(consts.StatusOK, map[string]any{"rate": rate})
 	}
 }

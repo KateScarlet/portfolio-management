@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
-import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import FundOperationDialog from "./FundOperationDialog"
 
 type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
@@ -59,7 +59,7 @@ export default function Dashboard({
 
   const totalFunds = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
-    return rate ? sum + f.amount * rate : sum
+    return rate ? sum + toDecimal(f.amount).times(rate).toNumber() : sum
   }, 0)
 
   return (

@@ -4,18 +4,19 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"math"
+
+	"github.com/shopspring/decimal"
 )
 
 type HoldingLot struct {
-	ID         string  `json:"id"`
-	Type       string  `gorm:"size:10;default:''" json:"type,omitempty"`
-	Date       int64   `json:"date"`
-	Shares     float64 `json:"shares"`
-	CostPrice  float64 `json:"costPrice,omitempty"`
-	Cost       float64 `json:"cost,omitempty"`
-	ValueAdded float64 `json:"valueAdded,omitempty"`
-	Fee        float64 `json:"fee,omitempty"`
+	ID         string          `json:"id"`
+	Type       string          `gorm:"size:10;default:''" json:"type,omitempty"`
+	Date       int64           `json:"date"`
+	Shares     decimal.Decimal `json:"shares"`
+	CostPrice  decimal.Decimal `json:"costPrice"`
+	Cost       decimal.Decimal `json:"cost"`
+	ValueAdded decimal.Decimal `json:"valueAdded"`
+	Fee        decimal.Decimal `json:"fee"`
 }
 
 type JSONColumn []HoldingLot
@@ -44,7 +45,7 @@ func (j JSONColumn) Value() (driver.Value, error) {
 	return json.Marshal(j)
 }
 
-type AssetMapColumn map[string]float64
+type AssetMapColumn map[string]decimal.Decimal
 
 func (a *AssetMapColumn) Scan(value any) error {
 	if value == nil {
@@ -80,34 +81,34 @@ type Portfolio struct {
 }
 
 type Holding struct {
-	ID          string     `gorm:"primaryKey" json:"id"`
-	UserID      string     `gorm:"index;not null" json:"userId"`
-	PortfolioID string     `gorm:"index;not null" json:"portfolioId"`
-	AssetId     string     `gorm:"size:20;not null" json:"assetId"`
-	Symbol      string     `gorm:"size:20;default:''" json:"symbol"`
-	Name        string     `gorm:"size:200;default:''" json:"name,omitempty"`
-	Market      string     `gorm:"size:20;default:''" json:"market,omitempty"`
-	Currency    string     `gorm:"size:10;default:'CNY'" json:"currency"`
-	Shares      float64    `gorm:"default:0" json:"shares"`
-	Price       float64    `gorm:"default:0" json:"price"`
-	CostPrice   float64    `gorm:"default:0" json:"costPrice,omitempty"`
-	Value       float64    `gorm:"default:0" json:"value"`
-	Cost        float64    `gorm:"default:0" json:"cost,omitempty"`
-	Date        int64      `gorm:"default:0" json:"date,omitempty"`
-	Fee         float64    `gorm:"-" json:"fee,omitempty"`
-	Lots        JSONColumn `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
+	ID          string          `gorm:"primaryKey" json:"id"`
+	UserID      string          `gorm:"index;not null" json:"userId"`
+	PortfolioID string          `gorm:"index;not null" json:"portfolioId"`
+	AssetId     string          `gorm:"size:20;not null" json:"assetId"`
+	Symbol      string          `gorm:"size:20;default:''" json:"symbol"`
+	Name        string          `gorm:"size:200;default:''" json:"name,omitempty"`
+	Market      string          `gorm:"size:20;default:''" json:"market,omitempty"`
+	Currency    string          `gorm:"size:10;default:'CNY'" json:"currency"`
+	Shares      decimal.Decimal `gorm:"default:0" json:"shares"`
+	Price       decimal.Decimal `gorm:"default:0" json:"price"`
+	CostPrice   decimal.Decimal `gorm:"default:0" json:"costPrice"`
+	Value       decimal.Decimal `gorm:"default:0" json:"value"`
+	Cost        decimal.Decimal `gorm:"default:0" json:"cost"`
+	Date        int64           `gorm:"default:0" json:"date,omitempty"`
+	Fee         decimal.Decimal `gorm:"-" json:"fee"`
+	Lots        JSONColumn      `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
 }
 
 type HoldingSnapshot struct {
-	AssetId   string  `json:"assetId"`
-	Symbol    string  `json:"symbol"`
-	Name      string  `json:"name"`
-	Currency  string  `json:"currency"`
-	Shares    float64 `json:"shares"`
-	Price     float64 `json:"price"`
-	CostPrice float64 `json:"costPrice"`
-	Value     float64 `json:"value"`
-	Cost      float64 `json:"cost"`
+	AssetId   string          `json:"assetId"`
+	Symbol    string          `json:"symbol"`
+	Name      string          `json:"name"`
+	Currency  string          `json:"currency"`
+	Shares    decimal.Decimal `json:"shares"`
+	Price     decimal.Decimal `json:"price"`
+	CostPrice decimal.Decimal `json:"costPrice"`
+	Value     decimal.Decimal `json:"value"`
+	Cost      decimal.Decimal `json:"cost"`
 }
 
 type HoldingSnapshotColumn []HoldingSnapshot
@@ -143,8 +144,8 @@ type PortfolioRecord struct {
 	Timestamp   int64                 `gorm:"index;not null" json:"timestamp"`
 	Assets      AssetMapColumn        `gorm:"type:text;not null;default:'{}'" json:"assets"`
 	Holdings    HoldingSnapshotColumn `gorm:"type:text;not null;default:'[]'" json:"holdings"`
-	Total       float64               `gorm:"default:0" json:"total"`
-	Principal   float64               `gorm:"default:0" json:"principal"`
+	Total       decimal.Decimal       `gorm:"default:0" json:"total"`
+	Principal   decimal.Decimal       `gorm:"default:0" json:"principal"`
 }
 
 type Setting struct {
@@ -155,27 +156,27 @@ type Setting struct {
 }
 
 type AvailableFund struct {
-	ID          string  `gorm:"primaryKey" json:"id"`
-	UserID      string  `gorm:"index;not null" json:"userId"`
-	PortfolioID string  `gorm:"index;not null" json:"portfolioId"`
-	Currency    string  `gorm:"size:10;not null" json:"currency"`
-	Amount      float64 `gorm:"default:0" json:"amount"`
+	ID          string          `gorm:"primaryKey" json:"id"`
+	UserID      string          `gorm:"index;not null" json:"userId"`
+	PortfolioID string          `gorm:"index;not null" json:"portfolioId"`
+	Currency    string          `gorm:"size:10;not null" json:"currency"`
+	Amount      decimal.Decimal `gorm:"default:0" json:"amount"`
 }
 
 type FundTransaction struct {
-	ID                string  `gorm:"primaryKey" json:"id"`
-	UserID            string  `gorm:"index;not null" json:"userId"`
-	PortfolioID       string  `gorm:"index;not null" json:"portfolioId"`
-	Type              string  `gorm:"size:20;not null" json:"type"`
-	Amount            float64 `gorm:"not null" json:"amount"`
-	Currency          string  `gorm:"size:10;not null" json:"currency"`
-	TargetPortfolioID string  `gorm:"size:50;default:''" json:"targetPortfolioId,omitempty"`
-	TargetAmount      float64 `gorm:"default:0" json:"targetAmount,omitempty"`
-	TargetCurrency    string  `gorm:"size:10;default:''" json:"targetCurrency,omitempty"`
-	ExchangeRate      float64 `gorm:"default:0" json:"exchangeRate,omitempty"`
-	HoldingID         string  `gorm:"size:50;default:''" json:"holdingId,omitempty"`
-	Note              string  `gorm:"size:500;default:''" json:"note,omitempty"`
-	CreatedAt         int64   `json:"createdAt"`
+	ID                string          `gorm:"primaryKey" json:"id"`
+	UserID            string          `gorm:"index;not null" json:"userId"`
+	PortfolioID       string          `gorm:"index;not null" json:"portfolioId"`
+	Type              string          `gorm:"size:20;not null" json:"type"`
+	Amount            decimal.Decimal `gorm:"not null" json:"amount"`
+	Currency          string          `gorm:"size:10;not null" json:"currency"`
+	TargetPortfolioID string          `gorm:"size:50;default:''" json:"targetPortfolioId,omitempty"`
+	TargetAmount      decimal.Decimal `gorm:"default:0" json:"targetAmount"`
+	TargetCurrency    string          `gorm:"size:10;default:''" json:"targetCurrency,omitempty"`
+	ExchangeRate      decimal.Decimal `gorm:"default:0" json:"exchangeRate"`
+	HoldingID         string          `gorm:"size:50;default:''" json:"holdingId,omitempty"`
+	Note              string          `gorm:"size:500;default:''" json:"note,omitempty"`
+	CreatedAt         int64           `json:"createdAt"`
 }
 
 type User struct {
@@ -219,54 +220,54 @@ func (h *Holding) RecalcFromLots() {
 		return
 	}
 
-	var totalBuyShares, totalSellShares float64
-	var totalBuyCost, totalSellCost float64
-	var totalBuyValue, totalSellValue float64
+	var totalBuyShares, totalSellShares decimal.Decimal
+	var totalBuyCost, totalSellCost decimal.Decimal
+	var totalBuyValue, totalSellValue decimal.Decimal
 
 	for _, lot := range h.Lots {
 		if lot.Type == "sell" {
-			totalSellShares += lot.Shares
-			totalSellCost += lot.Cost
-			totalSellValue += lot.ValueAdded
+			totalSellShares = totalSellShares.Add(lot.Shares)
+			totalSellCost = totalSellCost.Add(lot.Cost)
+			totalSellValue = totalSellValue.Add(lot.ValueAdded)
 		} else {
-			totalBuyShares += lot.Shares
-			totalBuyCost += lot.Cost
-			totalBuyValue += lot.ValueAdded
+			totalBuyShares = totalBuyShares.Add(lot.Shares)
+			totalBuyCost = totalBuyCost.Add(lot.Cost)
+			totalBuyValue = totalBuyValue.Add(lot.ValueAdded)
 		}
 	}
 
 	if h.Symbol != "" {
-		h.Shares = totalBuyShares - totalSellShares
-		h.Cost = totalBuyCost - totalSellCost
-		if math.Abs(h.Shares) < 1e-9 {
-			h.Shares = 0
+		h.Shares = totalBuyShares.Sub(totalSellShares)
+		h.Cost = totalBuyCost.Sub(totalSellCost)
+		if h.Shares.Abs().LessThan(decimal.NewFromFloat(1e-9)) {
+			h.Shares = decimal.Zero
 		}
-		if h.Shares > 0 {
-			h.CostPrice = h.Cost / h.Shares
+		if h.Shares.IsPositive() {
+			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {
-			h.CostPrice = 0
+			h.CostPrice = decimal.Zero
 		}
-		h.Value = h.Shares * h.Price
+		h.Value = h.Shares.Mul(h.Price)
 	} else {
-		h.Shares = totalBuyShares - totalSellShares
-		h.Value = totalBuyValue - totalSellValue
-		h.Cost = totalBuyCost - totalSellCost
-		if math.Abs(h.Shares) < 1e-9 {
-			h.Shares = 0
+		h.Shares = totalBuyShares.Sub(totalSellShares)
+		h.Value = totalBuyValue.Sub(totalSellValue)
+		h.Cost = totalBuyCost.Sub(totalSellCost)
+		if h.Shares.Abs().LessThan(decimal.NewFromFloat(1e-9)) {
+			h.Shares = decimal.Zero
 		}
-		if h.Shares > 0 {
-			h.CostPrice = h.Cost / h.Shares
+		if h.Shares.IsPositive() {
+			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {
-			h.CostPrice = 0
+			h.CostPrice = decimal.Zero
 		}
 	}
 }
 
 // TotalFees returns the sum of all lot fees for this holding.
-func (h *Holding) TotalFees() float64 {
-	var total float64
+func (h *Holding) TotalFees() decimal.Decimal {
+	total := decimal.Zero
 	for _, lot := range h.Lots {
-		total += lot.Fee
+		total = total.Add(lot.Fee)
 	}
 	return total
 }
@@ -274,11 +275,11 @@ func (h *Holding) TotalFees() float64 {
 // BuyFees returns the sum of buy lot fees only (excludes sell lot fees).
 // Sell fees are already deducted from realizedValue, so including them
 // in principal would double-count the cost.
-func (h *Holding) BuyFees() float64 {
-	var total float64
+func (h *Holding) BuyFees() decimal.Decimal {
+	total := decimal.Zero
 	for _, lot := range h.Lots {
 		if lot.Type != "sell" {
-			total += lot.Fee
+			total = total.Add(lot.Fee)
 		}
 	}
 	return total

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react"
+import Decimal from "decimal.js"
 import { ASSET_DEFINITIONS, Holding, HoldingLot, ColorScheme } from "../types"
-import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
@@ -52,9 +53,9 @@ export default function HoldingsManager({
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
 
   const computeCost = useCallback((costPriceStr: string, sharesStr: string) => {
-    const p = parseFloat(costPriceStr) || 0
-    const s = parseFloat(sharesStr) || 0
-    return String(p * s)
+    const p = toDecimal(costPriceStr)
+    const s = toDecimal(sharesStr)
+    return p.times(s).toString()
   }, [])
 
   const syncAllPrices = useCallback(async () => {
@@ -241,10 +242,10 @@ export default function HoldingsManager({
                             <p>{formatCurrencyByCode(h.price, h.currency || "CNY")}</p>
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
-                        ) : (h.shares || 0) > 0 ? (
+                        ) : toDecimal(h.shares).isPositive() ? (
                           <div>
-                            {(h.costPrice || 0) > 0 && (
-                              <p>{formatCurrencyByCode(h.costPrice || 0, h.currency || "CNY")}</p>
+                            {toDecimal(h.costPrice).isPositive() && (
+                              <p>{formatCurrencyByCode(h.costPrice, h.currency || "CNY")}</p>
                             )}
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
@@ -253,19 +254,21 @@ export default function HoldingsManager({
                         )}
                       </td>
                       <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
-                        {h.cost && h.cost > 0 ? (
+                        {h.cost && toDecimal(h.cost).isPositive() ? (
                           <div>
                             <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
                             {(() => {
-                              const profit = h.value - h.cost
-                              const returnRate = profit / h.cost
-                              const isPositive = profit >= 0
+                              const value = toDecimal(h.value)
+                              const cost = toDecimal(h.cost)
+                              const profit = value.minus(cost)
+                              const returnRate = profit.div(cost)
+                              const isPositive = !profit.isNegative()
                               return (
                                 <p
                                   className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
                                 >
                                   {isPositive ? "+" : ""}
-                                  {formatPercent(returnRate)}
+                                  {formatPercent(returnRate.toNumber())}
                                 </p>
                               )
                             })()}
@@ -289,9 +292,9 @@ export default function HoldingsManager({
                             />
                             <button
                               onClick={() => {
-                                const num = parseFloat(tempEditValue)
-                                if (!isNaN(num) && num >= 0) {
-                                  onUpdateHolding(h.id, { value: num })
+                                const val = toDecimal(tempEditValue)
+                                if (!val.isNegative()) {
+                                  onUpdateHolding(h.id, { value: val.toString() })
                                   setEditingValueId(null)
                                 }
                               }}
@@ -477,23 +480,23 @@ export default function HoldingsManager({
                                         <button
                                           onClick={() => {
                                             if (h.symbol) {
-                                              const costPrice = parseFloat(editingLotCostPrice) || 0
+                                              const costPrice = toDecimal(editingLotCostPrice)
                                               const shares =
-                                                parseFloat(editingLotShares) || lot.shares
-                                              const cost = parseFloat(editingLotCost) || 0
+                                                toDecimal(editingLotShares).isZero() ? toDecimal(lot.shares) : toDecimal(editingLotShares)
+                                              const cost = toDecimal(editingLotCost)
                                               saveEditLot(h, lot.id, {
-                                                costPrice,
-                                                shares,
-                                                cost,
-                                                fee: parseFloat(editingLotFee) || 0,
+                                                costPrice: costPrice.toString(),
+                                                shares: shares.toString(),
+                                                cost: cost.toString(),
+                                                fee: toDecimal(editingLotFee).toString(),
                                               })
                                             } else {
-                                              const cost = parseFloat(editingLotCost) || 0
-                                              const valueAdded = parseFloat(editingLotValue) || 0
+                                              const cost = toDecimal(editingLotCost)
+                                              const valueAdded = toDecimal(editingLotValue)
                                               saveEditLot(h, lot.id, {
-                                                cost,
-                                                valueAdded,
-                                                fee: parseFloat(editingLotFee) || 0,
+                                                cost: cost.toString(),
+                                                valueAdded: valueAdded.toString(),
+                                                fee: toDecimal(editingLotFee).toString(),
                                               })
                                             }
                                           }}
@@ -553,7 +556,7 @@ export default function HoldingsManager({
                                             )}
                                           </span>
                                         )}
-                                        {(lot.fee || 0) > 0 && (
+                                        {toDecimal(lot.fee).isPositive() && (
                                           <span className="w-20 text-[10px] text-[#ADB5BD] text-right">
                                             费:{" "}
                                             {formatCurrencyByCode(

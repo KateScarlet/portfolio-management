@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
 
 func TestJSONColumn_ScanNil(t *testing.T) {
@@ -27,8 +29,8 @@ func TestJSONColumn_ScanBytes(t *testing.T) {
 	if j[0].ID != "1" {
 		t.Fatalf("expected lot ID '1', got %q", j[0].ID)
 	}
-	if j[0].Shares != 10 {
-		t.Fatalf("expected shares 10, got %f", j[0].Shares)
+	if !j[0].Shares.Equal(decimal.NewFromInt(10)) {
+		t.Fatalf("expected shares 10, got %s", j[0].Shares)
 	}
 }
 
@@ -52,7 +54,7 @@ func TestJSONColumn_ValueNil(t *testing.T) {
 }
 
 func TestJSONColumn_ValueWithData(t *testing.T) {
-	j := JSONColumn{{ID: "1", Shares: 5}}
+	j := JSONColumn{{ID: "1", Shares: decimal.NewFromInt(5)}}
 	v, err := j.Value()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -86,7 +88,7 @@ func TestAssetMapColumn_ScanBytes(t *testing.T) {
 	if err := a.Scan([]byte(data)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if a["stocks"] != 1000 || a["bonds"] != 2000 {
+	if !a["stocks"].Equal(decimal.NewFromInt(1000)) || !a["bonds"].Equal(decimal.NewFromInt(2000)) {
 		t.Fatalf("unexpected values: %+v", a)
 	}
 }
@@ -103,7 +105,7 @@ func TestAssetMapColumn_ValueNil(t *testing.T) {
 }
 
 func TestAssetMapColumn_ValueWithData(t *testing.T) {
-	a := AssetMapColumn{"stocks": 500, "commodities": 300}
+	a := AssetMapColumn{"stocks": decimal.NewFromInt(500), "commodities": decimal.NewFromInt(300)}
 	v, err := a.Value()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -112,11 +114,11 @@ func TestAssetMapColumn_ValueWithData(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected []byte, got %T", v)
 	}
-	var parsed map[string]float64
+	var parsed map[string]decimal.Decimal
 	if err := json.Unmarshal(bytes, &parsed); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if parsed["stocks"] != 500 || parsed["commodities"] != 300 {
+	if !parsed["stocks"].Equal(decimal.NewFromInt(500)) || !parsed["commodities"].Equal(decimal.NewFromInt(300)) {
 		t.Fatalf("unexpected data: %+v", parsed)
 	}
 }
@@ -124,51 +126,51 @@ func TestAssetMapColumn_ValueWithData(t *testing.T) {
 func TestHolding_RecalcFromLots_SymbolBased(t *testing.T) {
 	h := &Holding{
 		Symbol: "VTI",
-		Price:  100,
+		Price:  decimal.NewFromInt(100),
 		Lots: []HoldingLot{
-			{Type: "", Shares: 10, Cost: 950, ValueAdded: 1000, Fee: 5},
-			{Type: "", Shares: 5, Cost: 490, ValueAdded: 500, Fee: 3},
-			{Type: "sell", Shares: 3, Cost: 285, ValueAdded: 300, Fee: 2},
+			{Type: "", Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(950), ValueAdded: decimal.NewFromInt(1000), Fee: decimal.NewFromInt(5)},
+			{Type: "", Shares: decimal.NewFromInt(5), Cost: decimal.NewFromInt(490), ValueAdded: decimal.NewFromInt(500), Fee: decimal.NewFromInt(3)},
+			{Type: "sell", Shares: decimal.NewFromInt(3), Cost: decimal.NewFromInt(285), ValueAdded: decimal.NewFromInt(300), Fee: decimal.NewFromInt(2)},
 		},
 	}
 	h.RecalcFromLots()
 
-	if h.Shares != 12 {
-		t.Errorf("expected shares=12, got %f", h.Shares)
+	if !h.Shares.Equal(decimal.NewFromInt(12)) {
+		t.Errorf("expected shares=12, got %s", h.Shares)
 	}
-	if h.Cost != 1155 {
-		t.Errorf("expected cost=1155, got %f", h.Cost)
+	if !h.Cost.Equal(decimal.NewFromInt(1155)) {
+		t.Errorf("expected cost=1155, got %s", h.Cost)
 	}
-	if h.CostPrice != 96.25 {
-		t.Errorf("expected costPrice=96.25, got %f", h.CostPrice)
+	if !h.CostPrice.Equal(decimal.NewFromFloat(96.25)) {
+		t.Errorf("expected costPrice=96.25, got %s", h.CostPrice)
 	}
-	if h.Value != 1200 {
-		t.Errorf("expected value=1200, got %f", h.Value)
+	if !h.Value.Equal(decimal.NewFromInt(1200)) {
+		t.Errorf("expected value=1200, got %s", h.Value)
 	}
-	if h.TotalFees() != 10 {
-		t.Errorf("expected totalFees=10, got %f", h.TotalFees())
+	if !h.TotalFees().Equal(decimal.NewFromInt(10)) {
+		t.Errorf("expected totalFees=10, got %s", h.TotalFees())
 	}
 }
 
 func TestHolding_RecalcFromLots_FullySold(t *testing.T) {
 	h := &Holding{
 		Symbol: "VTI",
-		Price:  100,
+		Price:  decimal.NewFromInt(100),
 		Lots: []HoldingLot{
-			{Type: "", Shares: 10, Cost: 1000, ValueAdded: 1000, Fee: 5},
-			{Type: "sell", Shares: 10, Cost: 1000, ValueAdded: 1100, Fee: 5},
+			{Type: "", Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(1000), ValueAdded: decimal.NewFromInt(1000), Fee: decimal.NewFromInt(5)},
+			{Type: "sell", Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(1000), ValueAdded: decimal.NewFromInt(1100), Fee: decimal.NewFromInt(5)},
 		},
 	}
 	h.RecalcFromLots()
 
-	if h.Shares != 0 {
-		t.Errorf("expected shares=0, got %f", h.Shares)
+	if !h.Shares.IsZero() {
+		t.Errorf("expected shares=0, got %s", h.Shares)
 	}
-	if h.Cost != 0 {
-		t.Errorf("expected cost=0, got %f", h.Cost)
+	if !h.Cost.IsZero() {
+		t.Errorf("expected cost=0, got %s", h.Cost)
 	}
-	if h.Value != 0 {
-		t.Errorf("expected value=0, got %f", h.Value)
+	if !h.Value.IsZero() {
+		t.Errorf("expected value=0, got %s", h.Value)
 	}
 }
 
@@ -176,21 +178,21 @@ func TestHolding_RecalcFromLots_ManualHolding(t *testing.T) {
 	h := &Holding{
 		Symbol: "",
 		Lots: []HoldingLot{
-			{Type: "", Shares: 0, Cost: 5000, ValueAdded: 5000, Fee: 0},
-			{Type: "", Shares: 0, Cost: 3000, ValueAdded: 3000, Fee: 0},
-			{Type: "sell", Shares: 0, Cost: 2000, ValueAdded: 2500, Fee: 0},
+			{Type: "", Shares: decimal.Zero, Cost: decimal.NewFromInt(5000), ValueAdded: decimal.NewFromInt(5000), Fee: decimal.Zero},
+			{Type: "", Shares: decimal.Zero, Cost: decimal.NewFromInt(3000), ValueAdded: decimal.NewFromInt(3000), Fee: decimal.Zero},
+			{Type: "sell", Shares: decimal.Zero, Cost: decimal.NewFromInt(2000), ValueAdded: decimal.NewFromInt(2500), Fee: decimal.Zero},
 		},
 	}
 	h.RecalcFromLots()
 
-	if h.Shares != 0 {
-		t.Errorf("expected shares=0, got %f", h.Shares)
+	if !h.Shares.IsZero() {
+		t.Errorf("expected shares=0, got %s", h.Shares)
 	}
-	if h.Value != 5500 {
-		t.Errorf("expected value=5500, got %f", h.Value)
+	if !h.Value.Equal(decimal.NewFromInt(5500)) {
+		t.Errorf("expected value=5500, got %s", h.Value)
 	}
-	if h.Cost != 6000 {
-		t.Errorf("expected cost=6000, got %f", h.Cost)
+	if !h.Cost.Equal(decimal.NewFromInt(6000)) {
+		t.Errorf("expected cost=6000, got %s", h.Cost)
 	}
 }
 
@@ -198,16 +200,16 @@ func TestHolding_BuyFees(t *testing.T) {
 	h := &Holding{
 		Symbol: "VTI",
 		Lots: []HoldingLot{
-			{Type: "", Shares: 10, Cost: 950, Fee: 5},
-			{Type: "", Shares: 5, Cost: 490, Fee: 3},
-			{Type: "sell", Shares: 3, Cost: 285, Fee: 2},
+			{Type: "", Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(950), Fee: decimal.NewFromInt(5)},
+			{Type: "", Shares: decimal.NewFromInt(5), Cost: decimal.NewFromInt(490), Fee: decimal.NewFromInt(3)},
+			{Type: "sell", Shares: decimal.NewFromInt(3), Cost: decimal.NewFromInt(285), Fee: decimal.NewFromInt(2)},
 		},
 	}
 
-	if h.TotalFees() != 10 {
-		t.Errorf("expected totalFees=10, got %f", h.TotalFees())
+	if !h.TotalFees().Equal(decimal.NewFromInt(10)) {
+		t.Errorf("expected totalFees=10, got %s", h.TotalFees())
 	}
-	if h.BuyFees() != 8 {
-		t.Errorf("expected buyFees=8, got %f", h.BuyFees())
+	if !h.BuyFees().Equal(decimal.NewFromInt(8)) {
+		t.Errorf("expected buyFees=8, got %s", h.BuyFees())
 	}
 }

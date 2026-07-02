@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type mockSource struct {
@@ -17,11 +19,11 @@ func (m *mockSource) Name() string               { return m.name }
 func (m *mockSource) SupportedMarkets() []string { return m.markets }
 func (m *mockSource) FetchQuote(symbol, market string) (*Quote, error) {
 	m.quoteCalls.Add(1)
-	return &Quote{Symbol: symbol, Price: 100.0, Currency: "USD"}, nil
+	return &Quote{Symbol: symbol, Price: decimal.NewFromInt(100), Currency: "USD"}, nil
 }
-func (m *mockSource) FetchExchangeRate(pair string) (float64, error) {
+func (m *mockSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	m.exchangeCalls.Add(1)
-	return 7.2, nil
+	return decimal.NewFromFloat(7.2), nil
 }
 
 func newTestRouter(t *testing.T, src *mockSource) *Router {
@@ -45,7 +47,7 @@ func TestFetchQuote_CachesResult(t *testing.T) {
 	if src.quoteCalls.Load() != 1 {
 		t.Errorf("expected source called once, got %d", src.quoteCalls.Load())
 	}
-	if q1.Price != q2.Price {
+	if !q1.Price.Equal(q2.Price) {
 		t.Errorf("expected same quote, got %v vs %v", q1, q2)
 	}
 }
@@ -66,7 +68,7 @@ func TestExchangeRate_CachesResult(t *testing.T) {
 	if src.exchangeCalls.Load() != 1 {
 		t.Errorf("expected source called once, got %d", src.exchangeCalls.Load())
 	}
-	if rate1 != rate2 {
+	if !rate1.Equal(rate2) {
 		t.Errorf("expected same rate, got %v vs %v", rate1, rate2)
 	}
 }
@@ -120,6 +122,6 @@ func TestFetchQuote_DifferentKeysCachedSeparately(t *testing.T) {
 // Ensure Router still satisfies its usage (compile-time check).
 var _ interface {
 	FetchQuote(userID, symbol, market string) (*Quote, error)
-	ExchangeRate(userID, pair string) (float64, error)
+	ExchangeRate(userID, pair string) (decimal.Decimal, error)
 	ClearAllCaches()
 } = (*Router)(nil)

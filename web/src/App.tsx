@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
+import Decimal from "decimal.js"
 import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
 import {
@@ -14,6 +15,7 @@ import {
   FundTransaction,
 } from "./types"
 import * as api from "./api"
+import { toDecimal } from "./utils"
 import Dashboard from "./components/Dashboard"
 import HoldingsManager from "./components/HoldingsManager"
 import RebalancePanel from "./components/RebalancePanel"
@@ -56,7 +58,7 @@ export default function App() {
 
   const totalFundsDisplay = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
-    return rate ? sum + f.amount * rate : sum
+    return rate ? sum + toDecimal(f.amount).times(rate).toNumber() : sum
   }, 0)
 
   useEffect(() => {
@@ -326,28 +328,28 @@ export default function App() {
     )
   }
 
-  const total = Object.values(assets).reduce((sum, val) => sum + val, 0) + totalFundsDisplay
-  const totalAssets = Object.values(assets).reduce((sum, val) => sum + val, 0)
+  const total = Object.values(assets).reduce((sum, val) => sum + toDecimal(val).toNumber(), 0) + totalFundsDisplay
+  const totalAssets = Object.values(assets).reduce((sum, val) => sum + toDecimal(val).toNumber(), 0)
   const totalFees = holdings.reduce(
-    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + (l.fee || 0), 0),
+    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + toDecimal(l.fee).toNumber(), 0),
     0
   )
 
-  const byCurrency: Record<string, number> = {}
+  const byCurrency: Record<string, Decimal> = {}
   for (const tx of fundTransactions) {
     if (tx.type === "transfer_in") {
-      byCurrency[tx.currency] = (byCurrency[tx.currency] || 0) + tx.amount
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).plus(toDecimal(tx.amount))
     } else if (tx.type === "transfer_out") {
-      byCurrency[tx.currency] = (byCurrency[tx.currency] || 0) - tx.amount
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).minus(toDecimal(tx.amount))
     }
   }
   let principal = 0
   for (const [currency, amount] of Object.entries(byCurrency)) {
-    if (currency === settings.displayCurrency || amount === 0) {
-      principal += amount
+    if (currency === settings.displayCurrency || amount.isZero()) {
+      principal += amount.toNumber()
     } else {
       const rate = exchangeRates[currency]
-      if (rate) principal += amount * rate
+      if (rate) principal += amount.times(rate).toNumber()
     }
   }
 

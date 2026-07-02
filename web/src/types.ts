@@ -2,7 +2,7 @@ export type AssetId = "stocks" | "bonds" | "cash" | "commodities"
 
 export interface AvailableFund {
   currency: string
-  amount: number
+  amount: string
 }
 
 export interface FundTransaction {
@@ -10,12 +10,12 @@ export interface FundTransaction {
   userId: string
   portfolioId: string
   type: "transfer_in" | "transfer_out" | "transfer" | "convert" | "buy" | "sell"
-  amount: number
+  amount: string
   currency: string
   targetPortfolioId?: string
-  targetAmount?: number
+  targetAmount?: string
   targetCurrency?: string
-  exchangeRate?: number
+  exchangeRate?: string
   holdingId?: string
   note?: string
   createdAt: number
@@ -39,15 +39,15 @@ export interface Portfolio {
 export interface PortfolioSummaryItem {
   id: string
   name: string
-  total: number
-  principal: number
-  assets: Record<AssetId, number>
+  total: string
+  principal: string
+  assets: Record<AssetId, string>
 }
 
 export interface PortfolioSummary {
-  total: number
-  principal: number
-  assets: Record<AssetId, number>
+  total: string
+  principal: string
+  assets: Record<AssetId, string>
   portfolios: PortfolioSummaryItem[]
 }
 
@@ -63,11 +63,11 @@ export interface HoldingLot {
   id: string
   type?: string // 'sell' for sell records, empty/undefined for buy
   date: number
-  shares: number
-  costPrice?: number
-  cost?: number
-  valueAdded?: number
-  fee?: number // 手续费
+  shares: string
+  costPrice?: string
+  cost?: string
+  valueAdded?: string
+  fee?: string // 手续费
 }
 
 export interface Holding {
@@ -77,13 +77,13 @@ export interface Holding {
   name?: string
   market?: string // e.g. "US", "CN", "HK", "FUND", "COMMODITY_CN", "COMMODITY_INTL", "CRYPTO"
   currency: string
-  shares: number
-  price: number
-  costPrice?: number // Avg cost per share for calculated holdings
-  value: number // Current total value
-  cost?: number // Total cost basis
+  shares: string
+  price: string
+  costPrice?: string // Avg cost per share for calculated holdings
+  value: string // Current total value
+  cost?: string // Total cost basis
   date?: number // Original purchase date for the lot being added
-  fee?: number // 手续费（仅用于创建时传递）
+  fee?: string // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
 }
 
@@ -92,20 +92,20 @@ export interface HoldingSnapshot {
   symbol: string
   name: string
   currency: string
-  shares: number
-  price: number
-  costPrice: number
-  value: number
-  cost: number
+  shares: string
+  price: string
+  costPrice: string
+  value: string
+  cost: string
 }
 
 export interface PortfolioRecord {
   id: string
   timestamp: number
-  assets: Record<AssetId, number>
+  assets: Record<AssetId, string>
   holdings: HoldingSnapshot[]
-  total: number
-  principal: number
+  total: string
+  principal: string
 }
 
 export type ColorScheme = "green-up" | "red-up"
@@ -208,7 +208,7 @@ export const CRYPTO_SYMBOLS = [
   { symbol: "BTC-USD", name: "Bitcoin" },
   { symbol: "ETH-USD", name: "Ethereum" },
   { symbol: "BNB-USD", name: "BNB" },
-  { symbol: "SOL-USD", name: "Solana" },
+  { symbol: "SOL-USD", name: "SOL" },
   { symbol: "XRP-USD", name: "XRP" },
   { symbol: "DOGE-USD", name: "Dogecoin" },
   { symbol: "ADA-USD", name: "Cardano" },

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Holding } from "../types"
-import { formatCurrencyByCode } from "../utils"
+import { formatCurrencyByCode, toDecimal } from "../utils"
 import * as api from "../api"
 import { useToast } from "./toast-context"
 
@@ -14,11 +14,11 @@ interface SellModalProps {
 
 export default function SellModal({ portfolioId, holding, displayCurrency, onConfirm, onClose }: SellModalProps) {
   const [sellShares, setSellShares] = useState(
-    holding.shares && holding.shares > 0 ? holding.shares.toString() : ""
+    holding.shares && toDecimal(holding.shares).isPositive() ? holding.shares.toString() : ""
   )
   const [sellPrice, setSellPrice] = useState(
-    holding.shares && holding.shares > 0
-      ? (holding.price || 0).toString()
+    holding.shares && toDecimal(holding.shares).isPositive()
+      ? (holding.price || "0").toString()
       : holding.value.toString()
   )
   const [sellFee, setSellFee] = useState("")
@@ -28,14 +28,14 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
   const confirmSell = async () => {
     const feeNum = parseFloat(sellFee) || 0
 
-    if (holding.shares && holding.shares > 0 && holding.price) {
+    if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
       const sShares = parseFloat(sellShares)
       const sPrice = parseFloat(sellPrice)
       if (isNaN(sShares) || sShares <= 0) {
         showToast("请输入有效的卖出份额", "error")
         return
       }
-      if (sShares > holding.shares) {
+      if (toDecimal(sShares).greaterThan(holding.shares)) {
         showToast(`卖出份额不能超过持有量 ${holding.shares}`, "error")
         return
       }
@@ -58,7 +58,7 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
         showToast("请输入有效的卖出金额", "error")
         return
       }
-      if (sValue > holding.value) {
+      if (toDecimal(sValue).greaterThan(holding.value)) {
         showToast(`卖出金额不能超过持有值 ${formatCurrencyByCode(holding.value, displayCurrency)}`, "error")
         return
       }
@@ -83,7 +83,7 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
         </div>
 
         <div className="space-y-4">
-          {holding.shares && holding.shares > 0 ? (
+          {holding.shares && toDecimal(holding.shares).isPositive() ? (
             <>
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">

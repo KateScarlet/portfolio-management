@@ -1,5 +1,5 @@
 import { PortfolioSummary, ASSET_DEFINITIONS, AssetId, ColorScheme } from "../types"
-import { formatCurrencyByCode } from "../utils"
+import { formatCurrencyByCode, toDecimal } from "../utils"
 
 interface Props {
   summary: PortfolioSummary | null
@@ -19,7 +19,9 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
   }
 
   const pnl =
-    summary.principal > 0 ? ((summary.total - summary.principal) / summary.principal) * 100 : 0
+    toDecimal(summary.principal).isPositive()
+      ? toDecimal(summary.total).minus(summary.principal).div(summary.principal).times(100).toNumber()
+      : 0
 
   return (
     <div
@@ -65,8 +67,8 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
         <h3 className="text-sm font-medium mb-2">资产配置</h3>
         <div className="space-y-1.5 mb-6">
           {(["stocks", "bonds", "cash", "commodities"] as AssetId[]).map((id) => {
-            const val = summary.assets[id] || 0
-            const pct = summary.total > 0 ? (val / summary.total) * 100 : 0
+            const val = summary.assets[id] || "0"
+            const pct = toDecimal(summary.total).isPositive() ? toDecimal(val).div(summary.total).times(100).toNumber() : 0
             return (
               <div key={id} className="flex items-center gap-2 text-sm">
                 <div
@@ -92,7 +94,7 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
         <h3 className="text-sm font-medium mb-2">各组合概况</h3>
         <div className="space-y-2">
           {summary.portfolios.map((p) => {
-            const pPnl = p.principal > 0 ? ((p.total - p.principal) / p.principal) * 100 : 0
+            const pPnl = toDecimal(p.principal).isPositive() ? toDecimal(p.total).minus(p.principal).div(p.principal).times(100).toNumber() : 0
             return (
               <div key={p.id} className="border border-[#E9ECEF] rounded p-3">
                 <div className="flex items-center justify-between">

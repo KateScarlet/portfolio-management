@@ -1,8 +1,10 @@
 package marketsource
 
+import "github.com/shopspring/decimal"
+
 type MarketSource interface {
 	Name() string
 	SupportedMarkets() []string
 	FetchQuote(symbol string, market string) (*Quote, error)
-	FetchExchangeRate(pair string) (float64, error)
+	FetchExchangeRate(pair string) (decimal.Decimal, error)
 }

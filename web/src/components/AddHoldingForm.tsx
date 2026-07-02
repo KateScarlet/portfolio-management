@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { AssetId, ASSET_DEFINITIONS, COMMODITY_CN_SYMBOLS, COMMODITY_INTL_SYMBOLS, CRYPTO_SYMBOLS } from "../types"
 import * as api from "../api"
+import { toDecimal } from "../utils"
 import { useToast } from "./toast-context"
 
 interface AddHoldingFormProps {
@@ -29,9 +30,9 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
           name: name.trim() || "手工资产",
           market,
           currency: targetCurrency,
-          shares: 0,
-          price: 0,
-          value: 0,
+          shares: "0",
+          price: "0",
+          value: "0",
         })
       } catch (e) {
         showToast(e instanceof Error ? e.message : "录入失败", "error")
@@ -57,9 +58,9 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             name: name.trim() || data.name || authoritativeSymbol,
             market,
             currency: targetCurrency,
-            shares: 0,
-            price: data.price,
-            value: 0,
+            shares: "0",
+            price: String(data.price),
+            value: "0",
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")

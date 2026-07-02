@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -11,15 +10,16 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"log/slog"
 )
 
 type SellRequest struct {
-	Shares float64 `json:"shares"`
-	Price  float64 `json:"price"`
-	Value  float64 `json:"value"`
-	Fee    float64 `json:"fee"`
+	Shares decimal.Decimal `json:"shares"`
+	Price  decimal.Decimal `json:"price"`
+	Value  decimal.Decimal `json:"value"`
+	Fee    decimal.Decimal `json:"fee"`
 }
 
 func SellHolding(db *gorm.DB) app.HandlerFunc {
@@ -49,27 +49,27 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-		if input.Fee < 0 {
+		if input.Fee.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot be negative"})
 			return
 		}
-		if input.Shares < 0 {
+		if input.Shares.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares cannot be negative"})
 			return
 		}
-		if input.Value < 0 {
+		if input.Value.IsNegative() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value cannot be negative"})
 			return
 		}
-		if input.Shares == 0 && input.Value == 0 {
+		if input.Shares.IsZero() && input.Value.IsZero() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
 			return
 		}
 
 		var holding models.Holding
-		var realizedValue float64
-		var costReduction float64
-		var newFundsAmount float64
+		var realizedValue decimal.Decimal
+		var costReduction decimal.Decimal
+		var newFundsAmount decimal.Decimal
 
 		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
@@ -80,49 +80,49 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			switch {
-			case input.Shares > 0:
-				if input.Shares > holding.Shares {
+			case input.Shares.IsPositive():
+				if input.Shares.GreaterThan(holding.Shares) {
 					return &httpError{status: consts.StatusBadRequest, msg: "Shares exceed holding"}
 				}
-				if input.Price <= 0 {
+				if !input.Price.IsPositive() {
 					return &httpError{status: consts.StatusBadRequest, msg: "Price must be greater than 0"}
 				}
-				realizedValue = input.Shares*input.Price - input.Fee
-				if holding.Shares > 0 {
-					if input.Shares >= holding.Shares {
+				realizedValue = input.Shares.Mul(input.Price).Sub(input.Fee)
+				if holding.Shares.IsPositive() {
+					if input.Shares.GreaterThanOrEqual(holding.Shares) {
 						costReduction = holding.Cost
 					} else {
-						costReduction = (holding.Cost / holding.Shares) * input.Shares
+						costReduction = holding.Cost.Div(holding.Shares).Mul(input.Shares)
 					}
 				}
-			case input.Value > 0:
+			case input.Value.IsPositive():
 				if holding.Symbol != "" {
 					return &httpError{status: consts.StatusBadRequest, msg: "股票类持仓必须使用股数卖出，不能使用金额卖出"}
 				}
-				if input.Value > holding.Value {
+				if input.Value.GreaterThan(holding.Value) {
 					return &httpError{status: consts.StatusBadRequest, msg: "Value exceed holding"}
 				}
-				realizedValue = input.Value - input.Fee
-				if holding.Value > 0 {
-					if input.Value >= holding.Value {
+				realizedValue = input.Value.Sub(input.Fee)
+				if holding.Value.IsPositive() {
+					if input.Value.GreaterThanOrEqual(holding.Value) {
 						costReduction = holding.Cost
 					} else {
-						costReduction = (holding.Cost / holding.Value) * input.Value
+						costReduction = holding.Cost.Div(holding.Value).Mul(input.Value)
 					}
-				} else if holding.Cost > 0 {
+				} else if holding.Cost.IsPositive() {
 					costReduction = holding.Cost
 				}
 			default:
 				return &httpError{status: consts.StatusBadRequest, msg: "Shares or value required"}
 			}
 
-			var grossProceeds float64
-			if input.Shares > 0 {
-				grossProceeds = input.Shares * input.Price
+			var grossProceeds decimal.Decimal
+			if input.Shares.IsPositive() {
+				grossProceeds = input.Shares.Mul(input.Price)
 			} else {
 				grossProceeds = input.Value
 			}
-			if input.Fee > 0 && input.Fee >= grossProceeds {
+			if input.Fee.IsPositive() && !input.Fee.LessThan(grossProceeds) {
 				return &httpError{status: consts.StatusBadRequest, msg: "Fee cannot exceed sell proceeds"}
 			}
 
@@ -134,9 +134,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				Cost:      costReduction,
 				Fee:       input.Fee,
 			}
-			if input.Shares > 0 {
+			if input.Shares.IsPositive() {
 				sellLot.Shares = input.Shares
-				sellLot.ValueAdded = input.Shares * input.Price
+				sellLot.ValueAdded = input.Shares.Mul(input.Price)
 			} else {
 				sellLot.ValueAdded = input.Value
 			}
@@ -155,7 +155,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			if realizedValue > 0 {
+			if realizedValue.IsPositive() {
 				currency := holding.Currency
 				if currency == "" {
 					currency = "CNY"
@@ -165,7 +165,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, currency).First(&af).Error
 				switch {
 				case err == nil:
-					newFundsAmount = af.Amount + realizedValue
+					newFundsAmount = af.Amount.Add(realizedValue)
 					if err := tx.Model(&af).Update("amount", newFundsAmount).Error; err != nil {
 						return err
 					}
@@ -206,7 +206,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 
 		c.JSON(consts.StatusOK, map[string]any{
 			"soldHolding":    holding,
-			"availableFunds": fmt.Sprintf("%.2f", newFundsAmount),
+			"availableFunds": newFundsAmount.StringFixed(2),
 		})
 	}
 }

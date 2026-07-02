@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/shopspring/decimal"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 
@@ -61,8 +61,8 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	return parseQuote(body, symbol)
 }
 
-func (c *Client) FetchExchangeRate(pair string) (float64, error) {
-	return 0, marketsource.ErrNotSupported
+func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	return decimal.Zero, marketsource.ErrNotSupported
 }
 
 func gbkToUTF8(data []byte) string {
@@ -96,11 +96,10 @@ func parseQuote(body, originalSymbol string) (*marketsource.Quote, error) {
 	}
 
 	name := fields[1]
-	priceStr := fields[3]
 
-	price, err := strconv.ParseFloat(priceStr, 64)
-	if err != nil || price <= 0 {
-		return nil, fmt.Errorf("tencent invalid price for %s: %s", originalSymbol, priceStr)
+	price, err := decimal.NewFromString(fields[3])
+	if err != nil || !price.IsPositive() {
+		return nil, fmt.Errorf("tencent invalid price for %s: %s", originalSymbol, fields[3])
 	}
 
 	currency := "CNY"

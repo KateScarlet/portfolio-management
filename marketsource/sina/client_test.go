@@ -87,8 +87,8 @@ func TestParseQuote(t *testing.T) {
 				t.Errorf("expected quote, got nil")
 				return
 			}
-			if q.Price <= 0 {
-				t.Errorf("expected positive price, got %f", q.Price)
+			if !q.Price.IsPositive() {
+				t.Errorf("expected positive price, got %s", q.Price)
 			}
 			if q.Name == "" {
 				t.Errorf("expected non-empty name")

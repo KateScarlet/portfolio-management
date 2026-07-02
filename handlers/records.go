@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"log/slog"
 )
@@ -78,14 +79,14 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		assets := models.AssetMapColumn{"stocks": 0, "bonds": 0, "cash": 0, "commodities": 0}
-		var total float64
+		assets := models.AssetMapColumn{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
+		total := decimal.Zero
 		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
 		for i := range holdings {
-			assets[holdings[i].AssetId] += holdings[i].Value
-			total += holdings[i].Value
+			assets[holdings[i].AssetId] = assets[holdings[i].AssetId].Add(holdings[i].Value)
+			total = total.Add(holdings[i].Value)
 
-			if holdings[i].Value > 0 {
+			if holdings[i].Value.IsPositive() {
 				snapshotHoldings = append(snapshotHoldings, models.HoldingSnapshot{
 					AssetId:   holdings[i].AssetId,
 					Symbol:    holdings[i].Symbol,
@@ -100,7 +101,7 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 		}
 
-		if total == 0 {
+		if total.IsZero() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "No data to record"})
 			return
 		}

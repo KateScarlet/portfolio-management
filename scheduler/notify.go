@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -24,7 +25,7 @@ type Notifier struct {
 	db              *gorm.DB
 	router          *marketsource.Router
 	mu              sync.RWMutex
-	prevPrices      map[string]map[string]float64
+	prevPrices      map[string]map[string]decimal.Decimal
 	lastDriftAlert  map[string]time.Time
 	lastSummaryTime map[string]time.Time
 	telegramClients map[string]*cachedTelegram
@@ -34,7 +35,7 @@ func NewNotifier(db *gorm.DB, router *marketsource.Router) *Notifier {
 	return &Notifier{
 		db:              db,
 		router:          router,
-		prevPrices:      make(map[string]map[string]float64),
+		prevPrices:      make(map[string]map[string]decimal.Decimal),
 		lastDriftAlert:  make(map[string]time.Time),
 		lastSummaryTime: make(map[string]time.Time),
 		telegramClients: make(map[string]*cachedTelegram),
@@ -100,7 +101,7 @@ func (n *Notifier) LoadTelegramConfig(userID string) (*telegram.Client, error) {
 	return client, nil
 }
 
-func (n *Notifier) NotifyAfterSync(userID, portfolioID string, holdings []models.Holding, syncedSymbols map[string]float64) {
+func (n *Notifier) NotifyAfterSync(userID, portfolioID string, holdings []models.Holding, syncedSymbols map[string]decimal.Decimal) {
 	client, err := n.LoadTelegramConfig(userID)
 	if err != nil {
 		slog.Error("failed to load telegram config for notification", "userId", userID, "error", err)
@@ -115,45 +116,47 @@ func (n *Notifier) NotifyAfterSync(userID, portfolioID string, holdings []models
 	n.checkSummary(userID, portfolioID, client, holdings)
 }
 
-func (n *Notifier) checkPriceAlert(userID, portfolioID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]float64) {
+func (n *Notifier) checkPriceAlert(userID, portfolioID string, client *telegram.Client, holdings []models.Holding, syncedPrices map[string]decimal.Decimal) {
 	settings := n.loadPortfolioSettings(portfolioID)
 
 	if settings["telegramPriceAlert"] != "true" {
 		return
 	}
 
-	threshold := 5.0
+	threshold := decimal.NewFromInt(5)
 	if v := settings["telegramPriceThreshold"]; v != "" {
-		_, _ = fmt.Sscanf(v, "%f", &threshold)
+		if t, err := decimal.NewFromString(v); err == nil {
+			threshold = t
+		}
 	}
 
 	cacheKey := syncKey(userID, portfolioID)
 	n.mu.Lock()
 	if n.prevPrices[cacheKey] == nil {
-		n.prevPrices[cacheKey] = make(map[string]float64)
+		n.prevPrices[cacheKey] = make(map[string]decimal.Decimal)
 	}
 	oldPrices := n.prevPrices[cacheKey]
 
 	var alerts []string
 	for symbol, newPrice := range syncedPrices {
 		oldPrice, ok := oldPrices[symbol]
-		if !ok || oldPrice == 0 {
+		if !ok || oldPrice.IsZero() {
 			continue
 		}
 
-		changePct := (newPrice - oldPrice) / oldPrice * 100
-		if changePct > threshold || changePct < -threshold {
+		changePct := newPrice.Sub(oldPrice).Div(oldPrice).Mul(decimal.NewFromInt(100))
+		if changePct.GreaterThan(threshold) || changePct.LessThan(threshold.Neg()) {
 			for i := range holdings {
 				h := &holdings[i]
 				if h.Symbol == symbol {
 					arrow := "📈"
-					if changePct < 0 {
+					if changePct.IsNegative() {
 						arrow = "📉"
 					}
 					alerts = append(alerts, fmt.Sprintf(
-						"%s <b>%s</b> (%s)\n当前价: ¥%.2f | 涨跌: %+.1f%%",
+						"%s <b>%s</b> (%s)\n当前价: ¥%s | 涨跌: %s%%",
 						arrow, h.Name, h.Symbol,
-						newPrice, changePct,
+						newPrice.StringFixed(2), changePct.StringFixed(1),
 					))
 					break
 				}
@@ -190,9 +193,11 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 		return
 	}
 
-	driftThreshold := 5.0
+	driftThreshold := decimal.NewFromInt(5)
 	if v := settings["driftThreshold"]; v != "" {
-		_, _ = fmt.Sscanf(v, "%f", &driftThreshold)
+		if t, err := decimal.NewFromString(v); err == nil {
+			driftThreshold = t
+		}
 	}
 
 	var holdings []models.Holding
@@ -206,50 +211,49 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 			pair := h.Currency + "CNY"
 			rate, err := n.router.ExchangeRate(userID, pair)
 			if err == nil {
-				h.Value *= rate
+				h.Value = h.Value.Mul(rate)
 			}
 		}
 	}
 
-	assets := map[string]float64{
-		"stocks":      0,
-		"bonds":       0,
-		"cash":        0,
-		"commodities": 0,
+	assets := map[string]decimal.Decimal{
+		"stocks":      decimal.Zero,
+		"bonds":       decimal.Zero,
+		"cash":        decimal.Zero,
+		"commodities": decimal.Zero,
 	}
-	var total float64
+	total := decimal.Zero
 	for i := range holdings {
 		h := &holdings[i]
-		assets[h.AssetId] += h.Value
-		total += h.Value
+		assets[h.AssetId] = assets[h.AssetId].Add(h.Value)
+		total = total.Add(h.Value)
 	}
 
-	if total == 0 {
+	if total.IsZero() {
 		return
 	}
 
-	targetPcts := map[string]float64{
-		"stocks":      25.0,
-		"bonds":       25.0,
-		"cash":        25.0,
-		"commodities": 25.0,
+	targetPcts := map[string]decimal.Decimal{
+		"stocks":      decimal.NewFromInt(25),
+		"bonds":       decimal.NewFromInt(25),
+		"cash":        decimal.NewFromInt(25),
+		"commodities": decimal.NewFromInt(25),
 	}
 	for id := range targetPcts {
 		if v := settings["target"+strings.ToUpper(id[:1])+id[1:]]; v != "" {
-			var pct float64
-			if _, err := fmt.Sscanf(v, "%f", &pct); err == nil {
+			if pct, err := decimal.NewFromString(v); err == nil {
 				targetPcts[id] = pct
 			}
 		}
 	}
 
-	var targetTotal float64
+	targetTotal := decimal.Zero
 	for _, v := range targetPcts {
-		targetTotal += v
+		targetTotal = targetTotal.Add(v)
 	}
-	if targetTotal > 0 && targetTotal != 100 {
+	if targetTotal.GreaterThan(decimal.Zero) && !targetTotal.Equal(decimal.NewFromInt(100)) {
 		for id := range targetPcts {
-			targetPcts[id] = targetPcts[id] / targetTotal * 100
+			targetPcts[id] = targetPcts[id].Div(targetTotal).Mul(decimal.NewFromInt(100))
 		}
 	}
 
@@ -262,12 +266,12 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID string, client *telegram.
 	}
 
 	for id, value := range assets {
-		pct := value / total * 100
-		diff := pct - targetPcts[id]
-		if diff > driftThreshold || diff < -driftThreshold {
+		pct := value.Div(total).Mul(decimal.NewFromInt(100))
+		diff := pct.Sub(targetPcts[id])
+		if diff.GreaterThan(driftThreshold) || diff.LessThan(driftThreshold.Neg()) {
 			alerts = append(alerts, fmt.Sprintf(
-				"<b>%s</b>: %.1f%% (目标 %.0f%%, 偏离 %+.1f%%)",
-				assetNames[id], pct, targetPcts[id], diff,
+				"<b>%s</b>: %s%% (目标 %s%%, 偏离 %s%%)",
+				assetNames[id], pct.StringFixed(1), targetPcts[id].StringFixed(0), diff.StringFixed(1),
 			))
 		}
 	}
@@ -328,45 +332,45 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 				slog.Error("failed to fetch exchange rate for summary", "pair", pair, "error", err)
 				continue
 			}
-			h.Value *= rate
-			h.Cost *= rate
+			h.Value = h.Value.Mul(rate)
+			h.Cost = h.Cost.Mul(rate)
 		}
 	}
 
-	assets := map[string]float64{
-		"stocks":      0,
-		"bonds":       0,
-		"cash":        0,
-		"commodities": 0,
+	assets := map[string]decimal.Decimal{
+		"stocks":      decimal.Zero,
+		"bonds":       decimal.Zero,
+		"cash":        decimal.Zero,
+		"commodities": decimal.Zero,
 	}
-	var total float64
+	total := decimal.Zero
 	for i := range holdings {
 		h := &holdings[i]
-		assets[h.AssetId] += h.Value
-		total += h.Value
+		assets[h.AssetId] = assets[h.AssetId].Add(h.Value)
+		total = total.Add(h.Value)
 	}
 
 	var txs []models.FundTransaction
 	if err := n.db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}).Find(&txs).Error; err != nil {
 		slog.Error("failed to load fund transactions for summary", "portfolioId", portfolioID, "error", err)
 	}
-	byCurrency := make(map[string]float64)
+	byCurrency := make(map[string]decimal.Decimal)
 	for _, tx := range txs {
 		if tx.Type == "transfer_in" {
-			byCurrency[tx.Currency] += tx.Amount
+			byCurrency[tx.Currency] = byCurrency[tx.Currency].Add(tx.Amount)
 		} else {
-			byCurrency[tx.Currency] -= tx.Amount
+			byCurrency[tx.Currency] = byCurrency[tx.Currency].Sub(tx.Amount)
 		}
 	}
-	var principal float64
+	principal := decimal.Zero
 	for currency, amount := range byCurrency {
-		if currency == "CNY" || amount == 0 {
-			principal += amount
+		if currency == "CNY" || amount.IsZero() {
+			principal = principal.Add(amount)
 			continue
 		}
 		rate, err := n.router.ExchangeRate(userID, currency+"CNY")
 		if err == nil {
-			principal += amount * rate
+			principal = principal.Add(amount.Mul(rate))
 		}
 	}
 
@@ -380,21 +384,21 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 	lines := []string{
 		fmt.Sprintf("📊 <b>投资组合摘要</b> — %s", now.Format("2006-01-02")),
 		"",
-		fmt.Sprintf("总资产: ¥%.0f", total),
-		fmt.Sprintf("累计投入: ¥%.0f", principal),
+		fmt.Sprintf("总资产: ¥%s", total.StringFixed(0)),
+		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(0)),
 	}
-	if principal > 0 {
-		pnl := (total - principal) / principal * 100
-		lines = append(lines, fmt.Sprintf("累计收益: %+.1f%%", pnl))
+	if principal.IsPositive() {
+		pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
+		lines = append(lines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(1)))
 	}
 	lines = append(lines, "")
 
 	for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
-		pct := 0.0
-		if total > 0 {
-			pct = assets[id] / total * 100
+		pct := decimal.Zero
+		if total.IsPositive() {
+			pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 		}
-		lines = append(lines, fmt.Sprintf("%s  %.1f%%  ¥%.0f", assetNames[id], pct, assets[id]))
+		lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(0)))
 	}
 
 	if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {

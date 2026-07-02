@@ -143,7 +143,7 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 
 		result := make([]map[string]any, 0, len(funds))
 		for _, f := range funds {
-			if f.Amount != 0 {
+			if !f.Amount.IsZero() {
 				result = append(result, map[string]any{
 					"currency": f.Currency,
 					"amount":   f.Amount,

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/shopspring/decimal"
 
 	"portfolio-management/marketsource"
 )
@@ -42,7 +43,6 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 		return nil, fmt.Errorf("coingecko client not initialized, call coingecko.Init() first")
 	}
 
-	// symbol is canonical like "BTC.USD", normalize for source
 	id := marketsource.NormalizeForSource(symbol, market, "coingecko")
 
 	var result map[string]map[string]float64
@@ -68,17 +68,19 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 		return nil, fmt.Errorf("coingecko invalid price for %s", symbol)
 	}
 
-	slog.Info("coingecko price fetched", "symbol", symbol, "price", price)
+	decimalPrice := decimal.NewFromFloat(price)
+
+	slog.Info("coingecko price fetched", "symbol", symbol, "price", decimalPrice)
 	return &marketsource.Quote{
 		Symbol:           symbol,
 		Name:             strings.ToUpper(marketsource.ExtractBaseSymbol(symbol)),
-		Price:            price,
-		OriginalPrice:    price,
+		Price:            decimalPrice,
+		OriginalPrice:    decimalPrice,
 		Currency:         "USD",
 		OriginalCurrency: "USD",
 	}, nil
 }
 
-func (c *Client) FetchExchangeRate(pair string) (float64, error) {
-	return 0, marketsource.ErrNotSupported
+func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	return decimal.Zero, marketsource.ErrNotSupported
 }

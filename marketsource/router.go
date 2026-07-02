@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +22,7 @@ type Router struct {
 	sources    map[string]MarketSource
 	defaults   map[string][]string
 	quoteCache *ttlcache.Cache[string, *Quote]
-	rateCache  *ttlcache.Cache[string, float64]
+	rateCache  *ttlcache.Cache[string, decimal.Decimal]
 	userCache  *ttlcache.Cache[string, *userConfigEntry]
 	cacheTTL   time.Duration
 }
@@ -42,7 +43,7 @@ func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
 		cacheTTL: 5 * time.Minute,
 	}
 	r.quoteCache = ttlcache.New[string, *Quote]()
-	r.rateCache = ttlcache.New[string, float64]()
+	r.rateCache = ttlcache.New[string, decimal.Decimal]()
 	r.userCache = ttlcache.New[string, *userConfigEntry]()
 	go r.quoteCache.Start()
 	go r.rateCache.Start()
@@ -86,7 +87,7 @@ func (r *Router) FetchQuote(userID, symbol, market string) (*Quote, error) {
 	return nil, fmt.Errorf("no source available for market %s", market)
 }
 
-func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
+func (r *Router) ExchangeRate(userID, pair string) (decimal.Decimal, error) {
 	if item := r.rateCache.Get(pair); item != nil {
 		slog.Info("exchange rate fetched from cache", "source", "cache", "pair", pair)
 		return item.Value(), nil
@@ -116,9 +117,9 @@ func (r *Router) ExchangeRate(userID, pair string) (float64, error) {
 	}
 
 	if lastErr != nil {
-		return 0, lastErr
+		return decimal.Zero, lastErr
 	}
-	return 0, fmt.Errorf("no source available for exchange rate %s", pair)
+	return decimal.Zero, fmt.Errorf("no source available for exchange rate %s", pair)
 }
 
 func (r *Router) ClearAllCaches() {

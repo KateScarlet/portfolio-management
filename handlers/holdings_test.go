@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -128,7 +129,7 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "CNY", Amount: 10000,
+		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	body := map[string]any{
 		"assetId":   "stocks",
@@ -154,8 +155,8 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 	if holding.Symbol != "AAPL" {
 		t.Errorf("expected symbol AAPL, got %q", holding.Symbol)
 	}
-	if holding.Shares != 10 {
-		t.Errorf("expected shares 10, got %f", holding.Shares)
+	if !holding.Shares.Equal(decimal.NewFromInt(10)) {
+		t.Errorf("expected shares 10, got %s", holding.Shares)
 	}
 }
 
@@ -163,7 +164,7 @@ func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "CNY", Amount: 10000,
+		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	createTestHolding(t, db, 10, 100, 900)
 
@@ -185,8 +186,8 @@ func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 	}
 	var holding models.Holding
 	json.Unmarshal(c.Response.Body(), &holding)
-	if holding.Shares != 15 {
-		t.Errorf("expected merged shares 15, got %f", holding.Shares)
+	if !holding.Shares.Equal(decimal.NewFromInt(15)) {
+		t.Errorf("expected merged shares 15, got %s", holding.Shares)
 	}
 	if len(holding.Lots) != 2 {
 		t.Errorf("expected 2 lots, got %d", len(holding.Lots))
@@ -227,7 +228,7 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
-		Amount:      10000,
+		Amount:      decimal.NewFromInt(10000),
 	})
 
 	body := map[string]any{
@@ -250,9 +251,9 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "CNY").First(&af)
-	expected := 8995.0 // 10000 - 1000 - 5
-	if af.Amount != expected {
-		t.Errorf("expected funds %.2f, got %.2f", expected, af.Amount)
+	expected := decimal.NewFromInt(8995) // 10000 - 1000 - 5
+	if !af.Amount.Equal(expected) {
+		t.Errorf("expected funds %s, got %s", expected, af.Amount)
 	}
 }
 
@@ -263,7 +264,7 @@ func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
-		Amount:      500,
+		Amount:      decimal.NewFromInt(500),
 	})
 
 	body := map[string]any{
@@ -287,7 +288,7 @@ func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "USD", Amount: 5000,
+		Currency: "USD", Amount: decimal.NewFromInt(5000),
 	})
 
 	body := map[string]any{
@@ -310,9 +311,9 @@ func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 
 	var af models.AvailableFund
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&af)
-	expected := 2590.0 // 5000 - 2400 - 10
-	if af.Amount != expected {
-		t.Errorf("expected USD funds %.2f, got %.2f", expected, af.Amount)
+	expected := decimal.NewFromInt(2590) // 5000 - 2400 - 10
+	if !af.Amount.Equal(expected) {
+		t.Errorf("expected USD funds %s, got %s", expected, af.Amount)
 	}
 
 	var cnCount int64
@@ -326,7 +327,7 @@ func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
 		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
-		Currency: "USD", Amount: 100,
+		Currency: "USD", Amount: decimal.NewFromInt(100),
 	})
 
 	body := map[string]any{
@@ -354,7 +355,7 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	id := uuid.New().String()
 	lots := models.JSONColumn{
-		{ID: uuid.New().String(), Date: 1000, Cost: 5000, ValueAdded: 5000},
+		{ID: uuid.New().String(), Date: 1000, Cost: decimal.NewFromInt(5000), ValueAdded: decimal.NewFromInt(5000)},
 	}
 	h := models.Holding{
 		ID:          id,
@@ -362,8 +363,8 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 		PortfolioID: testPortfolioID,
 		AssetId:     "bonds",
 		Name:        "手工债券",
-		Value:       5000,
-		Cost:        5000,
+		Value:       decimal.NewFromInt(5000),
+		Cost:        decimal.NewFromInt(5000),
 		Lots:        lots,
 	}
 	db.Create(&h)
@@ -388,8 +389,8 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 
 	var updated models.Holding
 	json.Unmarshal(c.Response.Body(), &updated)
-	if updated.Value != 6000 {
-		t.Errorf("expected value 6000, got %f (json.Number fix)", updated.Value)
+	if !updated.Value.Equal(decimal.NewFromInt(6000)) {
+		t.Errorf("expected value 6000, got %s (json.Number fix)", updated.Value)
 	}
 }
 
@@ -446,11 +447,11 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 
 	var updated models.Holding
 	json.Unmarshal(c.Response.Body(), &updated)
-	if updated.Shares != 20 {
-		t.Errorf("expected shares 20, got %f", updated.Shares)
+	if !updated.Shares.Equal(decimal.NewFromInt(20)) {
+		t.Errorf("expected shares 20, got %s", updated.Shares)
 	}
-	if updated.Cost != 1000 {
-		t.Errorf("expected cost 1000, got %f", updated.Cost)
+	if !updated.Cost.Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected cost 1000, got %s", updated.Cost)
 	}
 }
 
@@ -557,11 +558,11 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 
 func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
-		{Currency: "CNY", Value: 1000, Cost: 800, Price: 100, CostPrice: 80},
+		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80)},
 	}
 	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
-	if holdings[0].Value != 1000 {
-		t.Errorf("expected value unchanged at 1000, got %.2f", holdings[0].Value)
+	if !holdings[0].Value.Equal(decimal.NewFromInt(1000)) {
+		t.Errorf("expected value unchanged at 1000, got %s", holdings[0].Value)
 	}
 	if holdings[0].Currency != "CNY" {
 		t.Errorf("expected currency unchanged at CNY, got %s", holdings[0].Currency)
@@ -570,11 +571,11 @@ func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 
 func TestConvertHoldingsCurrency_EmptyCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
-		{Currency: "", Value: 500, Cost: 400, Price: 50, CostPrice: 40},
+		{Currency: "", Value: decimal.NewFromInt(500), Cost: decimal.NewFromInt(400), Price: decimal.NewFromInt(50), CostPrice: decimal.NewFromInt(40)},
 	}
 	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
-	if holdings[0].Value != 500 {
-		t.Errorf("expected value unchanged at 500, got %.2f", holdings[0].Value)
+	if !holdings[0].Value.Equal(decimal.NewFromInt(500)) {
+		t.Errorf("expected value unchanged at 500, got %s", holdings[0].Value)
 	}
 }
 
@@ -610,7 +611,7 @@ func TestListHoldings_WithoutCurrencyParam_OriginalValues(t *testing.T) {
 	if holdings[0].Currency != "USD" {
 		t.Errorf("expected original currency USD, got %s", holdings[0].Currency)
 	}
-	if holdings[0].Price != 100 {
-		t.Errorf("expected original price 100, got %.2f", holdings[0].Price)
+	if !holdings[0].Price.Equal(decimal.NewFromInt(100)) {
+		t.Errorf("expected original price 100, got %s", holdings[0].Price)
 	}
 }

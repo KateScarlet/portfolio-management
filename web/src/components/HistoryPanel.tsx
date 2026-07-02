@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
-import { formatCurrencyByCode, formatPercent, getProfitColor } from "../utils"
+import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {
@@ -48,9 +48,9 @@ export default function HistoryPanel({
           <tbody className="divide-y divide-[#F8F9FA] bg-white text-[#1A1A1A]">
             {history.map((record) => {
               const principal = record.principal
-              const profit = record.total - principal
-              const returnRate = principal > 0 ? profit / principal : 0
-              const isPositive = profit >= 0
+              const profit = toDecimal(record.total).minus(principal)
+              const returnRate = toDecimal(principal).isPositive() ? profit.div(principal).toNumber() : 0
+              const isPositive = !profit.isNegative()
               const isExpanded = expandedId === record.id
 
               return (
@@ -69,13 +69,13 @@ export default function HistoryPanel({
                       {formatCurrencyByCode(record.total, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm text-[#495057]">
-                      {principal > 0 ? formatCurrencyByCode(principal, displayCurrency) : "-"}
+                      {toDecimal(principal).isPositive() ? formatCurrencyByCode(principal, displayCurrency) : "-"}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm">
-                      {principal > 0 ? (
+                      {toDecimal(principal).isPositive() ? (
                         <span className={getProfitColor(isPositive, colorScheme)}>
                           {isPositive ? "+" : ""}
-                          {formatCurrencyByCode(profit, displayCurrency)}
+                          {formatCurrencyByCode(profit.toString(), displayCurrency)}
                           <br />
                           <span className="text-[10px] opacity-80">
                             {isPositive ? "+" : ""}
@@ -133,13 +133,13 @@ export default function HistoryPanel({
                             </thead>
                             <tbody className="font-mono">
                               {record.holdings.map((h, i) => {
-                                const pnl = h.value - h.cost
+                                const pnl = toDecimal(h.value).minus(h.cost)
                                 return (
                                   <tr key={i} className="border-b border-[#E9ECEF] last:border-0">
                                     <td className="py-1.5">{h.symbol || "-"}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.name}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.assetId}</td>
-                                    <td className="py-1.5 text-right">{h.shares.toFixed(2)}</td>
+                                    <td className="py-1.5 text-right">{toDecimal(h.shares).toFixed(2)}</td>
                                     <td className="py-1.5 text-right">
                                       {formatCurrencyByCode(h.price, h.currency || "CNY")}
                                     </td>
@@ -150,10 +150,10 @@ export default function HistoryPanel({
                                       {formatCurrencyByCode(h.cost, h.currency || "CNY")}
                                     </td>
                                     <td
-                                      className={`py-1.5 text-right ${getProfitColor(pnl >= 0, colorScheme)}`}
+                                      className={`py-1.5 text-right ${getProfitColor(!pnl.isNegative(), colorScheme)}`}
                                     >
-                                      {pnl >= 0 ? "+" : ""}
-                                      {formatCurrencyByCode(pnl, h.currency || "CNY")}
+                                      {!pnl.isNegative() ? "+" : ""}
+                                      {formatCurrencyByCode(pnl.toString(), h.currency || "CNY")}
                                     </td>
                                   </tr>
                                 )

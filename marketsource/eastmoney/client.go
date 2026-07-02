@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/shopspring/decimal"
 
 	"portfolio-management/marketsource"
 )
@@ -84,8 +85,8 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	}
 }
 
-func (c *Client) FetchExchangeRate(pair string) (float64, error) {
-	return 0, marketsource.ErrNotSupported
+func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	return decimal.Zero, marketsource.ErrNotSupported
 }
 
 func IsFuturesSymbol(symbol string) bool {
@@ -98,7 +99,6 @@ func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	// symbol is canonical like "au9999.CN", normalize for source
 	querySymbol := marketsource.NormalizeForSource(symbol, "COMMODITY_CN", "eastmoney")
 	lower := strings.ToLower(querySymbol)
 	market, ok := symbolMarket[lower]
@@ -123,7 +123,7 @@ func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for symbol %s", symbol)
 	}
 
-	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 	unit := symbolUnit[lower]
 
 	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
@@ -143,7 +143,6 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	// symbol is canonical like "600519.SH", normalize for source
 	secid := marketsource.NormalizeForSource(symbol, "CN", "eastmoney")
 
 	var resp eastmoneyResponse
@@ -163,7 +162,7 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for A-share %s", symbol)
 	}
 
-	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
@@ -181,7 +180,6 @@ func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	// symbol is canonical like "AAPL.US", normalize for source
 	secid := marketsource.NormalizeForSource(symbol, "US", "eastmoney")
 
 	var resp eastmoneyResponse
@@ -201,7 +199,7 @@ func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for US stock %s", symbol)
 	}
 
-	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney US stock price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
@@ -219,7 +217,6 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	// symbol is canonical like "00700.HK", normalize for source
 	secid := marketsource.NormalizeForSource(symbol, "HK", "eastmoney")
 
 	var resp eastmoneyResponse
@@ -239,7 +236,7 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for HK stock %s", symbol)
 	}
 
-	price := float64(resp.Data.F43) / math.Pow(10, float64(resp.Data.F59))
+	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney HK stock price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
@@ -269,7 +266,6 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	// code is canonical like "001811.CNOF", extract base code for API
 	queryCode := marketsource.NormalizeForSource(code, "FUND", "eastmoney")
 
 	r, err := httpClient.R().
@@ -292,13 +288,13 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("failed to parse fund response for %s: %w", code, err)
 	}
 
-	var price float64
+	var price decimal.Decimal
 	if resp.GSZ != "" {
-		fmt.Sscanf(resp.GSZ, "%f", &price)
+		price, _ = decimal.NewFromString(resp.GSZ)
 	} else if resp.DWJZ != "" {
-		fmt.Sscanf(resp.DWJZ, "%f", &price)
+		price, _ = decimal.NewFromString(resp.DWJZ)
 	}
-	if price == 0 {
+	if price.IsZero() {
 		return nil, fmt.Errorf("no price for fund %s", code)
 	}
 
