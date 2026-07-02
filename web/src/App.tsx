@@ -56,7 +56,7 @@ export default function App() {
     removeHolding,
     saveRecord,
     deleteRecord,
-  } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency)
+  } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency, exchangeRates)
 
   const totalFundsDisplay = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]

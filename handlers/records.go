@@ -74,24 +74,16 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		if displayCurrency == "" {
 			displayCurrency = "CNY"
 		}
-		if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
 
-		assets := models.AssetMapColumn{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
-		total := decimal.Zero
+		// Snapshot holdings in their original currencies
 		snapshotHoldings := make(models.HoldingSnapshotColumn, 0, len(holdings))
 		for i := range holdings {
-			assets[holdings[i].AssetId] = assets[holdings[i].AssetId].Add(holdings[i].Value)
-			total = total.Add(holdings[i].Value)
-
 			if holdings[i].Value.IsPositive() {
 				snapshotHoldings = append(snapshotHoldings, models.HoldingSnapshot{
 					AssetId:   holdings[i].AssetId,
 					Symbol:    holdings[i].Symbol,
 					Name:      holdings[i].Name,
-					Currency:  displayCurrency,
+					Currency:  holdings[i].Currency,
 					Shares:    holdings[i].Shares,
 					Price:     holdings[i].Price,
 					CostPrice: holdings[i].CostPrice,
@@ -99,6 +91,27 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 					Cost:      holdings[i].Cost,
 				})
 			}
+		}
+
+		// Deep copy holdings for summary computation (convertHoldingsCurrency mutates in-place)
+		convertedHoldings := make([]models.Holding, len(holdings))
+		for i := range holdings {
+			convertedHoldings[i] = holdings[i]
+			if len(holdings[i].Lots) > 0 {
+				convertedHoldings[i].Lots = make(models.JSONColumn, len(holdings[i].Lots))
+				copy(convertedHoldings[i].Lots, holdings[i].Lots)
+			}
+		}
+		if err := convertHoldingsCurrency(convertedHoldings, displayCurrency, router, user.UserID); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		assets := models.AssetMapColumn{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
+		total := decimal.Zero
+		for i := range convertedHoldings {
+			assets[convertedHoldings[i].AssetId] = assets[convertedHoldings[i].AssetId].Add(convertedHoldings[i].Value)
+			total = total.Add(convertedHoldings[i].Value)
 		}
 
 		if total.IsZero() {

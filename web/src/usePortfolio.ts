@@ -3,7 +3,11 @@ import { AssetId, Holding, PortfolioRecord } from "./types"
 import * as api from "./api"
 import { toDecimal } from "./utils"
 
-export function usePortfolio(portfolioId: string | null, displayCurrency: string = "CNY") {
+export function usePortfolio(
+  portfolioId: string | null,
+  displayCurrency: string = "CNY",
+  exchangeRates: Record<string, number> = {}
+) {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [history, setHistory] = useState<PortfolioRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,7 +21,7 @@ export function usePortfolio(portfolioId: string | null, displayCurrency: string
       setLoading(true)
       try {
         const [h, r] = await Promise.all([
-          api.fetchHoldings(portfolioId, displayCurrency),
+          api.fetchHoldings(portfolioId),
           api.fetchRecords(portfolioId),
         ])
         if (!cancelled) {
@@ -34,11 +38,13 @@ export function usePortfolio(portfolioId: string | null, displayCurrency: string
     return () => {
       cancelled = true
     }
-  }, [portfolioId, displayCurrency])
+  }, [portfolioId])
 
   const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
   holdings.forEach((h) => {
-    assets[h.assetId] = (assets[h.assetId] || 0) + toDecimal(h.value).toNumber()
+    const rate = h.currency === displayCurrency ? 1 : exchangeRates[h.currency]
+    const convertedValue = rate ? toDecimal(h.value).times(rate).toNumber() : toDecimal(h.value).toNumber()
+    assets[h.assetId] = (assets[h.assetId] || 0) + convertedValue
   })
 
   const addHolding = useCallback(
