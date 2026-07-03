@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	maxConnsPerUser = 3
+	maxConnsPerUser   = 10
 	heartbeatInterval = 15 * time.Second
 )
 
