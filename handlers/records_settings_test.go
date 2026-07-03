@@ -49,7 +49,9 @@ func TestListRecords_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
 	}
 	var records []models.PortfolioRecord
-	json.Unmarshal(c.Response.Body(), &records)
+	if err := json.Unmarshal(c.Response.Body(), &records); err != nil {
+		t.Fatal(err)
+	}
 	if len(records) != 0 {
 		t.Errorf("expected 0 records, got %d", len(records))
 	}
@@ -64,7 +66,9 @@ func TestListRecords_ReturnsUserRecords(t *testing.T) {
 	ListRecords(db)(context.Background(), c)
 
 	var records []models.PortfolioRecord
-	json.Unmarshal(c.Response.Body(), &records)
+	if err := json.Unmarshal(c.Response.Body(), &records); err != nil {
+		t.Fatal(err)
+	}
 	if len(records) != 2 {
 		t.Fatalf("expected 2 records, got %d", len(records))
 	}
@@ -105,7 +109,9 @@ func TestCreateRecord_FromHoldings(t *testing.T) {
 	}
 
 	var record models.PortfolioRecord
-	json.Unmarshal(c.Response.Body(), &record)
+	if err := json.Unmarshal(c.Response.Body(), &record); err != nil {
+		t.Fatal(err)
+	}
 	if !record.Total.Equal(decimal.NewFromInt(1000)) {
 		t.Errorf("expected total 1000, got %s", record.Total)
 	}

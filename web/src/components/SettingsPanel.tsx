@@ -378,7 +378,6 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                   {[...selected, ...available.filter((s) => !selected.includes(s))].map(
                                     (src) => {
                                       const isSelected = selected.includes(src)
-                                      const idx = selected.indexOf(src)
                                       const isDragging =
                                         dragState?.market === m.code && dragState?.src === src
                                       const isDrop =

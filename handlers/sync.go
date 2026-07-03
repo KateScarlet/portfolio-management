@@ -5,10 +5,11 @@ import (
 	"portfolio-management/middleware"
 	"portfolio-management/scheduler"
 
+	"log/slog"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"gorm.io/gorm"
-	"log/slog"
 )
 
 func TriggerSync(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {

@@ -355,11 +355,11 @@ func (n *Notifier) checkSummary(userID, portfolioID string, client *telegram.Cli
 		slog.Error("failed to load fund transactions for summary", "portfolioId", portfolioID, "error", err)
 	}
 	byCurrency := make(map[string]decimal.Decimal)
-	for _, tx := range txs {
-		if tx.Type == "transfer_in" {
-			byCurrency[tx.Currency] = byCurrency[tx.Currency].Add(tx.Amount)
+	for i := range txs {
+		if txs[i].Type == "transfer_in" {
+			byCurrency[txs[i].Currency] = byCurrency[txs[i].Currency].Add(txs[i].Amount)
 		} else {
-			byCurrency[tx.Currency] = byCurrency[tx.Currency].Sub(tx.Amount)
+			byCurrency[txs[i].Currency] = byCurrency[txs[i].Currency].Sub(txs[i].Amount)
 		}
 	}
 	principal := decimal.Zero

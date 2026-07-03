@@ -18,14 +18,14 @@ func NewEventBus() *EventBus {
 	}
 }
 
-func (eb *EventBus) Subscribe(userID string) (<-chan Event, func()) {
+func (eb *EventBus) Subscribe(userID string) (events <-chan Event, unsubscribe func()) {
 	ch := make(chan Event, subscriberBufferSize)
 
 	eb.mu.Lock()
 	eb.subs[userID] = append(eb.subs[userID], ch)
 	eb.mu.Unlock()
 
-	unsubscribe := func() {
+	unsubscribe = func() {
 		eb.mu.Lock()
 		defer eb.mu.Unlock()
 		subs := eb.subs[userID]

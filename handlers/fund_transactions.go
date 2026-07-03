@@ -9,34 +9,35 @@ import (
 	"portfolio-management/models"
 	"time"
 
+	"log/slog"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
-	"log/slog"
 )
 
-func CalcPrincipal(db *gorm.DB, portfolioID string, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
-	return calcPrincipalByQuery(db, db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
+func CalcPrincipal(db *gorm.DB, portfolioID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
+	return calcPrincipalByQuery(db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func CalcPrincipalByUser(db *gorm.DB, userID string, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
-	return calcPrincipalByQuery(db, db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
+func CalcPrincipalByUser(db *gorm.DB, userID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
+	return calcPrincipalByQuery(db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func calcPrincipalByQuery(db *gorm.DB, query *gorm.DB, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
+func calcPrincipalByQuery(query *gorm.DB, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	var txs []models.FundTransaction
 	if err := query.Find(&txs).Error; err != nil {
 		return decimal.Zero, err
 	}
 
 	byCurrency := make(map[string]decimal.Decimal)
-	for _, tx := range txs {
-		if tx.Type == "transfer_in" {
-			byCurrency[tx.Currency] = byCurrency[tx.Currency].Add(tx.Amount)
+	for i := range txs {
+		if txs[i].Type == "transfer_in" {
+			byCurrency[txs[i].Currency] = byCurrency[txs[i].Currency].Add(txs[i].Amount)
 		} else {
-			byCurrency[tx.Currency] = byCurrency[tx.Currency].Sub(tx.Amount)
+			byCurrency[txs[i].Currency] = byCurrency[txs[i].Currency].Sub(txs[i].Amount)
 		}
 	}
 
@@ -423,7 +424,7 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
 	var af models.AvailableFund
 	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return tx.Create(&models.AvailableFund{
 			ID:          uuid.New().String(),
 			UserID:      userID,
@@ -442,7 +443,7 @@ func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount 
 func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
 	var af models.AvailableFund
 	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 余额为 0"}
 	}
 	if err != nil {
@@ -455,6 +456,3 @@ func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amou
 	return tx.Model(&af).Update("amount", newAmount).Error
 }
 
-func formatDecimal(d decimal.Decimal) string {
-	return d.StringFixed(2)
-}

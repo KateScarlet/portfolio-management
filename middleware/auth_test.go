@@ -218,6 +218,7 @@ func TestGetUser_Exists(t *testing.T) {
 	result := GetUser(c)
 	if result == nil {
 		t.Fatal("expected non-nil result")
+		return
 	}
 	if result.UserID != expected.UserID {
 		t.Errorf("expected UserID=%q, got %q", expected.UserID, result.UserID)

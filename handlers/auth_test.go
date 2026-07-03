@@ -261,7 +261,9 @@ func TestListUsers_ReturnsAll(t *testing.T) {
 	}
 
 	var users []map[string]any
-	json.Unmarshal(c.Response.Body(), &users)
+	if err := json.Unmarshal(c.Response.Body(), &users); err != nil {
+		t.Fatal(err)
+	}
 	if len(users) != 2 {
 		t.Errorf("expected 2 users, got %d", len(users))
 	}

@@ -45,9 +45,7 @@ func stripPrefixes(s string) string {
 		s = s[2:]
 	}
 	// gb_ prefix for US stocks (e.g., gb_aapl -> AAPL)
-	if strings.HasPrefix(s, "GB_") {
-		s = s[3:]
-	}
+	s = strings.TrimPrefix(s, "GB_")
 	return s
 }
 

@@ -15,6 +15,7 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions) {
   const retryCountRef = useRef(0)
   const onEventRef = useRef(onEvent)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const connectRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     onEventRef.current = onEvent
@@ -59,9 +60,13 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions) {
         MAX_RETRY_DELAY
       )
       retryCountRef.current++
-      reconnectTimerRef.current = setTimeout(connect, delay)
+      reconnectTimerRef.current = setTimeout(connectRef.current, delay)
     }
   }, [])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const disconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -77,7 +82,6 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions) {
 
   useEffect(() => {
     if (!enabled) {
-      disconnect()
       return
     }
     connect()

@@ -104,7 +104,9 @@ func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 	ListHoldings(db, testRouter())(context.Background(), c)
 
 	var holdings []models.Holding
-	json.Unmarshal(c.Response.Body(), &holdings)
+	if err := json.Unmarshal(c.Response.Body(), &holdings); err != nil {
+		t.Fatal(err)
+	}
 	if len(holdings) != 0 {
 		t.Errorf("expected 0 holdings for other user, got %d", len(holdings))
 	}
@@ -185,7 +187,9 @@ func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 		t.Fatalf("expected 200 (merge), got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 	var holding models.Holding
-	json.Unmarshal(c.Response.Body(), &holding)
+	if err := json.Unmarshal(c.Response.Body(), &holding); err != nil {
+		t.Fatal(err)
+	}
 	if !holding.Shares.Equal(decimal.NewFromInt(15)) {
 		t.Errorf("expected merged shares 15, got %s", holding.Shares)
 	}
@@ -388,7 +392,9 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 	}
 
 	var updated models.Holding
-	json.Unmarshal(c.Response.Body(), &updated)
+	if err := json.Unmarshal(c.Response.Body(), &updated); err != nil {
+		t.Fatal(err)
+	}
 	if !updated.Value.Equal(decimal.NewFromInt(6000)) {
 		t.Errorf("expected value 6000, got %s (json.Number fix)", updated.Value)
 	}
@@ -446,7 +452,9 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 	}
 
 	var updated models.Holding
-	json.Unmarshal(c.Response.Body(), &updated)
+	if err := json.Unmarshal(c.Response.Body(), &updated); err != nil {
+		t.Fatal(err)
+	}
 	if !updated.Shares.Equal(decimal.NewFromInt(20)) {
 		t.Errorf("expected shares 20, got %s", updated.Shares)
 	}
@@ -560,7 +568,9 @@ func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80)},
 	}
-	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
+	if err := convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID); err != nil {
+		t.Fatal(err)
+	}
 	if !holdings[0].Value.Equal(decimal.NewFromInt(1000)) {
 		t.Errorf("expected value unchanged at 1000, got %s", holdings[0].Value)
 	}
@@ -573,7 +583,9 @@ func TestConvertHoldingsCurrency_EmptyCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "", Value: decimal.NewFromInt(500), Cost: decimal.NewFromInt(400), Price: decimal.NewFromInt(50), CostPrice: decimal.NewFromInt(40)},
 	}
-	convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID)
+	if err := convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID); err != nil {
+		t.Fatal(err)
+	}
 	if !holdings[0].Value.Equal(decimal.NewFromInt(500)) {
 		t.Errorf("expected value unchanged at 500, got %s", holdings[0].Value)
 	}
@@ -604,7 +616,9 @@ func TestListHoldings_WithoutCurrencyParam_OriginalValues(t *testing.T) {
 	}
 
 	var holdings []models.Holding
-	json.Unmarshal(c.Response.Body(), &holdings)
+	if err := json.Unmarshal(c.Response.Body(), &holdings); err != nil {
+		t.Fatal(err)
+	}
 	if len(holdings) != 1 {
 		t.Fatalf("expected 1 holding, got %d", len(holdings))
 	}

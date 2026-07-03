@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"portfolio-management"
+	frontend "portfolio-management"
 	"portfolio-management/db"
 	"portfolio-management/handlers"
 	"portfolio-management/marketsource"

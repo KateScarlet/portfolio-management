@@ -135,7 +135,8 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 		var user models.User
 		err = gormDB.Where("sso_provider = ? AND sso_id = ?", "oidc", sub).First(&user).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
 			user = models.User{
 				ID:          uuid.New().String(),
 				Username:    username,
@@ -149,10 +150,10 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败，用户名 '" + username + "' 可能已被占用: " + err.Error()})
 				return
 			}
-		} else if err != nil {
+		case err != nil:
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询用户失败"})
 			return
-		} else if user.Username != username {
+		case user.Username != username:
 			gormDB.Model(&user).Update("username", username)
 			user.Username = username
 		}

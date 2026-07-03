@@ -59,9 +59,8 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 		return nil, fmt.Errorf("sina returned status %d", resp.StatusCode())
 	}
 
-	body := resp.String()
 	// Sina returns GBK-encoded data, convert to UTF-8
-	body = gbkToUTF8(resp.Body())
+	body := gbkToUTF8(resp.Body())
 	return parseQuote(body, symbol, market)
 }
 
