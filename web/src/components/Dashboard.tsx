@@ -54,8 +54,10 @@ export default function Dashboard({
     .filter((item) => item.value > 0)
 
   const profit = total - principal
-  const returnRate = principal > 0 ? profit / principal : 0
-  const isPositive = profit >= 0
+  const returnRate = principal > 0 && Number.isFinite(profit) && Number.isFinite(principal)
+    ? profit / principal
+    : 0
+  const isPositive = Number.isFinite(profit) ? profit >= 0 : false
 
   const totalFunds = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]

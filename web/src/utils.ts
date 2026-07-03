@@ -34,11 +34,13 @@ export function formatCurrencyByCode(value: string | number | undefined | null, 
 
 export function formatPercent(value: string | number | undefined | null): string {
   const d = toDecimal(value)
+  const n = d.toNumber()
+  if (!Number.isFinite(n)) return "0.00%"
   return new Intl.NumberFormat("zh-CN", {
     style: "percent",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(d.toNumber())
+  }).format(n)
 }
 
 export function getProfitColor(isPositive: boolean, colorScheme: ColorScheme): string {

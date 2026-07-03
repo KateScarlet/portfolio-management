@@ -260,15 +260,22 @@ export default function HoldingsManager({
                             {(() => {
                               const value = toDecimal(h.value)
                               const cost = toDecimal(h.cost)
+                              if (cost.isZero() || !Number.isFinite(value.toNumber()) || !Number.isFinite(cost.toNumber())) {
+                                return <p className="text-[10px] text-[#ADB5BD]">-</p>
+                              }
                               const profit = value.minus(cost)
                               const returnRate = profit.div(cost)
-                              const isPositive = !profit.isNegative()
+                              const rateNum = returnRate.toNumber()
+                              if (!Number.isFinite(rateNum)) {
+                                return <p className="text-[10px] text-[#ADB5BD]">-</p>
+                              }
+                              const isPositive = profit.isPositive()
                               return (
                                 <p
                                   className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
                                 >
                                   {isPositive ? "+" : ""}
-                                  {formatPercent(returnRate.toNumber())}
+                                  {formatPercent(rateNum)}
                                 </p>
                               )
                             })()}

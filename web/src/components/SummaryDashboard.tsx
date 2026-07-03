@@ -18,9 +18,13 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
     return "text-[#6C757D]"
   }
 
+  const principalD = toDecimal(summary.principal)
   const pnl =
-    toDecimal(summary.principal).isPositive()
-      ? toDecimal(summary.total).minus(summary.principal).div(summary.principal).times(100).toNumber()
+    principalD.isPositive()
+      ? (() => {
+          const n = toDecimal(summary.total).minus(summary.principal).div(principalD).times(100).toNumber()
+          return Number.isFinite(n) ? n : 0
+        })()
       : 0
 
   return (
@@ -94,7 +98,13 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
         <h3 className="text-sm font-medium mb-2">各组合概况</h3>
         <div className="space-y-2">
           {summary.portfolios.map((p) => {
-            const pPnl = toDecimal(p.principal).isPositive() ? toDecimal(p.total).minus(p.principal).div(p.principal).times(100).toNumber() : 0
+            const pPrincipalD = toDecimal(p.principal)
+            const pPnl = pPrincipalD.isPositive()
+              ? (() => {
+                  const n = toDecimal(p.total).minus(pPrincipalD).div(pPrincipalD).times(100).toNumber()
+                  return Number.isFinite(n) ? n : 0
+                })()
+              : 0
             return (
               <div key={p.id} className="border border-[#E9ECEF] rounded p-3">
                 <div className="flex items-center justify-between">
