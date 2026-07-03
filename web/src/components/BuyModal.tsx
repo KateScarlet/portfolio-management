@@ -20,8 +20,6 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
   const [buyFee, setBuyFee] = useState("")
   const [buyDate, setBuyDate] = useState(new Date().toISOString().split("T")[0])
 
-  const [manualInputMode, setManualInputMode] = useState<"cost" | "priceShares">("cost")
-  const [manualCost, setManualCost] = useState("")
   const [manualPrice, setManualPrice] = useState("")
   const [manualShares, setManualShares] = useState("")
   const [manualValue, setManualValue] = useState("")
@@ -83,26 +81,13 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
         setSubmitting(false)
       }
     } else {
-      let addedCost: Decimal
-      let addedShares: Decimal
-      if (manualInputMode === "priceShares") {
-        const p = new Decimal(manualPrice)
-        const s = new Decimal(manualShares)
-        if (p.isNegative() || p.isZero() || s.isNegative() || s.isZero()) {
-          showToast("请输入有效的单价和份额", "error")
-          return
-        }
-        addedCost = p.times(s)
-        addedShares = s
-      } else {
-        const c = new Decimal(manualCost)
-        if (c.isNegative() || c.isZero()) {
-          showToast("请输入有效的总成本", "error")
-          return
-        }
-        addedCost = c
-        addedShares = new Decimal(0)
+      const p = new Decimal(manualPrice)
+      const s = new Decimal(manualShares)
+      if (p.isNegative() || p.isZero() || s.isNegative() || s.isZero()) {
+        showToast("请输入有效的单价和份额", "error")
+        return
       }
+      const addedCost = p.times(s)
 
       const val = new Decimal(manualValue)
       if (val.isNegative() || val.isZero()) {
@@ -118,8 +103,8 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
           name: holding.name,
           market: holding.market,
           currency: holding.currency || "CNY",
-          shares: addedShares.toString(),
-          price: manualInputMode === "priceShares" ? new Decimal(manualPrice).toString() : "0",
+          shares: s.toString(),
+          price: p.toString(),
           value: val.toString(),
           cost: addedCost.toString(),
           fee: feeNum.toString(),
@@ -186,70 +171,28 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
             <>
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                  录入方式
+                  单价
                 </label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-1.5 text-xs text-[#495057]">
-                    <input
-                      type="radio"
-                      checked={manualInputMode === "cost"}
-                      onChange={() => setManualInputMode("cost")}
-                      className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
-                    />
-                    总成本
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs text-[#495057]">
-                    <input
-                      type="radio"
-                      checked={manualInputMode === "priceShares"}
-                      onChange={() => setManualInputMode("priceShares")}
-                      className="text-[#1A1A1A] focus:ring-[#1A1A1A]"
-                    />
-                    单价+份额
-                  </label>
-                </div>
+                <input
+                  type="number"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                  placeholder="买入单价"
+                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                />
               </div>
-              {manualInputMode === "cost" ? (
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                    总成本
-                  </label>
-                  <input
-                    type="number"
-                    value={manualCost}
-                    onChange={(e) => setManualCost(e.target.value)}
-                    placeholder="投入本金"
-                    className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                      单价
-                    </label>
-                    <input
-                      type="number"
-                      value={manualPrice}
-                      onChange={(e) => setManualPrice(e.target.value)}
-                      placeholder="买入单价"
-                      className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                      份额
-                    </label>
-                    <input
-                      type="number"
-                      value={manualShares}
-                      onChange={(e) => setManualShares(e.target.value)}
-                      placeholder="数量"
-                      className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
-                    />
-                  </div>
-                </>
-              )}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                  份额
+                </label>
+                <input
+                  type="number"
+                  value={manualShares}
+                  onChange={(e) => setManualShares(e.target.value)}
+                  placeholder="数量"
+                  className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
+                />
+              </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                   当前价值
