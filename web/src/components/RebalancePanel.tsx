@@ -1,10 +1,10 @@
 import React from "react"
 import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
-import { formatCurrencyByCode, getProfitColor } from "../utils"
+import { formatCurrencyByCode, getProfitColor, toDecimal } from "../utils"
 
 interface RebalancePanelProps {
-  assets: Record<AssetId, number>
-  total: number
+  assets: Record<AssetId, string>
+  total: string
   driftThreshold: number
   colorScheme: ColorScheme
   targetPcts: Record<AssetId, number>
@@ -19,7 +19,7 @@ export default function RebalancePanel({
   targetPcts,
   displayCurrency,
 }: RebalancePanelProps) {
-  if (total === 0) {
+  if (toDecimal(total).isZero()) {
     return null
   }
 
@@ -27,10 +27,10 @@ export default function RebalancePanel({
     const id = key as AssetId
     const def = ASSET_DEFINITIONS[id]
     const targetPct = targetPcts[id]
-    const currentValue = assets[id] || 0
-    const currentPct = total > 0 ? currentValue / total : 0
-    const targetValue = total * (targetPct / 100)
-    const difference = targetValue - currentValue
+    const currentValue = assets[id] || "0"
+    const currentPct = toDecimal(total).gt(0) ? toDecimal(currentValue).div(total).toNumber() : 0
+    const targetValue = toDecimal(total).times(targetPct).div(100).toString()
+    const difference = toDecimal(targetValue).minus(currentValue).toString()
     const driftPct = currentPct * 100 - targetPct
     const isBalanced = Math.abs(driftPct) < driftThreshold
 
@@ -44,7 +44,7 @@ export default function RebalancePanel({
       difference,
       driftPct,
       isBalanced,
-      action: difference > 0 ? "buy" : difference < 0 ? "sell" : "keep",
+      action: toDecimal(difference).gt(0) ? "buy" : toDecimal(difference).lt(0) ? "sell" : "keep",
     }
   })
 
@@ -140,7 +140,7 @@ export default function RebalancePanel({
                     {item.action === "buy" ? "补仓" : item.action === "sell" ? "减仓" : "保持"}
                     {item.action !== "keep" && (
                       <span className="font-mono">
-                        {formatCurrencyByCode(Math.abs(item.difference), displayCurrency)}
+                        {formatCurrencyByCode(toDecimal(item.difference).abs().toString(), displayCurrency)}
                       </span>
                     )}
                   </span>

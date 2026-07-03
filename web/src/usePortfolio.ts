@@ -40,11 +40,11 @@ export function usePortfolio(
     }
   }, [portfolioId])
 
-  const assets: Record<AssetId, number> = { stocks: 0, bonds: 0, cash: 0, commodities: 0 }
+  const assets: Record<AssetId, string> = { stocks: "0", bonds: "0", cash: "0", commodities: "0" }
   holdings.forEach((h) => {
     const rate = h.currency === displayCurrency ? 1 : exchangeRates[h.currency]
-    const convertedValue = rate ? toDecimal(h.value).times(rate).toNumber() : toDecimal(h.value).toNumber()
-    assets[h.assetId] = (assets[h.assetId] || 0) + convertedValue
+    const convertedValue = rate ? toDecimal(h.value).times(rate) : toDecimal(h.value)
+    assets[h.assetId] = toDecimal(assets[h.assetId]).plus(convertedValue).toString()
   })
 
   const addHolding = useCallback(

@@ -8,9 +8,9 @@ import FundOperationDialog from "./FundOperationDialog"
 type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
 
 interface DashboardProps {
-  assets: Record<AssetId, number>
+  assets: Record<AssetId, string>
   total: string
-  totalAssets: number
+  totalAssets: string
   principal: string
   totalFees: string
   colorScheme: ColorScheme
@@ -45,14 +45,14 @@ export default function Dashboard({
   const chartData = Object.keys(assets)
     .map((key) => {
       const id = key as AssetId
-      const value = assets[id]
+      const value = toDecimal(assets[id]).toNumber()
       return {
         name: ASSET_DEFINITIONS[id].name,
         value,
         color: ASSET_DEFINITIONS[id].color,
       }
     })
-    .filter((item) => item.value > 0)
+    .filter((item) => toDecimal(item.value).gt(0))
 
   const totalD = toDecimal(total)
   const principalD = toDecimal(principal)
@@ -140,7 +140,7 @@ export default function Dashboard({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) => formatCurrencyByCode(Number(value), displayCurrency)}
+                formatter={(value) => formatCurrencyByCode(String(value), displayCurrency)}
                 contentStyle={{
                   borderRadius: "0.5rem",
                   border: "1px solid #E9ECEF",
@@ -170,8 +170,8 @@ export default function Dashboard({
       <div className="mt-8 grid grid-cols-2 gap-4">
         {Object.keys(ASSET_DEFINITIONS).map((key) => {
           const id = key as AssetId
-          const value = assets[id] || 0
-          const percentage = totalAssets > 0 ? value / totalAssets : 0
+          const value = assets[id] || "0"
+          const percentage = toDecimal(totalAssets).gt(0) ? toDecimal(value).div(totalAssets).toNumber() : 0
           const def = ASSET_DEFINITIONS[id]
 
           return (

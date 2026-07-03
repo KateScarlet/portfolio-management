@@ -344,8 +344,9 @@ export default function App() {
     )
   }
 
-  const totalAssets = Object.values(assets).reduce((sum, val) => sum + toDecimal(val).toNumber(), 0)
-  const total = new Decimal(totalAssets).plus(totalFundsDisplay)
+  const totalAssetsD = Object.values(assets).reduce((sum, val) => sum.plus(toDecimal(val)), new Decimal(0))
+  const total = totalAssetsD.plus(totalFundsDisplay)
+  const totalAssets = totalAssetsD.toString()
   const totalFees = holdings.reduce(
     (sum, h) => sum.plus((h.lots || []).reduce((ls, l) => ls.plus(toDecimal(l.fee)), new Decimal(0))),
     new Decimal(0)
@@ -439,7 +440,7 @@ export default function App() {
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
               assets={assets}
-              total={total.toNumber()}
+              total={total.toString()}
               driftThreshold={settings.driftThreshold}
               colorScheme={settings.colorScheme}
               targetPcts={{
