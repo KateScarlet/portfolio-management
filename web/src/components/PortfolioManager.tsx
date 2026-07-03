@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Portfolio } from "../types"
 import * as api from "../api"
+import ConfirmDialog from "./ConfirmDialog"
 
 interface Props {
   portfolios: Portfolio[]
@@ -15,6 +16,7 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
   const [editName, setEditName] = useState("")
   const [editDesc, setEditDesc] = useState("")
   const [error, setError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -44,11 +46,12 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
     }
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`确定删除组合"${name}"？该组合下的所有持仓和记录将被删除。`)) return
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     setError("")
     try {
-      await api.deletePortfolio(id)
+      await api.deletePortfolio(deleteTarget.id)
+      setDeleteTarget(null)
       onRefresh()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "未知错误")
@@ -162,7 +165,7 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
                     </button>
                     {!p.isDefault && (
                       <button
-                        onClick={() => handleDelete(p.id, p.name)}
+                        onClick={() => setDeleteTarget({ id: p.id, name: p.name })}
                         className="text-xs text-red-500 hover:text-red-700"
                       >
                         删除
