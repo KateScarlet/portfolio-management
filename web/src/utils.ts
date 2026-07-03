@@ -12,35 +12,37 @@ export function toDecimal(value: string | number | undefined | null): Decimal {
   return new Decimal(value)
 }
 
-export function formatCurrency(value: string | number | undefined | null): string {
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  CNY: "¥",
+  USD: "$",
+  HKD: "HK$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+}
+
+function formatDecimal(value: string | number | undefined | null): string {
   const d = toDecimal(value)
-  return new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(d.toNumber())
+  if (d.isNaN() || !d.isFinite()) return "0.00"
+  const isNeg = d.isNeg()
+  const [intPart, decPart = "00"] = d.abs().toFixed(2).split(".")
+  const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return `${isNeg ? "-" : ""}${formatted}.${decPart}`
+}
+
+export function formatCurrency(value: string | number | undefined | null): string {
+  return `${CURRENCY_SYMBOLS["CNY"]}${formatDecimal(value)}`
 }
 
 export function formatCurrencyByCode(value: string | number | undefined | null, currency: string): string {
-  const d = toDecimal(value)
-  return new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(d.toNumber())
+  const symbol = CURRENCY_SYMBOLS[currency] || currency
+  return `${symbol}${formatDecimal(value)}`
 }
 
 export function formatPercent(value: string | number | undefined | null): string {
   const d = toDecimal(value)
-  const n = d.toNumber()
-  if (!Number.isFinite(n)) return "0.00%"
-  return new Intl.NumberFormat("zh-CN", {
-    style: "percent",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n)
+  if (d.isNaN() || !d.isFinite()) return "0.00%"
+  return `${d.times(100).toFixed(2)}%`
 }
 
 export function getProfitColor(isPositive: boolean, colorScheme: ColorScheme): string {

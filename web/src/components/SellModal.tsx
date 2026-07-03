@@ -26,7 +26,7 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
   const { showToast } = useToast()
 
   const confirmSell = async () => {
-    const feeNum = parseFloat(sellFee) || 0
+    const feeStr = sellFee || "0"
 
     if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
       const sShares = parseFloat(sellShares)
@@ -45,7 +45,7 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
       }
 
       try {
-        const result = await api.sellHolding(portfolioId, holding.id, sShares, sPrice, feeNum, 0)
+        const result = await api.sellHolding(portfolioId, holding.id, sellShares, sellPrice, feeStr, "0")
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {
@@ -64,7 +64,7 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
       }
 
       try {
-        const result = await api.sellHolding(portfolioId, holding.id, 0, 0, feeNum, sValue)
+        const result = await api.sellHolding(portfolioId, holding.id, "0", "0", feeStr, sellPrice)
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {

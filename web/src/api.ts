@@ -61,10 +61,10 @@ export async function deleteHolding(pid: string, id: string): Promise<void> {
 export async function sellHolding(
   pid: string,
   id: string,
-  shares: number,
-  price: number,
-  fee: number,
-  value: number
+  shares: string,
+  price: string,
+  fee: string,
+  value: string
 ): Promise<{ soldHolding: Holding; availableFunds: string }> {
   return request<{ soldHolding: Holding; availableFunds: string }>(
     `/api/portfolios/${pid}/holdings/${id}/sell`,
@@ -126,7 +126,7 @@ export async function fetchAvailableFunds(
 export async function transferInFunds(
   pid: string,
   currency: string,
-  amount: number,
+  amount: string,
   note: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/api/portfolios/${pid}/funds/transfer-in`, {
@@ -138,7 +138,7 @@ export async function transferInFunds(
 export async function transferOutFunds(
   pid: string,
   currency: string,
-  amount: number,
+  amount: string,
   note: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/api/portfolios/${pid}/funds/transfer-out`, {
@@ -150,7 +150,7 @@ export async function transferOutFunds(
 export async function transferBetweenFunds(
   pid: string,
   currency: string,
-  amount: number,
+  amount: string,
   targetPortfolioId: string,
   note: string
 ): Promise<{ status: string }> {
@@ -164,9 +164,9 @@ export async function convertCurrency(
   pid: string,
   fromCurrency: string,
   toCurrency: string,
-  fromAmount: number,
-  toAmount: number,
-  exchangeRate: number
+  fromAmount: string,
+  toAmount: string,
+  exchangeRate: string
 ): Promise<{ status: string }> {
   return request<{ status: string }>(`/api/portfolios/${pid}/funds/convert`, {
     method: "POST",

@@ -121,10 +121,10 @@ export default function FundOperationDialog({
     try {
       switch (type) {
         case "transfer_in":
-          await api.transferInFunds(currentPortfolioId, currency, amt, note)
+          await api.transferInFunds(currentPortfolioId, currency, amount, note)
           break
         case "transfer_out":
-          await api.transferOutFunds(currentPortfolioId, currency, amt, note)
+          await api.transferOutFunds(currentPortfolioId, currency, amount, note)
           break
         case "transfer":
           if (!targetPortfolioId) {
@@ -132,7 +132,7 @@ export default function FundOperationDialog({
             setSubmitting(false)
             return
           }
-          await api.transferBetweenFunds(currentPortfolioId, currency, amt, targetPortfolioId, note)
+          await api.transferBetweenFunds(currentPortfolioId, currency, amount, targetPortfolioId, note)
           break
         case "convert": {
           const toAmt = parseFloat(toAmount)
@@ -147,7 +147,7 @@ export default function FundOperationDialog({
             setSubmitting(false)
             return
           }
-          await api.convertCurrency(currentPortfolioId, currency, toCurrency, amt, toAmt, rate)
+          await api.convertCurrency(currentPortfolioId, currency, toCurrency, amount, toAmount, exchangeRate)
           break
         }
       }

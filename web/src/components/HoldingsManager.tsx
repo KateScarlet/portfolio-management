@@ -12,7 +12,7 @@ interface HoldingsManagerProps {
   portfolioId: string
   holdings: Holding[]
   setHoldings: React.Dispatch<React.SetStateAction<Holding[]>>
-  total: number
+  total: string
   onAddHolding: (holding: Omit<Holding, "id">) => Promise<void>
   onUpdateHolding: (id: string, updates: Partial<Holding>) => void
   onRemoveHolding: (id: string) => void

@@ -178,6 +178,15 @@ export default function PortfolioManager({ portfolios, onClose, onRefresh }: Pro
           ))}
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="删除组合"
+          message={`确定删除组合"${deleteTarget.name}"？该组合下的所有持仓和记录将被删除。`}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   )
 }

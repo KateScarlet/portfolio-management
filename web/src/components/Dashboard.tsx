@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import Decimal from "decimal.js"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
 import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
@@ -8,10 +9,10 @@ type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
 
 interface DashboardProps {
   assets: Record<AssetId, number>
-  total: number
+  total: string
   totalAssets: number
-  principal: number
-  totalFees: number
+  principal: string
+  totalFees: string
   colorScheme: ColorScheme
   availableFunds: AvailableFund[]
   exchangeRates: Record<string, number>
@@ -53,16 +54,18 @@ export default function Dashboard({
     })
     .filter((item) => item.value > 0)
 
-  const profit = total - principal
-  const returnRate = principal > 0 && Number.isFinite(profit) && Number.isFinite(principal)
-    ? profit / principal
+  const totalD = toDecimal(total)
+  const principalD = toDecimal(principal)
+  const profit = totalD.minus(principalD)
+  const returnRate = principalD.isPositive()
+    ? profit.div(principalD).toNumber()
     : 0
-  const isPositive = Number.isFinite(profit) ? profit >= 0 : false
+  const isPositive = profit.gte(0)
 
   const totalFunds = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
-    return rate ? sum + toDecimal(f.amount).times(rate).toNumber() : sum
-  }, 0)
+    return rate ? sum.plus(toDecimal(f.amount).times(rate)) : sum
+  }, new Decimal(0))
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col h-full">
@@ -76,7 +79,7 @@ export default function Dashboard({
             累计投入成本:{" "}
             <span className="font-mono">{formatCurrencyByCode(principal, displayCurrency)}</span>
           </span>
-          {totalFees > 0 && (
+          {toDecimal(totalFees).gt(0) && (
             <span className="ml-2">
               累计手续费:{" "}
               <span className="font-mono">{formatCurrencyByCode(totalFees, displayCurrency)}</span>
@@ -114,12 +117,12 @@ export default function Dashboard({
         <span className="text-sm font-medium">
           {isPositive ? "+" : ""}
           {formatPercent(returnRate)} ({isPositive ? "+" : ""}
-          {formatCurrencyByCode(profit, displayCurrency)})
+          {formatCurrencyByCode(profit.toString(), displayCurrency)})
         </span>
       </div>
 
       <div className="w-full h-64 relative flex justify-center">
-        {total > 0 ? (
+        {totalD.gt(0) ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -153,7 +156,7 @@ export default function Dashboard({
             <p className="text-[10px] text-[#ADB5BD] uppercase tracking-wider mt-1">暂无数据</p>
           </div>
         )}
-        {total > 0 && (
+        {totalD.gt(0) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <p className={`text-2xl font-light ${getProfitColor(isPositive, colorScheme)}`}>
               {isPositive ? "+" : ""}
@@ -194,7 +197,7 @@ export default function Dashboard({
             className="text-sm font-mono text-[#1A1A1A] hover:text-blue-600 transition-colors cursor-pointer"
             title="点击查看详情"
           >
-            {formatCurrencyByCode(totalFunds, displayCurrency)}
+            {formatCurrencyByCode(totalFunds.toString(), displayCurrency)}
             <span className="text-[10px] ml-1 text-[#ADB5BD]">{showDetails ? "▲" : "▼"}</span>
           </button>
         </div>

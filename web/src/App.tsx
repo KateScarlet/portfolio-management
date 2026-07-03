@@ -60,8 +60,8 @@ export default function App() {
 
   const totalFundsDisplay = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]
-    return rate ? sum + toDecimal(f.amount).times(rate).toNumber() : sum
-  }, 0)
+    return rate ? sum.plus(toDecimal(f.amount).times(rate)) : sum
+  }, new Decimal(0))
 
   const handleSSEEvent = useCallback(
     (event: SSEEvent) => {
@@ -344,11 +344,11 @@ export default function App() {
     )
   }
 
-  const total = Object.values(assets).reduce((sum, val) => sum + toDecimal(val).toNumber(), 0) + totalFundsDisplay
   const totalAssets = Object.values(assets).reduce((sum, val) => sum + toDecimal(val).toNumber(), 0)
+  const total = new Decimal(totalAssets).plus(totalFundsDisplay)
   const totalFees = holdings.reduce(
-    (sum, h) => sum + (h.lots || []).reduce((ls, l) => ls + toDecimal(l.fee).toNumber(), 0),
-    0
+    (sum, h) => sum.plus((h.lots || []).reduce((ls, l) => ls.plus(toDecimal(l.fee)), new Decimal(0))),
+    new Decimal(0)
   )
 
   const byCurrency: Record<string, Decimal> = {}
@@ -359,13 +359,13 @@ export default function App() {
       byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).minus(toDecimal(tx.amount))
     }
   }
-  let principal = 0
+  let principal = new Decimal(0)
   for (const [currency, amount] of Object.entries(byCurrency)) {
     if (currency === settings.displayCurrency || amount.isZero()) {
-      principal += amount.toNumber()
+      principal = principal.plus(amount)
     } else {
       const rate = exchangeRates[currency]
-      if (rate) principal += amount.times(rate).toNumber()
+      if (rate) principal = principal.plus(amount.times(rate))
     }
   }
 
@@ -423,10 +423,10 @@ export default function App() {
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
             <Dashboard
               assets={assets}
-              total={total}
+              total={total.toString()}
               totalAssets={totalAssets}
-              principal={principal}
-              totalFees={totalFees}
+              principal={principal.toString()}
+              totalFees={totalFees.toString()}
               colorScheme={settings.colorScheme}
               availableFunds={availableFunds}
               exchangeRates={exchangeRates}
@@ -439,7 +439,7 @@ export default function App() {
           <div className="lg:col-span-7 flex flex-col gap-6 h-full">
             <RebalancePanel
               assets={assets}
-              total={total}
+              total={total.toNumber()}
               driftThreshold={settings.driftThreshold}
               colorScheme={settings.colorScheme}
               targetPcts={{
@@ -458,7 +458,7 @@ export default function App() {
             portfolioId={currentPortfolio.id}
             holdings={holdings}
             setHoldings={setHoldings}
-            total={total}
+            total={total.toString()}
             onAddHolding={handleAddHolding}
             onUpdateHolding={updateHolding}
             onRemoveHolding={handleRemoveHolding}
