@@ -106,7 +106,11 @@ func UpdatePortfolio(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolio, _ = gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		portfolio, err = gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 		c.JSON(consts.StatusOK, portfolio)
 	}
 }

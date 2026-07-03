@@ -77,7 +77,7 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			h.Shutdown(ctx)
+			h.Shutdown(context.Background())
 		}()
 	}
 }

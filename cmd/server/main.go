@@ -32,10 +32,9 @@ func main() {
 
 	h := server.Default(server.WithHostPorts(":3000"))
 
-	h.GET("/api/setup/status", handlers.SetupStatus())
-	h.POST("/api/setup/complete", handlers.SetupComplete(h))
-
 	if db.IsSetupMode() {
+		h.GET("/api/setup/status", handlers.SetupStatus())
+		h.POST("/api/setup/complete", handlers.SetupComplete(h))
 		serveFrontend(h)
 		h.Spin()
 		return

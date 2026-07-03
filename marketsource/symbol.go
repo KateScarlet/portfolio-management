@@ -1,7 +1,6 @@
 package marketsource
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -299,37 +298,4 @@ func ExtractBaseSymbol(symbol string) string {
 		return symbol[:idx]
 	}
 	return symbol
-}
-
-// ValidateSymbol checks if a symbol matches the expected format for its market.
-func ValidateSymbol(symbol, market string) error {
-	suffix := getExpectedSuffix(market)
-	if suffix == "" {
-		return nil // no validation for unknown markets
-	}
-	if !strings.HasSuffix(symbol, suffix) {
-		return fmt.Errorf("symbol %q does not match expected format for market %s (expected suffix %s)", symbol, market, suffix)
-	}
-	return nil
-}
-
-func getExpectedSuffix(market string) string {
-	switch market {
-	case "CN":
-		return ".SH" // or .SZ, but we just check it ends with a valid suffix
-	case "HK":
-		return ".HK"
-	case "US":
-		return ".US"
-	case "CRYPTO":
-		return ".CC"
-	case "FUND":
-		return ".CNOF"
-	case "COMMODITY_CN":
-		return ".CN"
-	case "COMMODITY_INTL":
-		return ".INTL"
-	default:
-		return ""
-	}
 }
