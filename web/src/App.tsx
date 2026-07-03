@@ -30,13 +30,43 @@ import PortfolioSelector from "./components/PortfolioSelector"
 import PortfolioManager from "./components/PortfolioManager"
 import SummaryDashboard from "./components/SummaryDashboard"
 
+const STORAGE_KEY = "selectedPortfolioId"
+
+function getStoredPortfolioId(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setStoredPortfolioId(id: string | null) {
+  try {
+    if (id) {
+      localStorage.setItem(STORAGE_KEY, id)
+    } else {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 export default function App() {
   const [setupMode, setSetupMode] = useState<boolean | null>(null)
   const [user, setUser] = useState<UserInfo | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
-  const [currentPortfolio, setCurrentPortfolio] = useState<Portfolio | null>(null)
+  const [currentPortfolio, setCurrentPortfolioState] = useState<Portfolio | null>(null)
   const [showPortfolioManager, setShowPortfolioManager] = useState(false)
+
+  const setCurrentPortfolio = useCallback((portfolio: Portfolio | null | ((prev: Portfolio | null) => Portfolio | null)) => {
+    setCurrentPortfolioState((prev) => {
+      const next = typeof portfolio === "function" ? portfolio(prev) : portfolio
+      setStoredPortfolioId(next?.id || null)
+      return next
+    })
+  }, [])
   const [showSummary, setShowSummary] = useState(false)
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -138,13 +168,21 @@ export default function App() {
       }
       setPortfolios(ps)
       setCurrentPortfolio((prev) => {
-        const existing = prev ? ps.find((p) => p.id === prev.id) : null
-        return existing || ps[0]
+        if (prev) {
+          const existing = ps.find((p) => p.id === prev.id)
+          if (existing) return existing
+        }
+        const storedId = getStoredPortfolioId()
+        if (storedId) {
+          const stored = ps.find((p) => p.id === storedId)
+          if (stored) return stored
+        }
+        return ps[0]
       })
     } catch (e) {
       console.error("Failed to load portfolios", e)
     }
-  }, [])
+  }, [setCurrentPortfolio])
 
   useEffect(() => {
     if (!user) return
@@ -159,8 +197,16 @@ export default function App() {
         if (!cancelled) {
           setPortfolios(ps)
           setCurrentPortfolio((prev) => {
-            const existing = prev ? ps.find((p) => p.id === prev.id) : null
-            return existing || ps[0]
+            if (prev) {
+              const existing = ps.find((p) => p.id === prev.id)
+              if (existing) return existing
+            }
+            const storedId = getStoredPortfolioId()
+            if (storedId) {
+              const stored = ps.find((p) => p.id === storedId)
+              if (stored) return stored
+            }
+            return ps[0]
           })
         }
       } catch (e) {
@@ -171,7 +217,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, setCurrentPortfolio])
 
   useEffect(() => {
     if (!currentPortfolio) return
