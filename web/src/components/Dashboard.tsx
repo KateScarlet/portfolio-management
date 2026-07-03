@@ -57,9 +57,7 @@ export default function Dashboard({
   const totalD = toDecimal(total)
   const principalD = toDecimal(principal)
   const profit = totalD.minus(principalD)
-  const returnRate = principalD.isPositive()
-    ? profit.div(principalD).toNumber()
-    : 0
+  const returnRate = principalD.isPositive() ? profit.div(principalD).toNumber() : 0
   const isPositive = profit.gte(0)
 
   const totalFunds = availableFunds.reduce((sum, f) => {
@@ -171,7 +169,9 @@ export default function Dashboard({
         {Object.keys(ASSET_DEFINITIONS).map((key) => {
           const id = key as AssetId
           const value = assets[id] || "0"
-          const percentage = toDecimal(totalAssets).gt(0) ? toDecimal(value).div(totalAssets).toNumber() : 0
+          const percentage = toDecimal(totalAssets).gt(0)
+            ? toDecimal(value).div(totalAssets).toNumber()
+            : 0
           const def = ASSET_DEFINITIONS[id]
 
           return (
@@ -220,7 +220,6 @@ export default function Dashboard({
                 <span className="text-xs text-[#6C757D]">暂无可用资金</span>
               </div>
             )}
-
           </div>
         )}
 

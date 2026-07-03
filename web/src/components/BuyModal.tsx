@@ -289,7 +289,6 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
               className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
             />
           </div>
-
         </div>
 
         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">

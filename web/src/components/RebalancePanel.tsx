@@ -140,7 +140,10 @@ export default function RebalancePanel({
                     {item.action === "buy" ? "补仓" : item.action === "sell" ? "减仓" : "保持"}
                     {item.action !== "keep" && (
                       <span className="font-mono">
-                        {formatCurrencyByCode(toDecimal(item.difference).abs().toString(), displayCurrency)}
+                        {formatCurrencyByCode(
+                          toDecimal(item.difference).abs().toString(),
+                          displayCurrency
+                        )}
                       </span>
                     )}
                   </span>

@@ -337,9 +337,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                       <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
                         自动同步价格
                       </label>
-                      <p className="text-xs text-[#6C757D] mb-3">
-                        定时从数据源获取最新价格。
-                      </p>
+                      <p className="text-xs text-[#6C757D] mb-3">定时从数据源获取最新价格。</p>
                       <div className="flex flex-wrap gap-2">
                         {SYNC_PRESETS.map((p) => (
                           <button
@@ -375,94 +373,95 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                   {m.name}
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {[...selected, ...available.filter((s) => !selected.includes(s))].map(
-                                    (src) => {
-                                      const isSelected = selected.includes(src)
-                                      const isDragging =
-                                        dragState?.market === m.code && dragState?.src === src
-                                      const isDrop =
-                                        dropTarget?.market === m.code && dropTarget?.src === src
-                                      return (
-                                        <button
-                                          key={src}
-                                          draggable={isSelected && selected.length > 1}
-                                          onClick={() => {
-                                            let next: string[]
-                                            if (!isSelected) {
-                                              next = [...selected, src]
-                                            } else if (selected.length <= 1) {
-                                              return
-                                            } else {
-                                              next = selected.filter((s) => s !== src)
-                                            }
+                                  {[
+                                    ...selected,
+                                    ...available.filter((s) => !selected.includes(s)),
+                                  ].map((src) => {
+                                    const isSelected = selected.includes(src)
+                                    const isDragging =
+                                      dragState?.market === m.code && dragState?.src === src
+                                    const isDrop =
+                                      dropTarget?.market === m.code && dropTarget?.src === src
+                                    return (
+                                      <button
+                                        key={src}
+                                        draggable={isSelected && selected.length > 1}
+                                        onClick={() => {
+                                          let next: string[]
+                                          if (!isSelected) {
+                                            next = [...selected, src]
+                                          } else if (selected.length <= 1) {
+                                            return
+                                          } else {
+                                            next = selected.filter((s) => s !== src)
+                                          }
+                                          setMarketSourceDraft({
+                                            ...marketSourceDraft,
+                                            [m.code]: next,
+                                          })
+                                        }}
+                                        onDragStart={(e) => {
+                                          setDragState({ market: m.code, src })
+                                          e.dataTransfer.effectAllowed = "move"
+                                          e.dataTransfer.setData("text/plain", src)
+                                        }}
+                                        onDragOver={(e) => {
+                                          if (
+                                            dragState?.market === m.code &&
+                                            dragState.src !== src &&
+                                            isSelected
+                                          ) {
+                                            e.preventDefault()
+                                            e.dataTransfer.dropEffect = "move"
+                                            setDropTarget({ market: m.code, src })
+                                          }
+                                        }}
+                                        onDragLeave={() => {
+                                          if (
+                                            dropTarget?.market === m.code &&
+                                            dropTarget.src === src
+                                          ) {
+                                            setDropTarget(null)
+                                          }
+                                        }}
+                                        onDrop={(e) => {
+                                          e.preventDefault()
+                                          if (
+                                            dragState?.market === m.code &&
+                                            dragState.src !== src &&
+                                            isSelected
+                                          ) {
+                                            const fromIdx = selected.indexOf(dragState.src)
+                                            const toIdx = selected.indexOf(src)
+                                            const next = [...selected]
+                                            next.splice(fromIdx, 1)
+                                            next.splice(toIdx, 0, dragState.src)
                                             setMarketSourceDraft({
                                               ...marketSourceDraft,
                                               [m.code]: next,
                                             })
-                                          }}
-                                          onDragStart={(e) => {
-                                            setDragState({ market: m.code, src })
-                                            e.dataTransfer.effectAllowed = "move"
-                                            e.dataTransfer.setData("text/plain", src)
-                                          }}
-                                          onDragOver={(e) => {
-                                            if (
-                                              dragState?.market === m.code &&
-                                              dragState.src !== src &&
-                                              isSelected
-                                            ) {
-                                              e.preventDefault()
-                                              e.dataTransfer.dropEffect = "move"
-                                              setDropTarget({ market: m.code, src })
-                                            }
-                                          }}
-                                          onDragLeave={() => {
-                                            if (
-                                              dropTarget?.market === m.code &&
-                                              dropTarget.src === src
-                                            ) {
-                                              setDropTarget(null)
-                                            }
-                                          }}
-                                          onDrop={(e) => {
-                                            e.preventDefault()
-                                            if (
-                                              dragState?.market === m.code &&
-                                              dragState.src !== src &&
-                                              isSelected
-                                            ) {
-                                              const fromIdx = selected.indexOf(dragState.src)
-                                              const toIdx = selected.indexOf(src)
-                                              const next = [...selected]
-                                              next.splice(fromIdx, 1)
-                                              next.splice(toIdx, 0, dragState.src)
-                                              setMarketSourceDraft({
-                                                ...marketSourceDraft,
-                                                [m.code]: next,
-                                              })
-                                            }
-                                            setDragState(null)
-                                            setDropTarget(null)
-                                          }}
-                                          onDragEnd={() => {
-                                            setDragState(null)
-                                            setDropTarget(null)
-                                          }}
-                                          className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
-                                            isDragging
-                                              ? "opacity-40 border-dashed border-[#ADB5BD]"
-                                              : isDrop
-                                                ? "border-2 border-[#1A1A1A] bg-[#1A1A1A] text-white"
-                                                : isSelected
-                                                  ? "bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-grab active:cursor-grabbing"
-                                                  : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
-                                          }`}
-                                        >
-                                          {marketSources.sourceNames[src] || src}
-                                        </button>
-                                      )
-                                    }
-                                  )}
+                                          }
+                                          setDragState(null)
+                                          setDropTarget(null)
+                                        }}
+                                        onDragEnd={() => {
+                                          setDragState(null)
+                                          setDropTarget(null)
+                                        }}
+                                        className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
+                                          isDragging
+                                            ? "opacity-40 border-dashed border-[#ADB5BD]"
+                                            : isDrop
+                                              ? "border-2 border-[#1A1A1A] bg-[#1A1A1A] text-white"
+                                              : isSelected
+                                                ? "bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-grab active:cursor-grabbing"
+                                                : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
+                                        }`}
+                                      >
+                                        {marketSources.sourceNames[src] || src}
+                                      </button>
+                                    )
+                                  })}
                                 </div>
                               </div>
                             )
@@ -585,9 +584,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                           <input
                             type="text"
                             value={draft.telegramChatID}
-                            onChange={(e) =>
-                              setDraft({ ...draft, telegramChatID: e.target.value })
-                            }
+                            onChange={(e) => setDraft({ ...draft, telegramChatID: e.target.value })}
                             placeholder="发送 /start 给 @userinfobot 获取"
                             className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
                           />
@@ -668,9 +665,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                             >
                               <span
                                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                  draft.telegramPriceAlert
-                                    ? "translate-x-4.5"
-                                    : "translate-x-0.5"
+                                  draft.telegramPriceAlert ? "translate-x-4.5" : "translate-x-0.5"
                                 }`}
                               />
                             </button>
@@ -691,9 +686,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                             >
                               <span
                                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                  draft.telegramDriftAlert
-                                    ? "translate-x-4.5"
-                                    : "translate-x-0.5"
+                                  draft.telegramDriftAlert ? "translate-x-4.5" : "translate-x-0.5"
                                 }`}
                               />
                             </button>
@@ -821,10 +814,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
                     {/* WebAuthn */}
                     {userRole === "admin" && (
-                      <WebAuthnConfigSection
-                        draft={webauthnDraft}
-                        onChange={setWebauthnDraft}
-                      />
+                      <WebAuthnConfigSection draft={webauthnDraft} onChange={setWebauthnDraft} />
                     )}
                   </div>
                 )}

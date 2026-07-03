@@ -34,7 +34,10 @@ export function formatCurrency(value: string | number | undefined | null): strin
   return `${CURRENCY_SYMBOLS["CNY"]}${formatDecimal(value)}`
 }
 
-export function formatCurrencyByCode(value: string | number | undefined | null, currency: string): string {
+export function formatCurrencyByCode(
+  value: string | number | undefined | null,
+  currency: string
+): string {
   const symbol = CURRENCY_SYMBOLS[currency] || currency
   return `${symbol}${formatDecimal(value)}`
 }

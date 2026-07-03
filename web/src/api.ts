@@ -188,7 +188,10 @@ export async function triggerSync(pid: string): Promise<SyncStatus> {
   return request<SyncStatus>(`/api/portfolios/${pid}/sync/trigger`, { method: "POST" })
 }
 
-export async function fetchPrice(symbol: string, market?: string): Promise<{
+export async function fetchPrice(
+  symbol: string,
+  market?: string
+): Promise<{
   symbol: string
   name: string
   price: number
@@ -394,7 +397,7 @@ export async function fetchMarketSources(): Promise<MarketSourceConfig> {
 }
 
 export async function updateMarketSources(
-  config: Record<string, string[]>,
+  config: Record<string, string[]>
 ): Promise<{ status: string }> {
   return request<{ status: string }>("/api/settings/market-sources", {
     method: "PUT",

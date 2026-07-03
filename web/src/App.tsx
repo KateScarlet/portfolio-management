@@ -95,7 +95,9 @@ export default function App() {
           setHoldings((prev) =>
             prev.map((h) => {
               const updated = data.holdings.find((u) => u.symbol === h.symbol)
-              return updated ? { ...h, price: String(updated.price), value: String(updated.value) } : h
+              return updated
+                ? { ...h, price: String(updated.price), value: String(updated.value) }
+                : h
             })
           )
           break
@@ -344,20 +346,28 @@ export default function App() {
     )
   }
 
-  const totalAssetsD = Object.values(assets).reduce((sum, val) => sum.plus(toDecimal(val)), new Decimal(0))
+  const totalAssetsD = Object.values(assets).reduce(
+    (sum, val) => sum.plus(toDecimal(val)),
+    new Decimal(0)
+  )
   const total = totalAssetsD.plus(totalFundsDisplay)
   const totalAssets = totalAssetsD.toString()
   const totalFees = holdings.reduce(
-    (sum, h) => sum.plus((h.lots || []).reduce((ls, l) => ls.plus(toDecimal(l.fee)), new Decimal(0))),
+    (sum, h) =>
+      sum.plus((h.lots || []).reduce((ls, l) => ls.plus(toDecimal(l.fee)), new Decimal(0))),
     new Decimal(0)
   )
 
   const byCurrency: Record<string, Decimal> = {}
   for (const tx of fundTransactions) {
     if (tx.type === "transfer_in") {
-      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).plus(toDecimal(tx.amount))
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).plus(
+        toDecimal(tx.amount)
+      )
     } else if (tx.type === "transfer_out") {
-      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).minus(toDecimal(tx.amount))
+      byCurrency[tx.currency] = (byCurrency[tx.currency] || new Decimal(0)).minus(
+        toDecimal(tx.amount)
+      )
     }
   }
   let principal = new Decimal(0)

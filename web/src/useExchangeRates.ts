@@ -16,9 +16,7 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
       setExchangeRates({ [displayCurrency]: 1 })
     }
 
-    const currencies = availableFunds
-      .map((f) => f.currency)
-      .filter((c) => c !== displayCurrency)
+    const currencies = availableFunds.map((f) => f.currency).filter((c) => c !== displayCurrency)
     const unique = [...new Set(currencies)]
     if (unique.length === 0) return
 

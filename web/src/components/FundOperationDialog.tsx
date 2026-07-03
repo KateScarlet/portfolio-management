@@ -132,7 +132,13 @@ export default function FundOperationDialog({
             setSubmitting(false)
             return
           }
-          await api.transferBetweenFunds(currentPortfolioId, currency, amount, targetPortfolioId, note)
+          await api.transferBetweenFunds(
+            currentPortfolioId,
+            currency,
+            amount,
+            targetPortfolioId,
+            note
+          )
           break
         case "convert": {
           const toAmt = parseFloat(toAmount)
@@ -147,7 +153,14 @@ export default function FundOperationDialog({
             setSubmitting(false)
             return
           }
-          await api.convertCurrency(currentPortfolioId, currency, toCurrency, amount, toAmount, exchangeRate)
+          await api.convertCurrency(
+            currentPortfolioId,
+            currency,
+            toCurrency,
+            amount,
+            toAmount,
+            exchangeRate
+          )
           break
         }
       }

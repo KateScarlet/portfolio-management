@@ -1,5 +1,11 @@
 import { useState } from "react"
-import { AssetId, ASSET_DEFINITIONS, COMMODITY_CN_SYMBOLS, COMMODITY_INTL_SYMBOLS, CRYPTO_SYMBOLS } from "../types"
+import {
+  AssetId,
+  ASSET_DEFINITIONS,
+  COMMODITY_CN_SYMBOLS,
+  COMMODITY_INTL_SYMBOLS,
+  CRYPTO_SYMBOLS,
+} from "../types"
 import * as api from "../api"
 import { toDecimal } from "../utils"
 import { useToast } from "./toast-context"
@@ -11,7 +17,9 @@ interface AddHoldingFormProps {
 
 export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")
-  const [market, setMarket] = useState<"US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO">("US")
+  const [market, setMarket] = useState<
+    "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
+  >("US")
   const [symbol, setSymbol] = useState("")
   const [name, setName] = useState("")
   const [isManual, setIsManual] = useState(false)
@@ -50,7 +58,11 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
         if (data && data.price) {
           const authoritativeSymbol = data.symbol || symbol.toUpperCase()
           const targetCurrency =
-            market === "US" || market === "CRYPTO" || market === "COMMODITY_INTL" ? "USD" : market === "HK" ? "HKD" : "CNY"
+            market === "US" || market === "CRYPTO" || market === "COMMODITY_INTL"
+              ? "USD"
+              : market === "HK"
+                ? "HKD"
+                : "CNY"
 
           await onAddHolding({
             assetId,
@@ -129,7 +141,8 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
               <select
                 value={market}
                 onChange={(e) => {
-                  const m = e.target.value as "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
+                  const m = e.target.value as
+                    "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
                   setMarket(m)
                   setSymbol("")
                 }}
@@ -146,7 +159,11 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                {(market === "COMMODITY_CN" || market === "COMMODITY_INTL") ? "商品" : market === "CRYPTO" ? "币种" : "代码"}
+                {market === "COMMODITY_CN" || market === "COMMODITY_INTL"
+                  ? "商品"
+                  : market === "CRYPTO"
+                    ? "币种"
+                    : "代码"}
               </label>
               {market === "COMMODITY_CN" ? (
                 <select

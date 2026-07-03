@@ -260,7 +260,11 @@ export default function HoldingsManager({
                             {(() => {
                               const value = toDecimal(h.value)
                               const cost = toDecimal(h.cost)
-                              if (cost.isZero() || !Number.isFinite(value.toNumber()) || !Number.isFinite(cost.toNumber())) {
+                              if (
+                                cost.isZero() ||
+                                !Number.isFinite(value.toNumber()) ||
+                                !Number.isFinite(cost.toNumber())
+                              ) {
                                 return <p className="text-[10px] text-[#ADB5BD]">-</p>
                               }
                               const profit = value.minus(cost)
@@ -488,8 +492,9 @@ export default function HoldingsManager({
                                           onClick={() => {
                                             if (h.symbol) {
                                               const costPrice = toDecimal(editingLotCostPrice)
-                                              const shares =
-                                                toDecimal(editingLotShares).isZero() ? toDecimal(lot.shares) : toDecimal(editingLotShares)
+                                              const shares = toDecimal(editingLotShares).isZero()
+                                                ? toDecimal(lot.shares)
+                                                : toDecimal(editingLotShares)
                                               const cost = toDecimal(editingLotCost)
                                               saveEditLot(h, lot.id, {
                                                 costPrice: costPrice.toString(),

@@ -8,7 +8,12 @@ interface Props {
   onClose: () => void
 }
 
-export default function SummaryDashboard({ summary, colorScheme, displayCurrency, onClose }: Props) {
+export default function SummaryDashboard({
+  summary,
+  colorScheme,
+  displayCurrency,
+  onClose,
+}: Props) {
   if (!summary) return null
 
   const greenUp = colorScheme === "green-up"
@@ -19,13 +24,16 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
   }
 
   const principalD = toDecimal(summary.principal)
-  const pnl =
-    principalD.isPositive()
-      ? (() => {
-          const n = toDecimal(summary.total).minus(summary.principal).div(principalD).times(100).toNumber()
-          return Number.isFinite(n) ? n : 0
-        })()
-      : 0
+  const pnl = principalD.isPositive()
+    ? (() => {
+        const n = toDecimal(summary.total)
+          .minus(summary.principal)
+          .div(principalD)
+          .times(100)
+          .toNumber()
+        return Number.isFinite(n) ? n : 0
+      })()
+    : 0
 
   return (
     <div
@@ -72,7 +80,9 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
         <div className="space-y-1.5 mb-6">
           {(["stocks", "bonds", "cash", "commodities"] as AssetId[]).map((id) => {
             const val = summary.assets[id] || "0"
-            const pct = toDecimal(summary.total).isPositive() ? toDecimal(val).div(summary.total).times(100).toNumber() : 0
+            const pct = toDecimal(summary.total).isPositive()
+              ? toDecimal(val).div(summary.total).times(100).toNumber()
+              : 0
             return (
               <div key={id} className="flex items-center gap-2 text-sm">
                 <div
@@ -101,7 +111,11 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
             const pPrincipalD = toDecimal(p.principal)
             const pPnl = pPrincipalD.isPositive()
               ? (() => {
-                  const n = toDecimal(p.total).minus(pPrincipalD).div(pPrincipalD).times(100).toNumber()
+                  const n = toDecimal(p.total)
+                    .minus(pPrincipalD)
+                    .div(pPrincipalD)
+                    .times(100)
+                    .toNumber()
                   return Number.isFinite(n) ? n : 0
                 })()
               : 0
@@ -109,9 +123,7 @@ export default function SummaryDashboard({ summary, colorScheme, displayCurrency
               <div key={p.id} className="border border-[#E9ECEF] rounded p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{p.name}</span>
-                  <span className="text-sm">
-                    {formatCurrencyByCode(p.total, displayCurrency)}
-                  </span>
+                  <span className="text-sm">{formatCurrencyByCode(p.total, displayCurrency)}</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-xs text-[#6C757D]">

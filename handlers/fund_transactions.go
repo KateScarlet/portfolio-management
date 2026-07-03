@@ -455,4 +455,3 @@ func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amou
 	newAmount := af.Amount.Sub(amount)
 	return tx.Model(&af).Update("amount", newAmount).Error
 }
-

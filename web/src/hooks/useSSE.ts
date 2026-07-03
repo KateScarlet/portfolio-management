@@ -55,10 +55,7 @@ export function useSSE({ onEvent, enabled = true }: UseSSEOptions) {
       es.close()
       esRef.current = null
 
-      const delay = Math.min(
-        BASE_RETRY_DELAY * Math.pow(2, retryCountRef.current),
-        MAX_RETRY_DELAY
-      )
+      const delay = Math.min(BASE_RETRY_DELAY * Math.pow(2, retryCountRef.current), MAX_RETRY_DELAY)
       retryCountRef.current++
       reconnectTimerRef.current = setTimeout(connectRef.current, delay)
     }

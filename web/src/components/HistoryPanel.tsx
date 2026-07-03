@@ -49,7 +49,9 @@ export default function HistoryPanel({
             {history.map((record) => {
               const principal = record.principal
               const profit = toDecimal(record.total).minus(principal)
-              const returnRate = toDecimal(principal).isPositive() ? profit.div(principal).toNumber() : 0
+              const returnRate = toDecimal(principal).isPositive()
+                ? profit.div(principal).toNumber()
+                : 0
               const isPositive = !profit.isNegative()
               const isExpanded = expandedId === record.id
 
@@ -69,7 +71,9 @@ export default function HistoryPanel({
                       {formatCurrencyByCode(record.total, displayCurrency)}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm text-[#495057]">
-                      {toDecimal(principal).isPositive() ? formatCurrencyByCode(principal, displayCurrency) : "-"}
+                      {toDecimal(principal).isPositive()
+                        ? formatCurrencyByCode(principal, displayCurrency)
+                        : "-"}
                     </td>
                     <td className="px-6 py-4 font-mono text-sm">
                       {toDecimal(principal).isPositive() ? (
@@ -139,7 +143,9 @@ export default function HistoryPanel({
                                     <td className="py-1.5">{h.symbol || "-"}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.name}</td>
                                     <td className="py-1.5 text-[#6C757D]">{h.assetId}</td>
-                                    <td className="py-1.5 text-right">{toDecimal(h.shares).toFixed(2)}</td>
+                                    <td className="py-1.5 text-right">
+                                      {toDecimal(h.shares).toFixed(2)}
+                                    </td>
                                     <td className="py-1.5 text-right">
                                       {formatCurrencyByCode(h.price, h.currency || "CNY")}
                                     </td>

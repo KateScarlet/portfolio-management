@@ -12,7 +12,13 @@ interface SellModalProps {
   onClose: () => void
 }
 
-export default function SellModal({ portfolioId, holding, displayCurrency, onConfirm, onClose }: SellModalProps) {
+export default function SellModal({
+  portfolioId,
+  holding,
+  displayCurrency,
+  onConfirm,
+  onClose,
+}: SellModalProps) {
   const [sellShares, setSellShares] = useState(
     holding.shares && toDecimal(holding.shares).isPositive() ? holding.shares.toString() : ""
   )
@@ -45,7 +51,14 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
       }
 
       try {
-        const result = await api.sellHolding(portfolioId, holding.id, sellShares, sellPrice, feeStr, "0")
+        const result = await api.sellHolding(
+          portfolioId,
+          holding.id,
+          sellShares,
+          sellPrice,
+          feeStr,
+          "0"
+        )
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {
@@ -59,7 +72,10 @@ export default function SellModal({ portfolioId, holding, displayCurrency, onCon
         return
       }
       if (toDecimal(sValue).greaterThan(holding.value)) {
-        showToast(`卖出金额不能超过持有值 ${formatCurrencyByCode(holding.value, displayCurrency)}`, "error")
+        showToast(
+          `卖出金额不能超过持有值 ${formatCurrencyByCode(holding.value, displayCurrency)}`,
+          "error"
+        )
         return
       }
 
