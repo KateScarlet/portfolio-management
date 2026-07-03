@@ -10,18 +10,18 @@ const (
 )
 
 type Event struct {
-	Type        string      `json:"type"`
-	PortfolioID string      `json:"portfolioId"`
-	Data        interface{} `json:"data"`
-	Timestamp   time.Time   `json:"timestamp"`
+	Type        string    `json:"type"`
+	PortfolioID string    `json:"portfolioId"`
+	Data        any       `json:"data"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 type SyncStartedData struct{}
 
 type SyncCompletedData struct {
-	LastSyncAt    time.Time `json:"lastSyncAt"`
-	SyncedCount   int       `json:"syncedCount"`
-	FailedCount   int       `json:"failedCount"`
+	LastSyncAt  time.Time `json:"lastSyncAt"`
+	SyncedCount int       `json:"syncedCount"`
+	FailedCount int       `json:"failedCount"`
 }
 
 type SyncFailedData struct {

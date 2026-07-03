@@ -189,8 +189,8 @@ export default function App() {
           targetCommodities:
             s.targetCommodities != null
               ? Number(s.targetCommodities)
-              : (s as any).targetGold != null
-                ? Number((s as any).targetGold)
+              : s.targetGold != null
+                ? Number(s.targetGold)
                 : DEFAULT_SETTINGS.targetCommodities,
           telegramBotToken: s.telegramBotToken || DEFAULT_SETTINGS.telegramBotToken,
           telegramChatID: s.telegramChatID || DEFAULT_SETTINGS.telegramChatID,

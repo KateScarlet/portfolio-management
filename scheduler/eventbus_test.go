@@ -140,7 +140,7 @@ func TestEventBus_BufferFull_DropsEvent(t *testing.T) {
 	}
 
 	// Fill the buffer
-	for i := 0; i < subscriberBufferSize; i++ {
+	for range subscriberBufferSize {
 		eb.Publish("user1", event)
 	}
 
@@ -148,7 +148,7 @@ func TestEventBus_BufferFull_DropsEvent(t *testing.T) {
 	eb.Publish("user1", event)
 
 	// Drain the buffer
-	for i := 0; i < subscriberBufferSize; i++ {
+	for range subscriberBufferSize {
 		<-ch
 	}
 
@@ -170,7 +170,7 @@ func TestEventBus_ConcurrentPublish(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 			eb.Publish("user1", Event{
@@ -206,7 +206,7 @@ func TestEventBus_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
 			ch, unsub := eb.Subscribe("user1")

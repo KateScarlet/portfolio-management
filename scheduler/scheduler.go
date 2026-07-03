@@ -408,7 +408,7 @@ func (s *PriceScheduler) SetEventBus(eb *EventBus) {
 	s.eventBus = eb
 }
 
-func (s *PriceScheduler) publishEvent(userID, portfolioID, eventType string, data interface{}) {
+func (s *PriceScheduler) publishEvent(userID, portfolioID, eventType string, data any) {
 	if s.eventBus == nil {
 		return
 	}
