@@ -200,7 +200,9 @@ func TestListSettings_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
 	}
 	var result map[string]string
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result) != 0 {
 		t.Errorf("expected empty settings, got %v", result)
 	}
@@ -215,7 +217,9 @@ func TestListSettings_ReturnsUserSettings(t *testing.T) {
 	ListSettings(db)(context.Background(), c)
 
 	var result map[string]string
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
 	if result["syncInterval"] != "5" {
 		t.Errorf("expected syncInterval=5, got %s", result["syncInterval"])
 	}
@@ -234,7 +238,9 @@ func TestGetAvailableFunds_Default(t *testing.T) {
 		t.Fatalf("expected 200, got %d", c.Response.StatusCode())
 	}
 	var result []map[string]any
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
 	if len(result) != 0 {
 		t.Errorf("expected empty funds array, got %v", result)
 	}
