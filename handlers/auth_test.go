@@ -18,7 +18,7 @@ import (
 func setupAuthTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := setupTestDB(t)
-	if err := db.AutoMigrate(&models.User{}, &models.PortfolioRecord{}, &models.WebAuthnCredential{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.PortfolioRecord{}, &models.WebAuthnCredential{}, &models.Account{}); err != nil {
 		t.Fatal(err)
 	}
 	return db

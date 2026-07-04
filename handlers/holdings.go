@@ -51,6 +51,23 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, r
 	return nil
 }
 
+// MergedHoldingAccount is one account's position within a merged holding.
+type MergedHoldingAccount struct {
+	HoldingID   string            `json:"holdingId"`
+	AccountID   string            `json:"accountId"`
+	AccountName string            `json:"accountName"`
+	Shares      decimal.Decimal   `json:"shares"`
+	Cost        decimal.Decimal   `json:"cost"`
+	Value       decimal.Decimal   `json:"value"`
+	Lots        models.JSONColumn `json:"lots"`
+}
+
+// MergedHolding is a holding merged across accounts by symbol.
+type MergedHolding struct {
+	models.Holding
+	Accounts []MergedHoldingAccount `json:"accounts"`
+}
+
 func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		user := middleware.GetUser(c)
@@ -82,6 +99,84 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
+		}
+
+		// Merge mode: group by symbol, aggregate across accounts
+		if c.Query("merge") == "true" {
+			// Load accounts for name lookup
+			accounts, err := gorm.G[models.Account](db).Where("user_id = ?", user.UserID).Find(ctx)
+			if err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+			accountNameMap := make(map[string]string, len(accounts))
+			for _, a := range accounts {
+				accountNameMap[a.ID] = a.Name
+			}
+
+			type mergeKey struct {
+				Symbol  string
+				Name    string
+				AssetId string
+			}
+			merged := make(map[mergeKey]*MergedHolding)
+
+			for _, h := range holdings {
+				key := mergeKey{Symbol: h.Symbol, Name: h.Name, AssetId: h.AssetId}
+				mh, exists := merged[key]
+				if !exists {
+					mh = &MergedHolding{
+						Holding: models.Holding{
+							ID:          h.ID,
+							UserID:      h.UserID,
+							PortfolioID: h.PortfolioID,
+							AccountID:   "",
+							AssetId:     h.AssetId,
+							Symbol:      h.Symbol,
+							Name:        h.Name,
+							Market:      h.Market,
+							Currency:    h.Currency,
+							Price:       h.Price,
+							Date:        h.Date,
+						},
+						Accounts: make([]MergedHoldingAccount, 0),
+					}
+					merged[key] = mh
+				}
+
+				accountName := accountNameMap[h.AccountID]
+				mh.Accounts = append(mh.Accounts, MergedHoldingAccount{
+					HoldingID:   h.ID,
+					AccountID:   h.AccountID,
+					AccountName: accountName,
+					Shares:      h.Shares,
+					Cost:        h.Cost,
+					Value:       h.Value,
+					Lots:        h.Lots,
+				})
+
+				mh.Shares = mh.Shares.Add(h.Shares)
+				mh.Cost = mh.Cost.Add(h.Cost)
+				mh.Value = mh.Value.Add(h.Value)
+			}
+
+			// Compute merged CostPrice and append all lots
+			result := make([]MergedHolding, 0, len(merged))
+			for _, mh := range merged {
+				if mh.Shares.IsPositive() {
+					mh.CostPrice = mh.Cost.Div(mh.Shares)
+				}
+				// Collect all lots from all accounts
+				allLots := models.JSONColumn{}
+				for _, acc := range mh.Accounts {
+					allLots = append(allLots, acc.Lots...)
+				}
+				mh.Lots = allLots
+				result = append(result, *mh)
+			}
+
+			c.JSON(consts.StatusOK, result)
+			return
 		}
 
 		c.JSON(consts.StatusOK, holdings)
@@ -173,9 +268,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
-				res = tx.Where("portfolio_id = ? AND symbol = ? AND symbol != ''", portfolioID, input.Symbol).First(&existing)
+				res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id = ? AND symbol != ''", portfolioID, input.Symbol, input.AccountID).First(&existing)
 			} else {
-				res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId).First(&existing)
+				res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId, input.AccountID).First(&existing)
 			}
 
 			if res.Error == nil {
@@ -322,7 +417,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 
 		allowedFields := map[string]bool{
 			"name": true, "symbol": true, "market": true, "price": true,
-			"date": true, "lots": true, "value": true,
+			"date": true, "lots": true, "value": true, "accountId": true,
 		}
 		safeUpdates := make(map[string]any)
 		for k, v := range updates {
@@ -385,15 +480,20 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 
 		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
 			var newVal decimal.Decimal
+			var parseErr error
 			switch v := newValue.(type) {
 			case string:
-				newVal, _ = decimal.NewFromString(v)
+				newVal, parseErr = decimal.NewFromString(v)
 			case float64:
 				newVal = decimal.NewFromFloat(v)
 			case json.Number:
-				newVal, _ = decimal.NewFromString(v.String())
+				newVal, parseErr = decimal.NewFromString(v.String())
 			default:
-				newVal, _ = decimal.NewFromString(fmt.Sprint(newValue))
+				newVal, parseErr = decimal.NewFromString(fmt.Sprint(newValue))
+			}
+			if parseErr != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的数值格式"})
+				return
 			}
 			oldVal := holding.Value
 			if !newVal.Equal(oldVal) && len(holding.Lots) > 0 {

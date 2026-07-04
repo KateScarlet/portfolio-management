@@ -4,6 +4,7 @@ import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
 import { useSSE } from "./hooks/useSSE"
 import {
+  Account,
   Settings,
   SyncStatus,
   UserInfo,
@@ -29,6 +30,9 @@ import UserManager from "./components/UserManager"
 import PortfolioSelector from "./components/PortfolioSelector"
 import PortfolioManager from "./components/PortfolioManager"
 import SummaryDashboard from "./components/SummaryDashboard"
+import AccountView from "./components/AccountView"
+import AccountSelector from "./components/AccountSelector"
+import AccountManager from "./components/AccountManager"
 
 const STORAGE_KEY = "selectedPortfolioId"
 
@@ -59,6 +63,10 @@ export default function App() {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [currentPortfolio, setCurrentPortfolioState] = useState<Portfolio | null>(null)
   const [showPortfolioManager, setShowPortfolioManager] = useState(false)
+  const [viewMode, setViewMode] = useState<"portfolio" | "account">("portfolio")
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [currentAccount, setCurrentAccount] = useState<Account | null>(null)
+  const [showAccountManager, setShowAccountManager] = useState(false)
 
   const setCurrentPortfolio = useCallback((portfolio: Portfolio | null | ((prev: Portfolio | null) => Portfolio | null)) => {
     setCurrentPortfolioState((prev) => {
@@ -184,6 +192,19 @@ export default function App() {
     }
   }, [setCurrentPortfolio])
 
+  const loadAccounts = useCallback(async () => {
+    try {
+      const list = await api.fetchAccounts()
+      setAccounts(list)
+      setCurrentAccount((prev) => {
+        if (!prev) return null
+        return list.find((a) => a.id === prev.id) || null
+      })
+    } catch (e) {
+      console.error("Failed to load accounts", e)
+    }
+  }, [])
+
   useEffect(() => {
     if (!user) return
     let cancelled = false
@@ -218,6 +239,11 @@ export default function App() {
       cancelled = true
     }
   }, [user, setCurrentPortfolio])
+
+  useEffect(() => {
+    if (!user) return
+    loadAccounts()
+  }, [user, loadAccounts])
 
   useEffect(() => {
     if (!currentPortfolio) return
@@ -434,12 +460,44 @@ export default function App() {
             <div className="w-4 h-4 border-2 border-white rounded-full"></div>
           </div>
           <h1 className="text-xl font-semibold tracking-tight">投资组合管理</h1>
-          <PortfolioSelector
-            portfolios={portfolios}
-            current={currentPortfolio}
-            onSelect={setCurrentPortfolio}
-            onManage={() => setShowPortfolioManager(true)}
-          />
+          <div className="flex items-center bg-[#F8F9FA] rounded-md p-0.5 ml-2">
+            <button
+              onClick={() => setViewMode("portfolio")}
+              className={`text-xs px-3 py-1 rounded transition-colors ${
+                viewMode === "portfolio"
+                  ? "bg-white text-[#1A1A1A] shadow-sm"
+                  : "text-[#6C757D] hover:text-[#1A1A1A]"
+              }`}
+            >
+              组合视图
+            </button>
+            <button
+              onClick={() => setViewMode("account")}
+              className={`text-xs px-3 py-1 rounded transition-colors ${
+                viewMode === "account"
+                  ? "bg-white text-[#1A1A1A] shadow-sm"
+                  : "text-[#6C757D] hover:text-[#1A1A1A]"
+              }`}
+            >
+              账户视图
+            </button>
+          </div>
+          {viewMode === "portfolio" && (
+            <PortfolioSelector
+              portfolios={portfolios}
+              current={currentPortfolio}
+              onSelect={setCurrentPortfolio}
+              onManage={() => setShowPortfolioManager(true)}
+            />
+          )}
+          {viewMode === "account" && (
+            <AccountSelector
+              accounts={accounts}
+              current={currentAccount}
+              onSelect={setCurrentAccount}
+              onManage={() => setShowAccountManager(true)}
+            />
+          )}
         </div>
         <div className="hidden sm:flex items-center gap-4">
           {syncStatus && syncStatus.lastSyncAt && (
@@ -476,6 +534,19 @@ export default function App() {
       </header>
 
       <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
+        {viewMode === "account" ? (
+          <AccountView
+            selectedAccount={currentAccount}
+            colorScheme={settings.colorScheme}
+            displayCurrency={settings.displayCurrency}
+            portfolios={portfolios}
+            currentPortfolio={currentPortfolio}
+            accounts={accounts}
+            onAddHolding={handleAddHolding}
+            onRefreshAvailableFunds={handleRefreshAvailableFunds}
+          />
+        ) : (
+          <>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 flex flex-col gap-6 h-full">
             <Dashboard
@@ -524,6 +595,7 @@ export default function App() {
             displayCurrency={settings.displayCurrency}
             onRefreshAvailableFunds={handleRefreshAvailableFunds}
             onSyncComplete={handleSyncComplete}
+            accounts={accounts}
           />
           <HistoryPanel
             history={history}
@@ -532,6 +604,8 @@ export default function App() {
             displayCurrency={settings.displayCurrency}
           />
         </div>
+          </>
+        )}
       </main>
 
       {showPortfolioManager && (
@@ -539,6 +613,13 @@ export default function App() {
           portfolios={portfolios}
           onClose={() => setShowPortfolioManager(false)}
           onRefresh={loadPortfolios}
+        />
+      )}
+      {showAccountManager && (
+        <AccountManager
+          accounts={accounts}
+          onClose={() => setShowAccountManager(false)}
+          onRefresh={loadAccounts}
         />
       )}
       {showSummary && (

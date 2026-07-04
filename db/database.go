@@ -154,12 +154,14 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 
 	db.Exec("PRAGMA journal_mode=WAL")
 
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}); err != nil {
 		return nil, err
 	}
 
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
+	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_symbol")
+	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_name_asset")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
@@ -169,6 +171,7 @@ func initSQLite(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
@@ -190,12 +193,14 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}); err != nil {
 		return nil, err
 	}
 
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol ON holdings(portfolio_id, symbol) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset ON holdings(portfolio_id, name, asset_id) WHERE symbol = ''")
+	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_symbol")
+	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_name_asset")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
@@ -205,6 +210,7 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
 	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
 	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
@@ -212,12 +218,12 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func generateID() string {
+func generateID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("failed to generate ID: " + err.Error())
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 // IsSetupMode checks if config file exists

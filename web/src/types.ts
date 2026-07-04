@@ -36,6 +36,33 @@ export interface Portfolio {
   createdAt: number
 }
 
+export interface Account {
+  id: string
+  userId: string
+  name: string
+  description?: string
+  broker?: string
+  createdAt: number
+}
+
+export interface HoldingWithAccount extends Holding {
+  accountName: string
+}
+
+export interface MergedHoldingAccount {
+  holdingId: string
+  accountId: string
+  accountName: string
+  shares: string
+  cost: string
+  value: string
+  lots?: HoldingLot[]
+}
+
+export interface MergedHolding extends Holding {
+  accounts: MergedHoldingAccount[]
+}
+
 export interface PortfolioSummaryItem {
   id: string
   name: string
@@ -72,6 +99,7 @@ export interface HoldingLot {
 
 export interface Holding {
   id: string
+  portfolioId?: string
   assetId: AssetId
   symbol: string // empty if manual value
   name?: string
@@ -85,6 +113,7 @@ export interface Holding {
   date?: number // Original purchase date for the lot being added
   fee?: string // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
+  accountId?: string // 所属账户ID
 }
 
 export interface HoldingSnapshot {

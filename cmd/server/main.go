@@ -108,6 +108,13 @@ func main() {
 	api.PATCH("/portfolios/:id", handlers.UpdatePortfolio(database))
 	api.DELETE("/portfolios/:id", handlers.DeletePortfolio(database))
 
+	api.GET("/accounts", handlers.ListAccounts(database))
+	api.POST("/accounts", handlers.CreateAccount(database))
+	api.PATCH("/accounts/:id", handlers.UpdateAccount(database))
+	api.DELETE("/accounts/:id", handlers.DeleteAccount(database))
+	api.GET("/accounts/all-holdings", handlers.ListAllAccountHoldings(database, router))
+	api.GET("/accounts/:id/holdings", handlers.ListAccountHoldings(database, router))
+
 	api.GET("/summary", handlers.GetSummary(database, router))
 
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database, router))

@@ -74,12 +74,12 @@ func deleteSession(database *gorm.DB, id string) {
 	database.Where("id = ?", id).Delete(&models.WebAuthnSession{})
 }
 
-func generateSessionID() string {
+func generateSessionID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("failed to generate session ID: " + err.Error())
+		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 type webauthnUser struct {
@@ -189,7 +189,11 @@ func WebAuthnRegisterStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			_ = json.Unmarshal(body, &reqBody)
 		}
 
-		sessionID := generateSessionID()
+		sessionID, err := generateSessionID()
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "生成会话ID失败"})
+			return
+		}
 		credentialOptions, sessionData, err := w.BeginRegistration(webUser,
 			webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred),
 			webauthn.WithExclusions(webauthn.Credentials(existingCreds).CredentialDescriptors()),
@@ -342,7 +346,11 @@ func WebAuthnLoginStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		sessionID := generateSessionID()
+		sessionID, err := generateSessionID()
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "生成会话ID失败"})
+			return
+		}
 		saveSession(gormDB, sessionID, sessionData)
 		setAuthCookie(c, "webauthn_session", sessionID, 300, cfg)
 

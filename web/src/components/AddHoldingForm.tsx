@@ -7,15 +7,15 @@ import {
   CRYPTO_SYMBOLS,
 } from "../types"
 import * as api from "../api"
-import { toDecimal } from "../utils"
 import { useToast } from "./toast-context"
 
 interface AddHoldingFormProps {
   onAddHolding: (holding: Omit<import("../types").Holding, "id">) => Promise<void>
   onClose: () => void
+  accountId?: string
 }
 
-export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingFormProps) {
+export default function AddHoldingForm({ onAddHolding, onClose, accountId }: AddHoldingFormProps) {
   const [assetId, setAssetId] = useState<AssetId>("stocks")
   const [market, setMarket] = useState<
     "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
@@ -32,21 +32,22 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
       const targetCurrency =
         market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
       try {
-        await onAddHolding({
-          assetId,
-          symbol: "",
-          name: name.trim() || "手工资产",
-          market,
-          currency: targetCurrency,
-          shares: "0",
-          price: "0",
-          value: "0",
-        })
-      } catch (e) {
-        showToast(e instanceof Error ? e.message : "录入失败", "error")
-        return
-      }
-    } else {
+          await onAddHolding({
+            assetId,
+            symbol: "",
+            name: name.trim() || "手工资产",
+            market,
+            currency: targetCurrency,
+            shares: "0",
+            price: "0",
+            value: "0",
+            accountId,
+          })
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : "录入失败", "error")
+          return
+        }
+      } else {
       if (!symbol) {
         showToast("请输入股票/基金代码", "error")
         return
@@ -73,13 +74,14 @@ export default function AddHoldingForm({ onAddHolding, onClose }: AddHoldingForm
             shares: "0",
             price: String(data.price),
             value: "0",
+            accountId,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
           setIsFetching(false)
           return
         }
-      } catch (e) {
+      } catch {
         showToast("价格获取失败，请尝试手动录入", "error")
         setIsFetching(false)
         return

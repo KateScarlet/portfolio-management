@@ -211,6 +211,9 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			if _, err := gorm.G[models.WebAuthnCredential](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
+			if _, err := gorm.G[models.Account](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
+				return err
+			}
 			rows, err := gorm.G[models.User](tx).Where("id = ?", id).Delete(ctx)
 			if err != nil {
 				return err

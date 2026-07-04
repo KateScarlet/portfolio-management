@@ -5,7 +5,10 @@ import type {
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser"
 import {
+  Account,
   Holding,
+  HoldingWithAccount,
+  MergedHolding,
   MarketSourceConfig,
   Portfolio,
   PortfolioRecord,
@@ -29,9 +32,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-export async function fetchHoldings(pid: string, currency?: string): Promise<Holding[]> {
-  const params = currency ? `?currency=${currency}` : ""
-  return request<Holding[]>(`/api/portfolios/${pid}/holdings${params}`)
+export async function fetchHoldings(pid: string, currency?: string): Promise<MergedHolding[]> {
+  const params = new URLSearchParams()
+  params.set("merge", "true")
+  if (currency) params.set("currency", currency)
+  return request<MergedHolding[]>(`/api/portfolios/${pid}/holdings?${params.toString()}`)
 }
 
 export async function createHolding(pid: string, h: Omit<Holding, "id">): Promise<Holding> {
@@ -390,6 +395,49 @@ export async function webAuthnListCredentials(): Promise<WebAuthnCredentialInfo[
 
 export async function webAuthnDeleteCredential(id: string): Promise<void> {
   await request<{ success: boolean }>(`/api/webauthn/credentials/${id}`, { method: "DELETE" })
+}
+
+// Account API
+export async function fetchAccounts(): Promise<Account[]> {
+  return request<Account[]>("/api/accounts")
+}
+
+export async function createAccount(data: {
+  name: string
+  description?: string
+  broker?: string
+}): Promise<Account> {
+  return request<Account>("/api/accounts", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateAccount(
+  id: string,
+  updates: { name?: string; description?: string; broker?: string }
+): Promise<Account> {
+  return request<Account>(`/api/accounts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  })
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/api/accounts/${id}`, {
+    method: "DELETE",
+  })
+}
+
+export async function fetchAccountViewHoldings(
+  currency?: string,
+  accountId?: string
+): Promise<HoldingWithAccount[]> {
+  const params = new URLSearchParams()
+  if (currency) params.set("currency", currency)
+  if (accountId) params.set("account_id", accountId)
+  const qs = params.toString()
+  return request<HoldingWithAccount[]>(`/api/accounts/all-holdings${qs ? "?" + qs : ""}`)
 }
 
 export async function fetchMarketSources(): Promise<MarketSourceConfig> {

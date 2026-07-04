@@ -80,10 +80,20 @@ type Portfolio struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
+type Account struct {
+	ID          string `gorm:"primaryKey" json:"id"`
+	UserID      string `gorm:"index;not null" json:"userId"`
+	Name        string `gorm:"size:100;not null" json:"name"`
+	Description string `gorm:"size:500;default:''" json:"description,omitempty"`
+	Broker      string `gorm:"size:100;default:''" json:"broker,omitempty"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 type Holding struct {
 	ID          string          `gorm:"primaryKey" json:"id"`
 	UserID      string          `gorm:"index;not null" json:"userId"`
 	PortfolioID string          `gorm:"index;not null" json:"portfolioId"`
+	AccountID   string          `gorm:"size:50;default:'';index" json:"accountId,omitempty"`
 	AssetId     string          `gorm:"size:20;not null" json:"assetId"`
 	Symbol      string          `gorm:"size:20;default:''" json:"symbol"`
 	Name        string          `gorm:"size:200;default:''" json:"name,omitempty"`

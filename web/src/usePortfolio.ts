@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { AssetId, Holding, PortfolioRecord } from "./types"
+import { AssetId, Holding, MergedHolding, PortfolioRecord } from "./types"
 import * as api from "./api"
 import { toDecimal } from "./utils"
 
@@ -8,7 +8,7 @@ export function usePortfolio(
   displayCurrency: string = "CNY",
   exchangeRates: Record<string, number> = {}
 ) {
-  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [holdings, setHoldings] = useState<MergedHolding[]>([])
   const [history, setHistory] = useState<PortfolioRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,34 +47,36 @@ export function usePortfolio(
     assets[h.assetId] = toDecimal(assets[h.assetId]).plus(convertedValue).toString()
   })
 
+  const refetchHoldings = useCallback(async () => {
+    if (!portfolioId) return
+    try {
+      const h = await api.fetchHoldings(portfolioId)
+      setHoldings(h)
+    } catch (e) {
+      console.error("Failed to refetch holdings", e)
+    }
+  }, [portfolioId])
+
   const addHolding = useCallback(
     async (holding: Omit<Holding, "id">) => {
       if (!portfolioId) return
-      const result = await api.createHolding(portfolioId, holding)
-      setHoldings((prev) => {
-        const idx = prev.findIndex((h) => h.id === result.id)
-        if (idx >= 0) {
-          const updated = [...prev]
-          updated[idx] = result
-          return updated
-        }
-        return [...prev, result]
-      })
+      await api.createHolding(portfolioId, holding)
+      await refetchHoldings()
     },
-    [portfolioId]
+    [portfolioId, refetchHoldings]
   )
 
   const updateHolding = useCallback(
     async (id: string, updates: Partial<Holding>) => {
       if (!portfolioId) return
       try {
-        const result = await api.updateHolding(portfolioId, id, updates)
-        setHoldings((prev) => prev.map((h) => (h.id === id ? result : h)))
+        await api.updateHolding(portfolioId, id, updates)
+        await refetchHoldings()
       } catch (e) {
         console.error("Failed to update holding", e)
       }
     },
-    [portfolioId]
+    [portfolioId, refetchHoldings]
   )
 
   const removeHolding = useCallback(
@@ -82,12 +84,12 @@ export function usePortfolio(
       if (!portfolioId) return
       try {
         await api.deleteHolding(portfolioId, id)
-        setHoldings((prev) => prev.filter((h) => h.id !== id))
+        await refetchHoldings()
       } catch (e) {
         console.error("Failed to remove holding", e)
       }
     },
-    [portfolioId]
+    [portfolioId, refetchHoldings]
   )
 
   const saveRecord = useCallback(async () => {

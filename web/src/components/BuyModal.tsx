@@ -1,6 +1,6 @@
 import { useState } from "react"
 import Decimal from "decimal.js"
-import { Holding } from "../types"
+import { Account, Holding } from "../types"
 import * as api from "../api"
 import { useToast } from "./toast-context"
 
@@ -9,9 +9,10 @@ interface BuyModalProps {
   holding: Holding
   onConfirm: (updatedHolding: Holding) => void
   onClose: () => void
+  accounts?: Account[]
 }
 
-export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: BuyModalProps) {
+export default function BuyModal({ portfolioId, holding, onConfirm, onClose, accounts = [] }: BuyModalProps) {
   const isSymbolBased = !!holding.symbol
 
   const [buyShares, setBuyShares] = useState("")
@@ -19,6 +20,7 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
   const [costCurrency, setCostCurrency] = useState(holding.currency || "CNY")
   const [buyFee, setBuyFee] = useState("")
   const [buyDate, setBuyDate] = useState(new Date().toISOString().split("T")[0])
+  const [accountId, setAccountId] = useState(holding.accountId || "")
 
   const [manualPrice, setManualPrice] = useState("")
   const [manualShares, setManualShares] = useState("")
@@ -72,6 +74,7 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
           cost: sharesNum.times(finalCostPrice).toString(),
           fee: feeNum.toString(),
           date: dateMs,
+          accountId: accountId || undefined,
         })
         onConfirm(result)
         onClose()
@@ -109,6 +112,7 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
           cost: addedCost.toString(),
           fee: feeNum.toString(),
           date: dateMs,
+          accountId: accountId || undefined,
         })
         onConfirm(result)
         onClose()
@@ -232,6 +236,26 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose }: B
               className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
             />
           </div>
+
+          {accounts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                账户 (选填)
+              </label>
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+              >
+                <option value="">不指定账户</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}{a.broker ? ` (${a.broker})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">

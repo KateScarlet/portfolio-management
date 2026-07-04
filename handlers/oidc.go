@@ -42,7 +42,11 @@ func OIDCLogin(cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		state := generateState()
+		state, err := generateState()
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "生成状态失败"})
+			return
+		}
 		setAuthCookie(c, "oidc_state", state, 600, cfg)
 
 		oauth2Config, err := newOAuth2Config(ctx, cfg)
@@ -232,12 +236,12 @@ func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 	}
 }
 
-func generateState() string {
+func generateState() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("failed to generate state: " + err.Error())
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 func GetWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
