@@ -215,11 +215,11 @@ const (
 	fetchRateLimit     = 50 * time.Millisecond
 )
 
-func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) bool {
+func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) {
 	state.mu.Lock()
 	if state.syncing {
 		state.mu.Unlock()
-		return false
+		return
 	}
 	state.syncing = true
 	state.mu.Unlock()
@@ -241,7 +241,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 		state.mu.Unlock()
 		slog.Error("failed to query holdings", "userId", userID, "portfolioId", portfolioID, "error", err)
 		s.publishEvent(userID, portfolioID, EventSyncFailed, SyncFailedData{Error: err.Error()})
-		return true
+		return
 	}
 
 	if len(holdings) == 0 {
@@ -256,7 +256,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 			SyncedCount: 0,
 			FailedCount: 0,
 		})
-		return true
+		return
 	}
 
 	synced := 0
@@ -355,7 +355,6 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 	if s.notifier != nil {
 		s.notifier.NotifyAfterSync(userID, portfolioID, holdings, syncedPrices)
 	}
-	return true
 }
 
 func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) bool {

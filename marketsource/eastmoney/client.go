@@ -18,8 +18,6 @@ import (
 var (
 	httpClient *resty.Client
 
-	fundCodeRe = regexp.MustCompile(`^\d{6}$`)
-
 	symbolMarket = map[string]int{
 		"au9999": 118,
 		"agtd":   118,

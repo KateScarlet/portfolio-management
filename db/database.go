@@ -218,14 +218,6 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func generateID() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
 // IsSetupMode checks if config file exists
 func IsSetupMode() bool {
 	_, err := os.Stat(ConfigFile())

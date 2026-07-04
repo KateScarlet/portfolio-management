@@ -199,9 +199,9 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 		filterAccountID := c.Query("account_id")
 		if filterAccountID != "" {
 			filtered := make([]models.Holding, 0)
-			for _, h := range holdings {
-				if h.AccountID == filterAccountID {
-					filtered = append(filtered, h)
+			for i := range holdings {
+				if holdings[i].AccountID == filterAccountID {
+					filtered = append(filtered, holdings[i])
 				}
 			}
 			holdings = filtered
@@ -217,10 +217,10 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 
 		// Enrich with account names
 		result := make([]HoldingWithAccount, len(holdings))
-		for i, h := range holdings {
+		for i := range holdings {
 			result[i] = HoldingWithAccount{
-				Holding:     h,
-				AccountName: accountNameMap[h.AccountID],
+				Holding:     holdings[i],
+				AccountName: accountNameMap[holdings[i].AccountID],
 			}
 		}
 
