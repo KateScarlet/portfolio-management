@@ -543,15 +543,13 @@ export default function HoldingsManager({
                             Update
                           </button>
                         )}
-                        {h.assetId !== "cash" && (
-                          <button
-                            onClick={() => setSellingHolding(h)}
-                            className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-orange-500 font-bold transition-colors"
-                            title="卖出"
-                          >
-                            Sell
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setSellingHolding(h)}
+                          className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-orange-500 font-bold transition-colors"
+                          title="卖出"
+                        >
+                          Sell
+                        </button>
                         <button
                           onClick={() => setDeletingHolding(h)}
                           className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"

@@ -217,14 +217,12 @@ export default function AccountView({
               >
                 Buy
               </button>
-              {h.assetId !== "cash" && (
-                <button
-                  onClick={() => setSellingHolding(h)}
-                  className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-orange-500 font-bold transition-colors"
-                >
-                  Sell
-                </button>
-              )}
+              <button
+                onClick={() => setSellingHolding(h)}
+                className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-orange-500 font-bold transition-colors"
+              >
+                Sell
+              </button>
               <button
                 onClick={() => setDeletingHolding(h)}
                 className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
