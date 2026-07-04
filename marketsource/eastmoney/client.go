@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -293,17 +292,22 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 	}, nil
 }
 
-type fundGZResponse struct {
-	FundCode string `json:"fundcode"`
-	Name     string `json:"name"`
-	JZRQ     string `json:"jzrq"`
-	DWJZ     string `json:"dwjz"`
-	GSZ      string `json:"gsz"`
-	GSZSZL   string `json:"gszzl"`
-	GZTime   string `json:"gztime"`
+type fundLSJZItem struct {
+	FSRQ  string `json:"FSRQ"`  // 净值日期
+	DWJZ  string `json:"DWJZ"`  // 单位净值
+	LJJZ  string `json:"LJJZ"`  // 累计净值
+	JZZZL string `json:"JZZZL"` // 日增长率
+	SGZT  string `json:"SGZT"`  // 申购状态
+	SHZT  string `json:"SHZT"`  // 赎回状态
 }
 
-var jsonpRe = regexp.MustCompile(`^jsonpgz\((.*)\);$`)
+type fundLSJZResponse struct {
+	Data struct {
+		LSJZList []fundLSJZItem `json:"LSJZList"`
+	} `json:"Data"`
+	ErrCode int    `json:"ErrCode"`
+	ErrMsg  string `json:"ErrMsg"`
+}
 
 func fetchFundQuote(code string) (*marketsource.Quote, error) {
 	if httpClient == nil {
@@ -313,40 +317,33 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 	queryCode := marketsource.NormalizeForSource(code, "FUND", "eastmoney")
 
 	r, err := httpClient.R().
-		SetHeader("Accept", "*/*").
-		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", queryCode))
+		SetHeader("Referer", "https://fund.eastmoney.com/").
+		Get(fmt.Sprintf("https://api.fund.eastmoney.com/f10/lsjz?fundCode=%s&pageIndex=1&pageSize=1", queryCode))
 	if err != nil {
-		return nil, fmt.Errorf("eastmoney fund request failed: %w", err)
+		return nil, fmt.Errorf("eastmoney lsjz request failed: %w", err)
 	}
 	if r.IsError() {
-		return nil, fmt.Errorf("eastmoney fund returned status %d", r.StatusCode())
+		return nil, fmt.Errorf("eastmoney lsjz returned status %d", r.StatusCode())
 	}
 
-	body := strings.TrimSpace(r.String())
-	m := jsonpRe.FindStringSubmatch(body)
-	if len(m) < 2 {
-		return nil, fmt.Errorf("unexpected fund response format for %s: %s", code, body[:min(len(body), 200)])
+	var resp fundLSJZResponse
+	if err := json.Unmarshal(r.Body(), &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse lsjz response: %w", err)
+	}
+	if resp.ErrCode != 0 || len(resp.Data.LSJZList) == 0 {
+		return nil, fmt.Errorf("eastmoney lsjz no data for %s: errCode=%d", code, resp.ErrCode)
 	}
 
-	var resp fundGZResponse
-	if err := json.Unmarshal([]byte(m[1]), &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse fund response for %s: %w", code, err)
-	}
-
-	var price decimal.Decimal
-	if resp.GSZ != "" {
-		price, _ = decimal.NewFromString(resp.GSZ)
-	} else if resp.DWJZ != "" {
-		price, _ = decimal.NewFromString(resp.DWJZ)
-	}
+	item := resp.Data.LSJZList[0]
+	price, _ := decimal.NewFromString(item.DWJZ)
 	if price.IsZero() {
-		return nil, fmt.Errorf("no price for fund %s", code)
+		return nil, fmt.Errorf("no NAV for fund %s", code)
 	}
 
-	slog.Info("eastmoney fund price fetched from API", "code", code, "price", price)
+	slog.Info("eastmoney fund NAV fetched", "code", code, "price", price, "date", item.FSRQ)
 	return &marketsource.Quote{
 		Symbol:           code,
-		Name:             resp.Name,
+		Name:             "",
 		Price:            price,
 		OriginalPrice:    price,
 		Currency:         "CNY",
