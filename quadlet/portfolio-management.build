@@ -1,0 +1,6 @@
+[Build]
+ImageTag=portfolio-management:latest
+SetWorkingDirectory=.
+
+[Install]
+WantedBy=default.target

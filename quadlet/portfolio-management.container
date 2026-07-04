@@ -1,0 +1,12 @@
+[Container]
+Environment=TZ=Asia/Shanghai
+Image=portfolio-management.build
+PublishPort=3000:3000
+Volume=portfolio-management-config:/app/bin/config
+Volume=portfolio-management-data:/app/bin/data
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

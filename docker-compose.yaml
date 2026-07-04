@@ -1,11 +1,14 @@
 services:
-  app:
-    build: .
+  portfolio-management:
+    build:
+      context: .
+      tags:
+        - portfolio-management:latest
     ports:
       - "3000:3000"
     volumes:
-      - app-config:/app/bin/config
-      - app-data:/app/bin/data
+      - portfolio-management-config:/app/bin/config
+      - portfolio-management-data:/app/bin/data
     environment:
       - TZ=Asia/Shanghai
     restart: unless-stopped
@@ -29,6 +32,5 @@ services:
   #   restart: unless-stopped
 
 volumes:
-  app-config:
-  app-data:
-  # pg-data:
+  portfolio-management-config:
+  portfolio-management-data:
