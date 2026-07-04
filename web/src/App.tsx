@@ -68,13 +68,16 @@ export default function App() {
   const [currentAccount, setCurrentAccount] = useState<Account | null>(null)
   const [showAccountManager, setShowAccountManager] = useState(false)
 
-  const setCurrentPortfolio = useCallback((portfolio: Portfolio | null | ((prev: Portfolio | null) => Portfolio | null)) => {
-    setCurrentPortfolioState((prev) => {
-      const next = typeof portfolio === "function" ? portfolio(prev) : portfolio
-      setStoredPortfolioId(next?.id || null)
-      return next
-    })
-  }, [])
+  const setCurrentPortfolio = useCallback(
+    (portfolio: Portfolio | null | ((prev: Portfolio | null) => Portfolio | null)) => {
+      setCurrentPortfolioState((prev) => {
+        const next = typeof portfolio === "function" ? portfolio(prev) : portfolio
+        setStoredPortfolioId(next?.id || null)
+        return next
+      })
+    },
+    []
+  )
   const [showSummary, setShowSummary] = useState(false)
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -547,63 +550,63 @@ export default function App() {
           />
         ) : (
           <>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-            <Dashboard
-              assets={assets}
-              total={total.toString()}
-              totalAssets={totalAssets}
-              principal={principal.toString()}
-              totalFees={totalFees.toString()}
-              colorScheme={settings.colorScheme}
-              availableFunds={availableFunds}
-              exchangeRates={exchangeRates}
-              portfolios={portfolios}
-              currentPortfolioId={currentPortfolio.id}
-              onRefreshFunds={handleRefreshAvailableFunds}
-              displayCurrency={settings.displayCurrency}
-            />
-          </div>
-          <div className="lg:col-span-7 flex flex-col gap-6 h-full">
-            <RebalancePanel
-              assets={assets}
-              total={total.toString()}
-              driftThreshold={settings.driftThreshold}
-              colorScheme={settings.colorScheme}
-              targetPcts={{
-                stocks: settings.targetStocks,
-                bonds: settings.targetBonds,
-                cash: settings.targetCash,
-                commodities: settings.targetCommodities,
-              }}
-              displayCurrency={settings.displayCurrency}
-            />
-          </div>
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-5 flex flex-col gap-6 h-full">
+                <Dashboard
+                  assets={assets}
+                  total={total.toString()}
+                  totalAssets={totalAssets}
+                  principal={principal.toString()}
+                  totalFees={totalFees.toString()}
+                  colorScheme={settings.colorScheme}
+                  availableFunds={availableFunds}
+                  exchangeRates={exchangeRates}
+                  portfolios={portfolios}
+                  currentPortfolioId={currentPortfolio.id}
+                  onRefreshFunds={handleRefreshAvailableFunds}
+                  displayCurrency={settings.displayCurrency}
+                />
+              </div>
+              <div className="lg:col-span-7 flex flex-col gap-6 h-full">
+                <RebalancePanel
+                  assets={assets}
+                  total={total.toString()}
+                  driftThreshold={settings.driftThreshold}
+                  colorScheme={settings.colorScheme}
+                  targetPcts={{
+                    stocks: settings.targetStocks,
+                    bonds: settings.targetBonds,
+                    cash: settings.targetCash,
+                    commodities: settings.targetCommodities,
+                  }}
+                  displayCurrency={settings.displayCurrency}
+                />
+              </div>
+            </div>
 
-        <div className="flex flex-col gap-6">
-          <HoldingsManager
-            portfolioId={currentPortfolio.id}
-            holdings={holdings}
-            setHoldings={setHoldings}
-            total={total.toString()}
-            onAddHolding={handleAddHolding}
-            onUpdateHolding={updateHolding}
-            onRemoveHolding={handleRemoveHolding}
-            onSaveRecord={saveRecord}
-            colorScheme={settings.colorScheme}
-            displayCurrency={settings.displayCurrency}
-            onRefreshAvailableFunds={handleRefreshAvailableFunds}
-            onSyncComplete={handleSyncComplete}
-            accounts={accounts}
-          />
-          <HistoryPanel
-            history={history}
-            onDeleteRecord={deleteRecord}
-            colorScheme={settings.colorScheme}
-            displayCurrency={settings.displayCurrency}
-          />
-        </div>
+            <div className="flex flex-col gap-6">
+              <HoldingsManager
+                portfolioId={currentPortfolio.id}
+                holdings={holdings}
+                setHoldings={setHoldings}
+                total={total.toString()}
+                onAddHolding={handleAddHolding}
+                onUpdateHolding={updateHolding}
+                onRemoveHolding={handleRemoveHolding}
+                onSaveRecord={saveRecord}
+                colorScheme={settings.colorScheme}
+                displayCurrency={settings.displayCurrency}
+                onRefreshAvailableFunds={handleRefreshAvailableFunds}
+                onSyncComplete={handleSyncComplete}
+                accounts={accounts}
+              />
+              <HistoryPanel
+                history={history}
+                onDeleteRecord={deleteRecord}
+                colorScheme={settings.colorScheme}
+                displayCurrency={settings.displayCurrency}
+              />
+            </div>
           </>
         )}
       </main>

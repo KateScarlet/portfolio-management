@@ -25,7 +25,8 @@ export default function AccountSelector({ accounts, current, onSelect, onManage 
         <option value="">全部账户</option>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>
-            {a.name}{a.broker ? ` (${a.broker})` : ""}
+            {a.name}
+            {a.broker ? ` (${a.broker})` : ""}
           </option>
         ))}
       </select>

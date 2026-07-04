@@ -147,7 +147,12 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 			}).Error
 		})
 		if err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			httpErr := &httpError{}
+			if errors.As(err, &httpErr) {
+				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
 			return
 		}
 

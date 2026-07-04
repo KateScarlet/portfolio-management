@@ -12,7 +12,13 @@ interface BuyModalProps {
   accounts?: Account[]
 }
 
-export default function BuyModal({ portfolioId, holding, onConfirm, onClose, accounts = [] }: BuyModalProps) {
+export default function BuyModal({
+  portfolioId,
+  holding,
+  onConfirm,
+  onClose,
+  accounts = [],
+}: BuyModalProps) {
   const isSymbolBased = !!holding.symbol
 
   const [buyShares, setBuyShares] = useState("")
@@ -250,7 +256,8 @@ export default function BuyModal({ portfolioId, holding, onConfirm, onClose, acc
                 <option value="">不指定账户</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name}{a.broker ? ` (${a.broker})` : ""}
+                    {a.name}
+                    {a.broker ? ` (${a.broker})` : ""}
                   </option>
                 ))}
               </select>

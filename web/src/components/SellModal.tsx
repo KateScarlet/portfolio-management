@@ -21,9 +21,10 @@ export default function SellModal({
   onClose,
   accounts = [],
 }: SellModalProps) {
-  const mergedAccounts: MergedHoldingAccount[] = ("accounts" in holding ? (holding as MergedHolding).accounts : null) || []
+  const mergedAccounts: MergedHoldingAccount[] =
+    ("accounts" in holding ? (holding as MergedHolding).accounts : null) || []
   const [accountId, setAccountId] = useState(
-    mergedAccounts.length === 1 ? mergedAccounts[0].accountId : (holding.accountId || "")
+    mergedAccounts.length === 1 ? mergedAccounts[0].accountId : holding.accountId || ""
   )
   const [sellShares, setSellShares] = useState(
     holding.shares && toDecimal(holding.shares).isPositive() ? holding.shares.toString() : ""
@@ -56,9 +57,10 @@ export default function SellModal({
         return
       }
 
-      const targetHoldingId = mergedAccounts.length > 0
-        ? (mergedAccounts.find((a) => a.accountId === accountId)?.holdingId || holding.id)
-        : holding.id
+      const targetHoldingId =
+        mergedAccounts.length > 0
+          ? mergedAccounts.find((a) => a.accountId === accountId)?.holdingId || holding.id
+          : holding.id
 
       try {
         const result = await api.sellHolding(
@@ -89,12 +91,20 @@ export default function SellModal({
         return
       }
 
-      const targetHoldingId = mergedAccounts.length > 0
-        ? (mergedAccounts.find((a) => a.accountId === accountId)?.holdingId || holding.id)
-        : holding.id
+      const targetHoldingId =
+        mergedAccounts.length > 0
+          ? mergedAccounts.find((a) => a.accountId === accountId)?.holdingId || holding.id
+          : holding.id
 
       try {
-        const result = await api.sellHolding(portfolioId, targetHoldingId, "0", "0", feeStr, sellPrice)
+        const result = await api.sellHolding(
+          portfolioId,
+          targetHoldingId,
+          "0",
+          "0",
+          feeStr,
+          sellPrice
+        )
         onConfirm(result.soldHolding)
         onClose()
       } catch (e) {

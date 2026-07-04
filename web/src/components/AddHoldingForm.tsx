@@ -32,22 +32,22 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId }: Add
       const targetCurrency =
         market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
       try {
-          await onAddHolding({
-            assetId,
-            symbol: "",
-            name: name.trim() || "手工资产",
-            market,
-            currency: targetCurrency,
-            shares: "0",
-            price: "0",
-            value: "0",
-            accountId,
-          })
-        } catch (e) {
-          showToast(e instanceof Error ? e.message : "录入失败", "error")
-          return
-        }
-      } else {
+        await onAddHolding({
+          assetId,
+          symbol: "",
+          name: name.trim() || "手工资产",
+          market,
+          currency: targetCurrency,
+          shares: "0",
+          price: "0",
+          value: "0",
+          accountId,
+        })
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "录入失败", "error")
+        return
+      }
+    } else {
       if (!symbol) {
         showToast("请输入股票/基金代码", "error")
         return

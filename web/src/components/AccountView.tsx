@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from "react"
 import React from "react"
 import Decimal from "decimal.js"
-import { Account, ASSET_DEFINITIONS, Holding, HoldingWithAccount, Portfolio, ColorScheme } from "../types"
+import {
+  Account,
+  ASSET_DEFINITIONS,
+  Holding,
+  HoldingWithAccount,
+  Portfolio,
+  ColorScheme,
+} from "../types"
 import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
@@ -52,17 +59,27 @@ export default function AccountView({
 
   useEffect(() => {
     let cancelled = false
-    api.fetchAccountViewHoldings(displayCurrency, selectedAccountId)
-      .then((data) => { if (!cancelled) setHoldings(data) })
-      .catch(() => { if (!cancelled) setHoldings([]) })
-    return () => { cancelled = true }
+    api
+      .fetchAccountViewHoldings(displayCurrency, selectedAccountId)
+      .then((data) => {
+        if (!cancelled) setHoldings(data)
+      })
+      .catch(() => {
+        if (!cancelled) setHoldings([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [displayCurrency, selectedAccountId])
 
-  const handleAddHolding = useCallback(async (h: Omit<Holding, "id">) => {
-    await onAddHolding(h)
-    await loadHoldings()
-    onRefreshAvailableFunds()
-  }, [onAddHolding, loadHoldings, onRefreshAvailableFunds])
+  const handleAddHolding = useCallback(
+    async (h: Omit<Holding, "id">) => {
+      await onAddHolding(h)
+      await loadHoldings()
+      onRefreshAvailableFunds()
+    },
+    [onAddHolding, loadHoldings, onRefreshAvailableFunds]
+  )
 
   const handleBuyConfirm = useCallback(async () => {
     await loadHoldings()
@@ -78,10 +95,7 @@ export default function AccountView({
     (sum, h) => sum.plus(toDecimal(h.value)),
     new Decimal(0)
   )
-  const totalCost = (holdings || []).reduce(
-    (sum, h) => sum.plus(toDecimal(h.cost)),
-    new Decimal(0)
-  )
+  const totalCost = (holdings || []).reduce((sum, h) => sum.plus(toDecimal(h.cost)), new Decimal(0))
   const totalProfit = totalValue.minus(totalCost)
   const totalReturnPct = totalCost.isZero() ? new Decimal(0) : totalProfit.div(totalCost)
 
@@ -127,27 +141,39 @@ export default function AccountView({
                 <p className="text-sm font-mono flex items-center gap-2">
                   {h.symbol}
                   {h.lots && h.lots.length > 0 && (
-                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{h.lots.length} 笔</span>
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                      {h.lots.length} 笔
+                    </span>
                   )}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-[10px] text-[#ADB5BD] truncate max-w-37.5" title={h.name}>{h.name}</p>
-                  <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{h.currency || "CNY"}</span>
+                  <p className="text-[10px] text-[#ADB5BD] truncate max-w-37.5" title={h.name}>
+                    {h.name}
+                  </p>
+                  <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                    {h.currency || "CNY"}
+                  </span>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <p className="text-sm text-[#6C757D]">{h.name || "手工资产"}</p>
                 {h.lots && h.lots.length > 0 && (
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{h.lots.length} 笔</span>
+                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                    {h.lots.length} 笔
+                  </span>
                 )}
-                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{h.currency || "CNY"}</span>
+                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                  {h.currency || "CNY"}
+                </span>
               </div>
             )}
           </td>
           {!selectedAccount && (
             <td className="px-6 py-5">
-              <span className="text-xs text-[#6C757D] bg-[#F8F9FA] px-2 py-1 rounded">{h.accountName || "未分配"}</span>
+              <span className="text-xs text-[#6C757D] bg-[#F8F9FA] px-2 py-1 rounded">
+                {h.accountName || "未分配"}
+              </span>
             </td>
           )}
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
@@ -158,7 +184,9 @@ export default function AccountView({
               </div>
             ) : toDecimal(h.shares).isPositive() ? (
               <div>
-                {toDecimal(h.costPrice).isPositive() && <p>{formatCurrencyByCode(h.costPrice, h.currency || "CNY")}</p>}
+                {toDecimal(h.costPrice).isPositive() && (
+                  <p>{formatCurrencyByCode(h.costPrice, h.currency || "CNY")}</p>
+                )}
                 <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
               </div>
             ) : (
@@ -169,7 +197,10 @@ export default function AccountView({
             {h.cost && toDecimal(h.cost).isPositive() ? (
               <div>
                 <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
-                <p className={`text-[10px] ${profitColor}`}>{profit.isPositive() ? "+" : ""}{formatPercent(returnRate.toNumber())}</p>
+                <p className={`text-[10px] ${profitColor}`}>
+                  {profit.isPositive() ? "+" : ""}
+                  {formatPercent(returnRate.toNumber())}
+                </p>
               </div>
             ) : (
               <span className="text-[#ADB5BD] text-xs">-</span>
@@ -222,16 +253,28 @@ export default function AccountView({
                   <tbody>
                     {h.lots.map((lot) => (
                       <tr key={lot.id} className="border-t border-[#E9ECEF]">
-                        <td className="py-1.5 text-[#495057]">{lot.date ? new Date(lot.date).toLocaleDateString() : "-"}</td>
+                        <td className="py-1.5 text-[#495057]">
+                          {lot.date ? new Date(lot.date).toLocaleDateString() : "-"}
+                        </td>
                         <td className="py-1.5 text-right">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${lot.type === "sell" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] ${lot.type === "sell" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}
+                          >
                             {lot.type === "sell" ? "卖出" : "买入"}
                           </span>
                         </td>
                         <td className="py-1.5 text-right font-mono">{lot.shares}</td>
-                        <td className="py-1.5 text-right font-mono">{lot.costPrice ? formatCurrencyByCode(lot.costPrice, h.currency || "CNY") : "-"}</td>
-                        <td className="py-1.5 text-right font-mono">{lot.cost ? formatCurrencyByCode(lot.cost, h.currency || "CNY") : "-"}</td>
-                        <td className="py-1.5 text-right font-mono text-[#6C757D]">{lot.fee ? formatCurrencyByCode(lot.fee, h.currency || "CNY") : "-"}</td>
+                        <td className="py-1.5 text-right font-mono">
+                          {lot.costPrice
+                            ? formatCurrencyByCode(lot.costPrice, h.currency || "CNY")
+                            : "-"}
+                        </td>
+                        <td className="py-1.5 text-right font-mono">
+                          {lot.cost ? formatCurrencyByCode(lot.cost, h.currency || "CNY") : "-"}
+                        </td>
+                        <td className="py-1.5 text-right font-mono text-[#6C757D]">
+                          {lot.fee ? formatCurrencyByCode(lot.fee, h.currency || "CNY") : "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -260,15 +303,21 @@ export default function AccountView({
         <div className="flex items-center gap-6 text-sm">
           <div>
             <span className="text-[#6C757D]">总市值 </span>
-            <span className="font-medium">{formatCurrencyByCode(totalValue.toString(), displayCurrency)}</span>
+            <span className="font-medium">
+              {formatCurrencyByCode(totalValue.toString(), displayCurrency)}
+            </span>
           </div>
           <div>
             <span className="text-[#6C757D]">总成本 </span>
-            <span className="font-medium">{formatCurrencyByCode(totalCost.toString(), displayCurrency)}</span>
+            <span className="font-medium">
+              {formatCurrencyByCode(totalCost.toString(), displayCurrency)}
+            </span>
           </div>
           <div>
             <span className="text-[#6C757D]">总盈亏 </span>
-            <span className={`font-medium ${totalProfit.isPositive() ? "text-emerald-600" : "text-orange-600"}`}>
+            <span
+              className={`font-medium ${totalProfit.isPositive() ? "text-emerald-600" : "text-orange-600"}`}
+            >
               {formatCurrencyByCode(totalProfit.toString(), displayCurrency)}
               <span className="ml-1 text-[10px]">({formatPercent(totalReturnPct.toString())})</span>
             </span>
@@ -290,7 +339,11 @@ export default function AccountView({
         </div>
 
         {isAdding && currentPortfolio && (
-          <AddHoldingForm onAddHolding={handleAddHolding} onClose={() => setIsAdding(false)} accountId={selectedAccount?.id} />
+          <AddHoldingForm
+            onAddHolding={handleAddHolding}
+            onClose={() => setIsAdding(false)}
+            accountId={selectedAccount?.id}
+          />
         )}
 
         {holdings === null ? (
@@ -324,11 +377,15 @@ export default function AccountView({
                       <tr>
                         <td colSpan={colSpan} className="px-6 py-3 bg-[#F8F9FA]">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#1A1A1A]">{accountName}</span>
+                            <span className="text-xs font-semibold text-[#1A1A1A]">
+                              {accountName}
+                            </span>
                             <span className="text-[10px] text-[#6C757D]">
                               {groupHoldings.length} 个持仓 · 市值{" "}
                               {formatCurrencyByCode(
-                                groupHoldings.reduce((s, h) => s.plus(toDecimal(h.value)), new Decimal(0)).toString(),
+                                groupHoldings
+                                  .reduce((s, h) => s.plus(toDecimal(h.value)), new Decimal(0))
+                                  .toString(),
                                 displayCurrency
                               )}
                             </span>
