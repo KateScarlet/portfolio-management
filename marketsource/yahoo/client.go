@@ -35,7 +35,7 @@ type Client struct{}
 func (c *Client) Name() string { return "雅虎财经" }
 
 func (c *Client) SupportedMarkets() []string {
-	return []string{"US", "HK", "COMMODITY_INTL", "CRYPTO", "CN"}
+	return []string{"US", "HK", "COMMODITY_INTL", "CRYPTO", "CN", "EXCHANGE"}
 }
 
 func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {

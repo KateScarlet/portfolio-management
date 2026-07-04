@@ -262,10 +262,32 @@ export const MARKET_OPTIONS = [
   { code: "COMMODITY_CN", name: "商品(国内)" },
   { code: "COMMODITY_INTL", name: "商品(国际)" },
   { code: "CRYPTO", name: "加密货币" },
+  { code: "EXCHANGE", name: "汇率" },
 ] as const
 
 export interface MarketSourceConfig {
   available: Record<string, string[]>
   config: Record<string, string[]> | null
   sourceNames: Record<string, string>
+}
+
+export interface SourceTestResult {
+  success: boolean
+  name?: string
+  price?: string
+  currency?: string
+  rate?: string
+  latency?: number
+  error?: string
+  symbol?: string
+}
+
+export interface TestSourcesResult {
+  results: Record<string, SourceTestResult>
+}
+
+export interface SourceTestComplete {
+  total: number
+  success: number
+  failed: number
 }

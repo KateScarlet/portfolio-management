@@ -1,10 +1,13 @@
 package eastmoney
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -44,9 +47,18 @@ type eastmoneyResponse struct {
 }
 
 func Init() {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	// nid18用于反反爬
+	nid18 := hex.EncodeToString(b)
+
 	httpClient = resty.New().
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").
 		SetHeader("Accept", "application/json").
+		SetCookie(&http.Cookie{
+			Name:  "nid18",
+			Value: nid18,
+		}).
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
@@ -84,7 +96,41 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 }
 
 func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
-	return decimal.Zero, marketsource.ErrNotSupported
+	return fetchExchangeRate(pair)
+}
+
+func fetchExchangeRate(pair string) (decimal.Decimal, error) {
+	if httpClient == nil {
+		return decimal.Zero, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
+	}
+
+	// Eastmoney forex secid format: 119.PAIR (e.g., 119.USDCNY)
+	secid := "119." + pair
+
+	var resp eastmoneyResponse
+	r, err := httpClient.R().
+		SetQueryParam("secid", secid).
+		SetQueryParam("fields", "f43,f57,f58,f59").
+		SetResult(&resp).
+		Get("http://push2.eastmoney.com/api/qt/stock/get")
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("eastmoney forex request failed: %w", err)
+	}
+	if r.IsError() {
+		return decimal.Zero, fmt.Errorf("eastmoney forex returned status %d", r.StatusCode())
+	}
+
+	if resp.RC != 0 || resp.Data == nil {
+		return decimal.Zero, fmt.Errorf("eastmoney no data for forex pair %s", pair)
+	}
+
+	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	if price.IsZero() {
+		return decimal.Zero, fmt.Errorf("zero exchange rate for %s", pair)
+	}
+
+	slog.Info("eastmoney forex rate fetched from API", "pair", pair, "rate", price)
+	return price, nil
 }
 
 func IsFuturesSymbol(symbol string) bool {
@@ -267,6 +313,7 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 	queryCode := marketsource.NormalizeForSource(code, "FUND", "eastmoney")
 
 	r, err := httpClient.R().
+		SetHeader("Accept", "*/*").
 		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", queryCode))
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney fund request failed: %w", err)

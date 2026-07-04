@@ -13,7 +13,10 @@ import {
   Portfolio,
   PortfolioRecord,
   PortfolioSummary,
+  SourceTestComplete,
+  SourceTestResult,
   SyncStatus,
+  TestSourcesResult,
   UserInfo,
 } from "./types"
 
@@ -451,4 +454,72 @@ export async function updateMarketSources(
     method: "PUT",
     body: JSON.stringify(config),
   })
+}
+
+export async function testMarketSources(
+  config: Record<string, string[]>
+): Promise<TestSourcesResult> {
+  return request<TestSourcesResult>("/api/settings/market-sources/test", {
+    method: "POST",
+    body: JSON.stringify(config),
+  })
+}
+
+export interface SourceTestStreamOptions {
+  onResult: (key: string, source: string, market: string, result: SourceTestResult) => void
+  onComplete: (summary: SourceTestComplete) => void
+  onError: (error: Error) => void
+}
+
+export async function testMarketSourcesStream(
+  config: Record<string, string[]>,
+  options: SourceTestStreamOptions
+): Promise<void> {
+  const res = await fetch(BASE + "/api/settings/market-sources/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(config),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || res.statusText)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      let eventType = ""
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7).trim()
+        } else if (line.startsWith("data: ")) {
+          const data = line.slice(6)
+          try {
+            const parsed = JSON.parse(data)
+            if (eventType === "source-test-result") {
+              options.onResult(parsed.key, parsed.source, parsed.market, parsed.result)
+            } else if (eventType === "source-test-complete") {
+              options.onComplete(parsed)
+            }
+          } catch {
+            // skip malformed data
+          }
+        }
+      }
+    }
+  } catch (err) {
+    options.onError(err instanceof Error ? err : new Error(String(err)))
+  }
 }

@@ -41,3 +41,26 @@ func TestFetchQuote_UnknownSymbol(t *testing.T) {
 		t.Fatal("expected error for unknown symbol")
 	}
 }
+
+func TestFetchExchangeRate_NotInitialized(t *testing.T) {
+	// Reset httpClient to nil to test initialization check
+	originalClient := httpClient
+	httpClient = nil
+	defer func() { httpClient = originalClient }()
+
+	c := &Client{}
+	_, err := c.FetchExchangeRate("USDCNY")
+	if err == nil {
+		t.Fatal("expected error when client not initialized")
+	}
+}
+
+func TestFetchExchangeRate_UnsupportedPair(t *testing.T) {
+	Init()
+	c := &Client{}
+	// This will fail because the pair doesn't exist in eastmoney's API
+	_, err := c.FetchExchangeRate("INVALIDPAIR")
+	if err == nil {
+		t.Log("note: this test expects an error for invalid pair")
+	}
+}

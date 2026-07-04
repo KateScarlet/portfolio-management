@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Settings, AssetId, ASSET_DEFINITIONS, MARKET_OPTIONS, MarketSourceConfig } from "../types"
+import {
+  Settings,
+  AssetId,
+  ASSET_DEFINITIONS,
+  MARKET_OPTIONS,
+  MarketSourceConfig,
+  SourceTestResult,
+  SourceTestComplete,
+} from "../types"
 import {
   Settings as SettingsIcon,
   ArrowUp,
@@ -9,6 +17,9 @@ import {
   Palette,
   Bell,
   Shield,
+  Check,
+  X,
+  Loader2,
 } from "lucide-react"
 import * as api from "../api"
 
@@ -76,6 +87,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
   const [marketSourceDraft, setMarketSourceDraft] = useState<Record<string, string[]>>({})
   const [dragState, setDragState] = useState<{ market: string; src: string } | null>(null)
   const [dropTarget, setDropTarget] = useState<{ market: string; src: string } | null>(null)
+  const [testingSources, setTestingSources] = useState(false)
+  const [sourceTestResults, setSourceTestResults] = useState<Record<string, SourceTestResult>>({})
+  const [sourceTestResultsOrder, setSourceTestResultsOrder] = useState<string[]>([])
+  const [testProgress, setTestProgress] = useState<{ tested: number; total: number; success: number } | null>(null)
 
   const handleOpen = () => {
     setDraft(settings)
@@ -357,9 +372,45 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
 
                     {marketSources && (
                       <div>
-                        <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                          行情源配置
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium text-[#1A1A1A]">
+                            行情源配置
+                          </label>
+                          <button
+                            onClick={() => {
+                              setTestingSources(true)
+                              setSourceTestResults({})
+                              setSourceTestResultsOrder([])
+                              setTestProgress(null)
+                              api.testMarketSourcesStream(marketSourceDraft, {
+                                onResult: (key, _source, _market, result) => {
+                                  setSourceTestResults((prev) => ({ ...prev, [key]: result }))
+                                  setSourceTestResultsOrder((prev) => [...prev, key])
+                                  setTestProgress((prev) =>
+                                    prev ? { ...prev, tested: prev.tested + 1 } : null
+                                  )
+                                },
+                                onComplete: (summary: SourceTestComplete) => {
+                                  setTestProgress({ tested: summary.total, total: summary.total, success: summary.success })
+                                  setTestingSources(false)
+                                },
+                                onError: (err) => {
+                                  console.error("Test failed", err)
+                                  setTestingSources(false)
+                                },
+                              })
+                            }}
+                            disabled={testingSources}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors text-[#6C757D] hover:text-[#1A1A1A] hover:border-[#ADB5BD] disabled:opacity-50"
+                          >
+                            {testingSources ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3" />
+                            )}
+                            测试
+                          </button>
+                        </div>
                         <p className="text-xs text-[#6C757D] mb-3">
                           拖动已选源调整优先级，点击取消选中，点击未选源添加。
                         </p>
@@ -368,105 +419,190 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                             const available = marketSources.available[m.code] || []
                             const selected = marketSourceDraft[m.code] || []
                             return (
-                              <div key={m.code} className="flex items-center gap-3">
-                                <span className="text-xs text-[#495057] w-20 shrink-0">
-                                  {m.name}
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {[
-                                    ...selected,
-                                    ...available.filter((s) => !selected.includes(s)),
-                                  ].map((src) => {
-                                    const isSelected = selected.includes(src)
-                                    const isDragging =
-                                      dragState?.market === m.code && dragState?.src === src
-                                    const isDrop =
-                                      dropTarget?.market === m.code && dropTarget?.src === src
-                                    return (
-                                      <button
-                                        key={src}
-                                        draggable={isSelected && selected.length > 1}
-                                        onClick={() => {
-                                          let next: string[]
-                                          if (!isSelected) {
-                                            next = [...selected, src]
-                                          } else if (selected.length <= 1) {
-                                            return
-                                          } else {
-                                            next = selected.filter((s) => s !== src)
-                                          }
-                                          setMarketSourceDraft({
-                                            ...marketSourceDraft,
-                                            [m.code]: next,
-                                          })
-                                        }}
-                                        onDragStart={(e) => {
-                                          setDragState({ market: m.code, src })
-                                          e.dataTransfer.effectAllowed = "move"
-                                          e.dataTransfer.setData("text/plain", src)
-                                        }}
-                                        onDragOver={(e) => {
-                                          if (
-                                            dragState?.market === m.code &&
-                                            dragState.src !== src &&
-                                            isSelected
-                                          ) {
-                                            e.preventDefault()
-                                            e.dataTransfer.dropEffect = "move"
-                                            setDropTarget({ market: m.code, src })
-                                          }
-                                        }}
-                                        onDragLeave={() => {
-                                          if (
-                                            dropTarget?.market === m.code &&
-                                            dropTarget.src === src
-                                          ) {
-                                            setDropTarget(null)
-                                          }
-                                        }}
-                                        onDrop={(e) => {
-                                          e.preventDefault()
-                                          if (
-                                            dragState?.market === m.code &&
-                                            dragState.src !== src &&
-                                            isSelected
-                                          ) {
-                                            const fromIdx = selected.indexOf(dragState.src)
-                                            const toIdx = selected.indexOf(src)
-                                            const next = [...selected]
-                                            next.splice(fromIdx, 1)
-                                            next.splice(toIdx, 0, dragState.src)
-                                            setMarketSourceDraft({
-                                              ...marketSourceDraft,
-                                              [m.code]: next,
-                                            })
-                                          }
-                                          setDragState(null)
-                                          setDropTarget(null)
-                                        }}
-                                        onDragEnd={() => {
-                                          setDragState(null)
-                                          setDropTarget(null)
-                                        }}
-                                        className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
-                                          isDragging
-                                            ? "opacity-40 border-dashed border-[#ADB5BD]"
-                                            : isDrop
-                                              ? "border-2 border-[#1A1A1A] bg-[#1A1A1A] text-white"
-                                              : isSelected
-                                                ? "bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-grab active:cursor-grabbing"
-                                                : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
-                                        }`}
-                                      >
-                                        {marketSources.sourceNames[src] || src}
-                                      </button>
-                                    )
-                                  })}
+                              <div key={m.code}>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-[#495057] w-20 shrink-0">
+                                    {m.name}
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                      ...selected,
+                                      ...available.filter((s) => !selected.includes(s)),
+                                    ].map((src) => {
+                                      const isSelected = selected.includes(src)
+                                      const isDragging =
+                                        dragState?.market === m.code && dragState?.src === src
+                                      const isDrop =
+                                        dropTarget?.market === m.code && dropTarget?.src === src
+                                      return (
+                                        <div key={src} className="flex items-center gap-1">
+                                          <button
+                                            draggable={isSelected && selected.length > 1}
+                                            onClick={() => {
+                                              let next: string[]
+                                              if (!isSelected) {
+                                                next = [...selected, src]
+                                              } else if (selected.length <= 1) {
+                                                return
+                                              } else {
+                                                next = selected.filter((s) => s !== src)
+                                              }
+                                              setMarketSourceDraft({
+                                                ...marketSourceDraft,
+                                                [m.code]: next,
+                                              })
+                                            }}
+                                            onDragStart={(e) => {
+                                              setDragState({ market: m.code, src })
+                                              e.dataTransfer.effectAllowed = "move"
+                                              e.dataTransfer.setData("text/plain", src)
+                                            }}
+                                            onDragOver={(e) => {
+                                              if (
+                                                dragState?.market === m.code &&
+                                                dragState.src !== src &&
+                                                isSelected
+                                              ) {
+                                                e.preventDefault()
+                                                e.dataTransfer.dropEffect = "move"
+                                                setDropTarget({ market: m.code, src })
+                                              }
+                                            }}
+                                            onDragLeave={() => {
+                                              if (
+                                                dropTarget?.market === m.code &&
+                                                dropTarget.src === src
+                                              ) {
+                                                setDropTarget(null)
+                                              }
+                                            }}
+                                            onDrop={(e) => {
+                                              e.preventDefault()
+                                              if (
+                                                dragState?.market === m.code &&
+                                                dragState.src !== src &&
+                                                isSelected
+                                              ) {
+                                                const fromIdx = selected.indexOf(dragState.src)
+                                                const toIdx = selected.indexOf(src)
+                                                const next = [...selected]
+                                                next.splice(fromIdx, 1)
+                                                next.splice(toIdx, 0, dragState.src)
+                                                setMarketSourceDraft({
+                                                  ...marketSourceDraft,
+                                                  [m.code]: next,
+                                                })
+                                              }
+                                              setDragState(null)
+                                              setDropTarget(null)
+                                            }}
+                                            onDragEnd={() => {
+                                              setDragState(null)
+                                              setDropTarget(null)
+                                            }}
+                                            className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
+                                              isDragging
+                                                ? "opacity-40 border-dashed border-[#ADB5BD]"
+                                                : isDrop
+                                                  ? "border-2 border-[#1A1A1A] bg-[#1A1A1A] text-white"
+                                                  : isSelected
+                                                    ? "bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-grab active:cursor-grabbing"
+                                                    : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
+                                            }`}
+                                          >
+                                            {marketSources.sourceNames[src] || src}
+                                          </button>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
                                 </div>
                               </div>
                             )
                           })}
                         </div>
+                        {(testingSources || sourceTestResultsOrder.length > 0) && (
+                          <div className="mt-4 border-t border-[#E9ECEF] pt-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="text-sm font-medium text-[#1A1A1A]">
+                                测试结果
+                              </label>
+                              {testProgress && (
+                                <span className="text-xs text-[#6C757D]">
+                                  {testingSources
+                                    ? `测试中 ${testProgress.tested}/${testProgress.total}`
+                                    : `${testProgress.success}/${testProgress.total} 成功`}
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-3">
+                              {(() => {
+                                const groups: Record<string, { key: string; src: string; result: SourceTestResult }[]> = {}
+                                for (const key of sourceTestResultsOrder) {
+                                  const result = sourceTestResults[key]
+                                  if (!result) continue
+                                  const lastHyphen = key.lastIndexOf("-")
+                                  const src = key.substring(0, lastHyphen)
+                                  const mkt = key.substring(lastHyphen + 1)
+                                  if (!groups[mkt]) groups[mkt] = []
+                                  groups[mkt].push({ key, src, result })
+                                }
+                                return MARKET_OPTIONS.filter((m) => groups[m.code]).map((m) => (
+                                  <div key={m.code}>
+                                    <div className="text-xs font-medium text-[#495057] mb-1">
+                                      {m.name}
+                                    </div>
+                                    <div className="space-y-1 w-full">
+                                      {groups[m.code].map(({ key, src, result }) => (
+                                        <div
+                                          key={key}
+                                          className="flex items-center gap-2 text-xs pl-2 w-full"
+                                        >
+                                          {result.success ? (
+                                            <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                                          ) : (
+                                            <X className="w-3 h-3 text-red-500 shrink-0" />
+                                          )}
+                                          <span className="text-[#495057] w-20 shrink-0 truncate">
+                                            {marketSources?.sourceNames[src] || src}
+                                          </span>
+                                          <span className="text-[#6C757D] w-24 shrink-0 truncate">
+                                            {result.symbol || ""}
+                                          </span>
+                                          <span className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`} title={result.success ? "" : (result.error || "未知错误")}>
+                                            {result.success ? (
+                                              result.rate
+                                                ? ""
+                                                : result.name || ""
+                                            ) : (
+                                              result.error || "失败"
+                                            )}
+                                          </span>
+                                          <span className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`}>
+                                            {result.success ? (
+                                              result.rate
+                                                ? `${result.rate}`
+                                                : result.price
+                                                  ? `${result.currency === "USD" ? "$" : result.currency === "CNY" ? "¥" : result.currency === "HKD" ? "HK$" : result.currency === "EUR" ? "€" : result.currency === "GBP" ? "£" : result.currency === "JPY" ? "¥" : ""}${result.price}`
+                                                  : ""
+                                            ) : (
+                                              ""
+                                            )}
+                                          </span>
+                                          {result.latency !== undefined && (
+                                            <span className="text-[#6C757D] ml-auto shrink-0">
+                                              {result.latency}ms
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))
+                              })()}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -803,9 +939,9 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                 placeholder="http://localhost:3000/api/auth/oidc/callback"
                                 className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
                               />
-                            </div>
-                          </div>
-                        )}
+                        </div>
+                      </div>
+                    )}
                       </div>
                     )}
 

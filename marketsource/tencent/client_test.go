@@ -14,8 +14,8 @@ func TestNormalizeForSource_Tencent(t *testing.T) {
 	}{
 		{"600519.SH", "CN", "sh600519"},
 		{"000001.SZ", "CN", "sz000001"},
-		{"00700.HK", "HK", "hk00700"},
-		{"02800.HK", "HK", "hk02800"},
+		{"0700.HK", "HK", "hk00700"},
+		{"2800.HK", "HK", "hk02800"},
 	}
 
 	for _, tt := range tests {

@@ -22,10 +22,10 @@ func TestNormalizeSymbol(t *testing.T) {
 		{"600519.SH", "CN", "600519.SH"}, // already normalized
 
 		// HK
-		{"00700", "HK", "00700.HK"},
-		{"2800", "HK", "02800.HK"},
-		{"HK00700", "HK", "00700.HK"},
-		{"00700.HK", "HK", "00700.HK"},
+		{"00700", "HK", "0700.HK"},
+		{"2800", "HK", "2800.HK"},
+		{"HK00700", "HK", "0700.HK"},
+		{"00700.HK", "HK", "0700.HK"},
 
 		// US
 		{"AAPL", "US", "AAPL.US"},
@@ -85,13 +85,13 @@ func TestNormalizeForSource(t *testing.T) {
 		// Tencent
 		{"600519.SH", "CN", "tencent", "sh600519"},
 		{"000001.SZ", "CN", "tencent", "sz000001"},
-		{"00700.HK", "HK", "tencent", "hk00700"},
-		{"02800.HK", "HK", "tencent", "hk02800"},
+		{"0700.HK", "HK", "tencent", "hk00700"},
+		{"2800.HK", "HK", "tencent", "hk02800"},
 
 		// Sina
 		{"600519.SH", "CN", "sina", "sh600519"},
 		{"000001.SZ", "CN", "sina", "sz000001"},
-		{"00700.HK", "HK", "sina", "hk00700"},
+		{"0700.HK", "HK", "sina", "hk00700"},
 		{"AAPL.US", "US", "sina", "gb_aapl"},
 
 		// Eastmoney
@@ -100,7 +100,7 @@ func TestNormalizeForSource(t *testing.T) {
 		{"au9999.CN", "COMMODITY_CN", "eastmoney", "au9999"},
 		{"001811.CNOF", "FUND", "eastmoney", "001811"},
 		{"AAPL.US", "US", "eastmoney", "105.AAPL"},
-		{"00700.HK", "HK", "eastmoney", "116.00700"},
+		{"0700.HK", "HK", "eastmoney", "116.00700"},
 
 		// CoinGecko
 		{"BTC.CC", "CRYPTO", "coingecko", "bitcoin"},

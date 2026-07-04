@@ -39,6 +39,7 @@ func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
 			"CN":             {"eastmoney", "tencent", "sina", "yahoo"},
 			"FUND":           {"eastmoney"},
 			"COMMODITY_CN":   {"eastmoney"},
+			"EXCHANGE":       {"sina", "yahoo"},
 		},
 		cacheTTL: 5 * time.Minute,
 	}
@@ -93,7 +94,7 @@ func (r *Router) ExchangeRate(userID, pair string) (decimal.Decimal, error) {
 		return item.Value(), nil
 	}
 
-	sources := r.resolveSources(userID, "")
+	sources := r.resolveSources(userID, "EXCHANGE")
 
 	var lastErr error
 	for _, name := range sources {
@@ -126,6 +127,24 @@ func (r *Router) ClearAllCaches() {
 	r.quoteCache.DeleteAll()
 	r.rateCache.DeleteAll()
 	r.userCache.DeleteAll()
+}
+
+// TestSource tests a specific source directly, bypassing fallback chain and cache.
+func (r *Router) TestSource(source, market, symbol string) (*Quote, error) {
+	src, ok := r.sources[source]
+	if !ok {
+		return nil, fmt.Errorf("source %s not found", source)
+	}
+	return src.FetchQuote(symbol, market)
+}
+
+// TestExchangeSource tests a specific source's exchange rate directly.
+func (r *Router) TestExchangeSource(source, pair string) (decimal.Decimal, error) {
+	src, ok := r.sources[source]
+	if !ok {
+		return decimal.Zero, fmt.Errorf("source %s not found", source)
+	}
+	return src.FetchExchangeRate(pair)
 }
 
 func (r *Router) SourceNames() map[string]string {
@@ -233,6 +252,10 @@ func (r *Router) allSourceNames() []string {
 func (r *Router) loadUserConfig(userID string) map[string][]string {
 	if item := r.userCache.Get(userID); item != nil {
 		return item.Value().config
+	}
+
+	if r.db == nil {
+		return nil
 	}
 
 	var value string

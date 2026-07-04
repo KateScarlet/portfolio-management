@@ -66,15 +66,13 @@ func normalizeAShare(s string) string {
 
 func normalizeHK(s string) string {
 	if before, ok := strings.CutSuffix(s, ".HK"); ok {
-		// Ensure 5-digit padding
-		code := before
-		for len(code) < 5 {
-			code = "0" + code
-		}
-		return code + ".HK"
+		s = before
 	}
-	// Pad to 5 digits
-	for len(s) < 5 {
+	// HK stocks are 4-digit codes; take last 4 chars if longer, pad if shorter
+	if len(s) > 4 {
+		s = s[len(s)-4:]
+	}
+	for len(s) < 4 {
 		s = "0" + s
 	}
 	return s + ".HK"
@@ -161,7 +159,7 @@ func normalizeForYahoo(symbol, market string) string {
 		}
 		return symbol
 	case "HK":
-		// 00700.HK -> 00700.HK (unchanged)
+		// 0700.HK -> 0700.HK (unchanged)
 		return symbol
 	case "US":
 		// AAPL.US -> AAPL (strip suffix)
@@ -239,6 +237,9 @@ func normalizeForEastmoney(symbol, market string) string {
 		return "105." + ticker
 	case "HK":
 		code := strings.TrimSuffix(symbol, ".HK")
+		for len(code) < 5 {
+			code = "0" + code
+		}
 		return "116." + code
 	case "FUND":
 		code := strings.TrimSuffix(symbol, ".CNOF")

@@ -40,7 +40,7 @@ type Client struct{}
 func (c *Client) Name() string { return "新浪财经" }
 
 func (c *Client) SupportedMarkets() []string {
-	return []string{"US", "CN", "HK"}
+	return []string{"US", "CN", "HK", "EXCHANGE"}
 }
 
 func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
@@ -65,7 +65,56 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 }
 
 func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
-	return decimal.Zero, marketsource.ErrNotSupported
+	return fetchExchangeRate(pair)
+}
+
+func fetchExchangeRate(pair string) (decimal.Decimal, error) {
+	if httpClient == nil {
+		return decimal.Zero, fmt.Errorf("sina client not initialized, call sina.Init() first")
+	}
+
+	// Sina forex format: fx_s{pair_lowercase} (e.g., fx_susdcny)
+	querySymbol := "fx_s" + strings.ToLower(pair)
+
+	resp, err := httpClient.R().
+		Get(fmt.Sprintf("https://hq.sinajs.cn/list=%s", querySymbol))
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("sina forex request failed: %w", err)
+	}
+	if resp.IsError() {
+		return decimal.Zero, fmt.Errorf("sina forex returned status %d", resp.StatusCode())
+	}
+
+	body := gbkToUTF8(resp.Body())
+	body = strings.TrimSpace(body)
+	if body == "" || body == "var hq_str_=\"\"" {
+		return decimal.Zero, fmt.Errorf("sina no data for forex pair %s", pair)
+	}
+
+	// Format: var hq_str_fx_susdcny="美元兑人民币,7.2450,...";
+	_, after, ok := strings.Cut(body, "=\"")
+	if !ok {
+		return decimal.Zero, fmt.Errorf("sina unexpected forex response format")
+	}
+
+	data := strings.TrimRight(after, "\";")
+	if data == "" {
+		return decimal.Zero, fmt.Errorf("sina no data for forex pair %s", pair)
+	}
+
+	fields := strings.Split(data, ",")
+	if len(fields) < 2 {
+		return decimal.Zero, fmt.Errorf("sina forex response has too few fields for %s", pair)
+	}
+
+	// The exchange rate is typically in field index 1
+	rate, err := decimal.NewFromString(fields[1])
+	if err != nil || !rate.IsPositive() {
+		return decimal.Zero, fmt.Errorf("sina invalid forex rate for %s: %s", pair, fields[1])
+	}
+
+	slog.Info("sina forex rate fetched", "pair", pair, "rate", rate)
+	return rate, nil
 }
 
 func gbkToUTF8(data []byte) string {

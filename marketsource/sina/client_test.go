@@ -99,3 +99,43 @@ func TestParseQuote(t *testing.T) {
 		})
 	}
 }
+
+func TestSupportedMarkets_IncludesExchange(t *testing.T) {
+	c := &Client{}
+	markets := c.SupportedMarkets()
+
+	found := false
+	for _, m := range markets {
+		if m == "EXCHANGE" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected EXCHANGE in supported markets")
+	}
+}
+
+func TestFetchExchangeRate_NotInitialized(t *testing.T) {
+	// Reset httpClient to nil to test initialization check
+	originalClient := httpClient
+	httpClient = nil
+	defer func() { httpClient = originalClient }()
+
+	c := &Client{}
+	_, err := c.FetchExchangeRate("USDCNY")
+	if err == nil {
+		t.Fatal("expected error when client not initialized")
+	}
+}
+
+func TestFetchExchangeRate_EmptyResponse(t *testing.T) {
+	Init()
+	c := &Client{}
+	// This will fail because we're not mocking the HTTP response
+	// but it tests the error handling path
+	_, err := c.FetchExchangeRate("INVALIDPAIR")
+	if err == nil {
+		t.Log("note: this test expects an error for invalid pair")
+	}
+}

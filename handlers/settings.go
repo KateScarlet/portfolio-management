@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"portfolio-management/marketsource"
@@ -9,9 +10,12 @@ import (
 	"portfolio-management/models"
 	"portfolio-management/scheduler"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/hertz/pkg/protocol/sse"
 	"gorm.io/gorm"
 )
 
@@ -271,5 +275,163 @@ func UpdateMarketSources(router *marketsource.Router) app.HandlerFunc {
 		}
 
 		c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// Test symbol for each market category (canonical format)
+var testSymbols = map[string]string{
+	"US":             "AAPL.US",
+	"CN":             "600519.SH",
+	"HK":             "0700.HK",
+	"FUND":           "022485",
+	"COMMODITY_CN":   "au9999",
+	"COMMODITY_INTL": "GC.INTL",
+	"CRYPTO":         "BTC",
+}
+
+type sourceTestJob struct {
+	Source string
+	Market string
+}
+
+type sourceTestResult struct {
+	Key    string         `json:"key"`
+	Source string         `json:"source"`
+	Market string         `json:"market"`
+	Result map[string]any `json:"result"`
+}
+
+const maxConcurrentTest = 5
+
+func TestMarketSources(router *marketsource.Router) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		var body map[string][]string
+		if err := c.BindAndValidate(&body); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		jobs := make([]sourceTestJob, 0)
+		for market, sources := range body {
+			for _, source := range sources {
+				jobs = append(jobs, sourceTestJob{Source: source, Market: market})
+			}
+		}
+
+		if len(jobs) == 0 {
+			c.JSON(consts.StatusOK, map[string]any{"results": map[string]any{}})
+			return
+		}
+
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+
+		w := sse.NewWriter(c)
+
+		resultsCh := make(chan sourceTestResult, len(jobs))
+		sem := make(chan struct{}, maxConcurrentTest)
+		var wg sync.WaitGroup
+
+		for _, job := range jobs {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(j sourceTestJob) {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
+				result := testSingleSource(router, j.Market, j.Source)
+				resultsCh <- sourceTestResult{
+					Key:    j.Source + "-" + j.Market,
+					Source: j.Source,
+					Market: j.Market,
+					Result: result,
+				}
+			}(job)
+		}
+
+		go func() {
+			wg.Wait()
+			close(resultsCh)
+		}()
+
+		successCount := 0
+		failCount := 0
+		for r := range resultsCh {
+			data, _ := json.Marshal(r)
+			_ = w.WriteEvent("", "source-test-result", data)
+			if r.Result["success"] == true {
+				successCount++
+			} else {
+				failCount++
+			}
+		}
+
+		summary := map[string]any{
+			"total":   len(jobs),
+			"success": successCount,
+			"failed":  failCount,
+		}
+		summaryData, _ := json.Marshal(summary)
+		_ = w.WriteEvent("", "source-test-complete", summaryData)
+	}
+}
+
+func testSingleSource(router *marketsource.Router, market, source string) map[string]any {
+	start := time.Now()
+
+	if market == "EXCHANGE" {
+		pair := "USDCNY"
+		rate, err := router.TestExchangeSource(source, pair)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			return map[string]any{
+				"success": false,
+				"error":   err.Error(),
+				"latency": latency,
+				"symbol":  pair,
+			}
+		}
+		return map[string]any{
+			"success": true,
+			"rate":    rate.String(),
+			"latency": latency,
+			"symbol":  pair,
+		}
+	}
+
+	symbol, ok := testSymbols[market]
+	if !ok {
+		return map[string]any{
+			"success": false,
+			"error":   "unsupported market: " + market,
+			"latency": time.Since(start).Milliseconds(),
+		}
+	}
+	normalizedSymbol := marketsource.NormalizeSymbol(symbol, market)
+	quote, err := router.TestSource(source, market, normalizedSymbol)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		return map[string]any{
+			"success": false,
+			"error":   err.Error(),
+			"latency": latency,
+			"symbol":  normalizedSymbol,
+		}
+	}
+	return map[string]any{
+		"success":  true,
+		"name":     quote.Name,
+		"price":    quote.Price.String(),
+		"currency": quote.Currency,
+		"latency":  latency,
+		"symbol":   normalizedSymbol,
 	}
 }

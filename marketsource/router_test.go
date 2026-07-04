@@ -1,6 +1,7 @@
 package marketsource
 
 import (
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -53,7 +54,7 @@ func TestFetchQuote_CachesResult(t *testing.T) {
 }
 
 func TestExchangeRate_CachesResult(t *testing.T) {
-	src := &mockSource{name: "eastmoney", markets: []string{"US"}}
+	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
 	r := newTestRouter(t, src)
 
 	rate1, err := r.ExchangeRate("", "USD/CNY")
@@ -88,7 +89,7 @@ func TestFetchQuote_CacheExpires(t *testing.T) {
 }
 
 func TestClearAllCaches(t *testing.T) {
-	src := &mockSource{name: "eastmoney", markets: []string{"US"}}
+	src := &mockSource{name: "sina", markets: []string{"US", "EXCHANGE"}}
 	r := newTestRouter(t, src)
 
 	_, _ = r.FetchQuote("", "AAPL", "US")
@@ -125,3 +126,156 @@ var _ interface {
 	ExchangeRate(userID, pair string) (decimal.Decimal, error)
 	ClearAllCaches()
 } = (*Router)(nil)
+
+// --- EXCHANGE market category tests ---
+
+func TestExchangeRate_UsesExchangeMarketCategory(t *testing.T) {
+	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := newTestRouter(t, src)
+
+	rate, err := r.ExchangeRate("", "USDCNY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rate.Equal(decimal.NewFromFloat(7.2)) {
+		t.Errorf("expected rate 7.2, got %v", rate)
+	}
+}
+
+func TestExchangeRate_FallbackToNextSource(t *testing.T) {
+	src1 := &failingSource{name: "sina", markets: []string{"EXCHANGE"}}
+	src2 := &mockSource{name: "yahoo", markets: []string{"EXCHANGE"}}
+	r := NewRouter(nil, map[string]MarketSource{
+		"sina":  src1,
+		"yahoo": src2,
+	})
+
+	rate, err := r.ExchangeRate("", "USDCNY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rate.Equal(decimal.NewFromFloat(7.2)) {
+		t.Errorf("expected rate 7.2 from fallback source, got %v", rate)
+	}
+	if src1.exchangeCalls.Load() != 1 {
+		t.Errorf("expected first source called once, got %d", src1.exchangeCalls.Load())
+	}
+	if src2.exchangeCalls.Load() != 1 {
+		t.Errorf("expected second source called once, got %d", src2.exchangeCalls.Load())
+	}
+}
+
+func TestExchangeRate_SkipsNotSupported(t *testing.T) {
+	src1 := &notSupportedSource{name: "eastmoney", markets: []string{"EXCHANGE"}}
+	src2 := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := NewRouter(nil, map[string]MarketSource{
+		"eastmoney": src1,
+		"sina":      src2,
+	})
+
+	rate, err := r.ExchangeRate("", "USDCNY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rate.Equal(decimal.NewFromFloat(7.2)) {
+		t.Errorf("expected rate 7.2 from second source, got %v", rate)
+	}
+}
+
+func TestExchangeRate_AllSourcesFail(t *testing.T) {
+	src1 := &failingSource{name: "eastmoney", markets: []string{"EXCHANGE"}}
+	src2 := &failingSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := NewRouter(nil, map[string]MarketSource{
+		"eastmoney": src1,
+		"sina":      src2,
+	})
+
+	_, err := r.ExchangeRate("", "USDCNY")
+	if err == nil {
+		t.Fatal("expected error when all sources fail")
+	}
+}
+
+func TestExchangeRate_DifferentPairsCachedSeparately(t *testing.T) {
+	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := newTestRouter(t, src)
+
+	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate("", "EURCNY")
+	_, _ = r.ExchangeRate("", "USDCNY")
+
+	if src.exchangeCalls.Load() != 2 {
+		t.Errorf("expected 2 calls for 2 distinct pairs, got %d", src.exchangeCalls.Load())
+	}
+}
+
+func TestExchangeRate_CacheExpires(t *testing.T) {
+	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := newTestRouter(t, src)
+	r.cacheTTL = 50 * time.Millisecond
+
+	_, _ = r.ExchangeRate("", "USDCNY")
+	time.Sleep(60 * time.Millisecond)
+	_, _ = r.ExchangeRate("", "USDCNY")
+
+	if src.exchangeCalls.Load() != 2 {
+		t.Errorf("expected source called twice after expiry, got %d", src.exchangeCalls.Load())
+	}
+}
+
+func TestExchangeRate_ClearCacheRefetches(t *testing.T) {
+	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
+	r := newTestRouter(t, src)
+
+	_, _ = r.ExchangeRate("", "USDCNY")
+	r.ClearAllCaches()
+	_, _ = r.ExchangeRate("", "USDCNY")
+
+	if src.exchangeCalls.Load() != 2 {
+		t.Errorf("expected 2 calls after cache clear, got %d", src.exchangeCalls.Load())
+	}
+}
+
+func TestAvailableSources_IncludesExchange(t *testing.T) {
+	src := &mockSource{name: "sina", markets: []string{"US", "CN", "EXCHANGE"}}
+	r := newTestRouter(t, src)
+
+	available := r.AvailableSources()
+	if _, ok := available["EXCHANGE"]; !ok {
+		t.Error("expected EXCHANGE in available sources")
+	}
+}
+
+// --- Mock sources for testing ---
+
+type failingSource struct {
+	name          string
+	markets       []string
+	exchangeCalls atomic.Int32
+}
+
+func (f *failingSource) Name() string               { return f.name }
+func (f *failingSource) SupportedMarkets() []string { return f.markets }
+func (f *failingSource) FetchQuote(symbol, market string) (*Quote, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (f *failingSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	f.exchangeCalls.Add(1)
+	return decimal.Zero, fmt.Errorf("source unavailable")
+}
+
+type notSupportedSource struct {
+	name          string
+	markets       []string
+	exchangeCalls atomic.Int32
+}
+
+func (n *notSupportedSource) Name() string               { return n.name }
+func (n *notSupportedSource) SupportedMarkets() []string { return n.markets }
+func (n *notSupportedSource) FetchQuote(symbol, market string) (*Quote, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (n *notSupportedSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
+	n.exchangeCalls.Add(1)
+	return decimal.Zero, ErrNotSupported
+}

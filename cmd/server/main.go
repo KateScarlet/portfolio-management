@@ -102,6 +102,7 @@ func main() {
 
 	api.GET("/settings/market-sources", handlers.GetMarketSources(router))
 	api.PUT("/settings/market-sources", handlers.UpdateMarketSources(router))
+	api.POST("/settings/market-sources/test", handlers.TestMarketSources(router))
 
 	api.GET("/portfolios", handlers.ListPortfolios(database))
 	api.POST("/portfolios", handlers.CreatePortfolio(database))
