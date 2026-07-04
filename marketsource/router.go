@@ -37,7 +37,7 @@ func NewRouter(db *gorm.DB, sources map[string]MarketSource) *Router {
 			"CRYPTO":         {"coingecko", "yahoo"},
 			"COMMODITY_INTL": {"yahoo"},
 			"CN":             {"eastmoney", "tencent", "sina", "yahoo"},
-			"FUND":           {"eastmoney"},
+			"FUND":           {"eastmoney", "tencent"},
 			"COMMODITY_CN":   {"eastmoney"},
 			"EXCHANGE":       {"sina", "yahoo"},
 		},

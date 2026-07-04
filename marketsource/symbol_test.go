@@ -102,6 +102,9 @@ func TestNormalizeForSource(t *testing.T) {
 		{"AAPL.US", "US", "eastmoney", "105.AAPL"},
 		{"0700.HK", "HK", "eastmoney", "116.00700"},
 
+		// Tencent
+		{"001811.CNOF", "FUND", "tencent", "jj001811"},
+
 		// CoinGecko
 		{"BTC.CC", "CRYPTO", "coingecko", "bitcoin"},
 		{"ETH.CC", "CRYPTO", "coingecko", "ethereum"},

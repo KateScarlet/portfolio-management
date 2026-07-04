@@ -38,7 +38,7 @@ type Client struct{}
 func (c *Client) Name() string { return "腾讯财经" }
 
 func (c *Client) SupportedMarkets() []string {
-	return []string{"CN", "HK"}
+	return []string{"CN", "HK", "FUND"}
 }
 
 func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) {
@@ -58,6 +58,9 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	}
 
 	body := gbkToUTF8(resp.Body())
+	if market == "FUND" {
+		return parseFundQuote(body, symbol)
+	}
 	return parseQuote(body, symbol)
 }
 
@@ -115,5 +118,42 @@ func parseQuote(body, originalSymbol string) (*marketsource.Quote, error) {
 		OriginalPrice:    price,
 		Currency:         currency,
 		OriginalCurrency: currency,
+	}, nil
+}
+
+func parseFundQuote(body, originalSymbol string) (*marketsource.Quote, error) {
+	body = strings.TrimSpace(body)
+	if body == "" || body == "v_pv_none_match=\"1\";" {
+		return nil, fmt.Errorf("tencent no data for fund %s", originalSymbol)
+	}
+
+	// Format: v_jj001811="001811~中欧明睿新常态混合A~0.0000~0.0000~~4.4013~4.6523~0.6955~2026-07-03~"
+	parts := strings.SplitN(body, "=", 2)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("tencent unexpected response format")
+	}
+
+	data := strings.Trim(parts[1], "\"")
+	fields := strings.Split(data, "~")
+	if len(fields) < 9 {
+		return nil, fmt.Errorf("tencent fund response has too few fields for %s", originalSymbol)
+	}
+
+	name := fields[1]
+
+	// Unit NAV is at index 5
+	price, err := decimal.NewFromString(fields[5])
+	if err != nil || !price.IsPositive() {
+		return nil, fmt.Errorf("tencent invalid NAV for fund %s: %s", originalSymbol, fields[5])
+	}
+
+	slog.Info("tencent fund NAV fetched", "symbol", originalSymbol, "price", price)
+	return &marketsource.Quote{
+		Symbol:           originalSymbol,
+		Name:             name,
+		Price:            price,
+		OriginalPrice:    price,
+		Currency:         "CNY",
+		OriginalCurrency: "CNY",
 	}, nil
 }

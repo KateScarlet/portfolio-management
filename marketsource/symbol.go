@@ -195,6 +195,9 @@ func normalizeForTencent(symbol, market string) string {
 			code = "0" + code
 		}
 		return "hk" + code
+	case "FUND":
+		code := strings.TrimSuffix(symbol, ".CNOF")
+		return "jj" + code
 	default:
 		return symbol
 	}
