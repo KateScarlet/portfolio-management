@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from "react"
 import { Account, ASSET_DEFINITIONS, Holding, HoldingLot, MergedHolding, ColorScheme } from "../types"
+import AssetIcon from "./AssetIcon"
 import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
@@ -264,18 +265,7 @@ export default function HoldingsManager({
                       onClick={() => setExpandedId(isExpanded ? null : h.id)}
                     >
                       <td className="px-6 py-5 flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${h.assetId === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
-                          style={{ backgroundColor: def.color }}
-                        >
-                          {h.assetId === "stocks"
-                            ? "STK"
-                            : h.assetId === "bonds"
-                              ? "BND"
-                              : h.assetId === "commodities"
-                                ? "CMD"
-                                : "CSH"}
-                        </div>
+                        <AssetIcon assetId={h.assetId} />
                         <div>
                           <p className="text-sm font-medium">{def.name}</p>
                         </div>

@@ -8,6 +8,7 @@ import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
 import SellModal from "./SellModal"
 import ConfirmDialog from "./ConfirmDialog"
+import AssetIcon from "./AssetIcon"
 
 interface Props {
   selectedAccount: Account | null
@@ -115,12 +116,7 @@ export default function AccountView({
           onClick={() => setExpandedId(isExpanded ? null : h.id)}
         >
           <td className="px-6 py-5 flex items-center gap-3">
-            <div
-              className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold ${h.assetId === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
-              style={{ backgroundColor: def.color }}
-            >
-              {h.assetId === "stocks" ? "STK" : h.assetId === "bonds" ? "BND" : h.assetId === "commodities" ? "CMD" : "CSH"}
-            </div>
+            <AssetIcon assetId={h.assetId} />
             <div>
               <p className="text-sm font-medium">{def.name}</p>
             </div>

@@ -1,5 +1,6 @@
 import React from "react"
 import { AssetId, ASSET_DEFINITIONS, ColorScheme } from "../types"
+import AssetIcon from "./AssetIcon"
 import { formatCurrencyByCode, getProfitColor, toDecimal } from "../utils"
 
 interface RebalancePanelProps {
@@ -98,18 +99,7 @@ export default function RebalancePanel({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold ${item.id === "cash" ? "text-[#495057] border border-[#DEE2E6]" : "text-white"}`}
-                    style={{ backgroundColor: item.def.color }}
-                  >
-                    {item.id === "stocks"
-                      ? "STK"
-                      : item.id === "bonds"
-                        ? "BND"
-                        : item.id === "commodities"
-                          ? "CMD"
-                          : "CSH"}
-                  </div>
+                  <AssetIcon assetId={item.id} />
                   <div>
                     <p className="text-sm font-medium text-[#1A1A1A]">{item.def.name}</p>
                     <p className="text-[11px] text-[#ADB5BD] font-mono">

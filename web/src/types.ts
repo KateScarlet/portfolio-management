@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react"
+import { CandlestickChart, ScrollText, Banknote, Gem } from "lucide-react"
+
 export type AssetId = "stocks" | "bonds" | "cash" | "commodities"
 
 export interface AvailableFund {
@@ -84,6 +87,7 @@ export interface AssetInfo {
   description: string
   color: string
   targetPct: number
+  icon: LucideIcon
 }
 
 export interface HoldingLot {
@@ -192,6 +196,7 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     description: "提供高增长潜力（如VTI, SPY）",
     color: "#1A1A1A", // black
     targetPct: 25,
+    icon: CandlestickChart,
   },
   bonds: {
     id: "bonds",
@@ -199,6 +204,7 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     description: "提供通货紧缩保护（如TLT）",
     color: "#868E96", // gray
     targetPct: 25,
+    icon: ScrollText,
   },
   cash: {
     id: "cash",
@@ -206,6 +212,7 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     description: "提供流动性和衰退保护（如SHV, 货基）",
     color: "#E9ECEF", // silver/cash
     targetPct: 25,
+    icon: Banknote,
   },
   commodities: {
     id: "commodities",
@@ -213,6 +220,7 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     description: "提供通货膨胀保护（如黄金, 能源, 农产品等）",
     color: "#D4AF37",
     targetPct: 25,
+    icon: Gem,
   },
 }
 
