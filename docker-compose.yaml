@@ -7,8 +7,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - portfolio-management-config:/app/bin/config
-      - portfolio-management-data:/app/bin/data
+      - portfolio-management-config:/app/config
+      - portfolio-management-data:/app/data
     environment:
       - TZ=Asia/Shanghai
     restart: unless-stopped
