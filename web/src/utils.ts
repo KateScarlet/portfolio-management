@@ -21,13 +21,19 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   JPY: "¥",
 }
 
-function formatDecimal(value: string | number | undefined | null): string {
+function formatDecimal(value: string | number | undefined | null, decimals: number = 2): string {
   const d = toDecimal(value)
-  if (d.isNaN() || !d.isFinite()) return "0.00"
+  if (d.isNaN() || !d.isFinite()) return `0.${"0".repeat(decimals)}`
   const isNeg = d.isNeg()
-  const [intPart, decPart = "00"] = d.abs().toFixed(2).split(".")
+  const fixed = d.abs().toFixed(decimals)
+  const [intPart, decPart = "0".repeat(decimals)] = fixed.split(".")
   const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
   return `${isNeg ? "-" : ""}${formatted}.${decPart}`
+}
+
+export function formatPrice(value: string | number | undefined | null, currency: string): string {
+  const symbol = CURRENCY_SYMBOLS[currency] || currency
+  return `${symbol}${formatDecimal(value, 4)}`
 }
 
 export function formatCurrency(value: string | number | undefined | null): string {

@@ -9,7 +9,7 @@ import {
   Portfolio,
   ColorScheme,
 } from "../types"
-import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
+import { formatCurrencyByCode, formatPrice, formatPercent, getProfitColor, toDecimal } from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
@@ -179,13 +179,13 @@ export default function AccountView({
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
             {h.symbol ? (
               <div>
-                <p>{formatCurrencyByCode(h.price, h.currency || "CNY")}</p>
+                <p>{formatPrice(h.price, h.currency || "CNY")}</p>
                 <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
               </div>
             ) : toDecimal(h.shares).isPositive() ? (
               <div>
                 {toDecimal(h.costPrice).isPositive() && (
-                  <p>{formatCurrencyByCode(h.costPrice, h.currency || "CNY")}</p>
+                  <p>{formatPrice(h.costPrice, h.currency || "CNY")}</p>
                 )}
                 <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
               </div>
@@ -264,7 +264,7 @@ export default function AccountView({
                         <td className="py-1.5 text-right font-mono">{lot.shares}</td>
                         <td className="py-1.5 text-right font-mono">
                           {lot.costPrice
-                            ? formatCurrencyByCode(lot.costPrice, h.currency || "CNY")
+                            ? formatPrice(lot.costPrice, h.currency || "CNY")
                             : "-"}
                         </td>
                         <td className="py-1.5 text-right font-mono">

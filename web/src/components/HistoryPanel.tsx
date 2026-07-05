@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
-import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
+import { formatCurrencyByCode, formatPrice, formatPercent, getProfitColor, toDecimal } from "../utils"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {
@@ -147,7 +147,7 @@ export default function HistoryPanel({
                                       {toDecimal(h.shares).toFixed(2)}
                                     </td>
                                     <td className="py-1.5 text-right">
-                                      {formatCurrencyByCode(h.price, h.currency || "CNY")}
+                                      {formatPrice(h.price, h.currency || "CNY")}
                                     </td>
                                     <td className="py-1.5 text-right">
                                       {formatCurrencyByCode(h.value, h.currency || "CNY")}
