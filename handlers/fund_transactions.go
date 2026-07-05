@@ -18,6 +18,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var currencyConversionTolerance = decimal.RequireFromString("0.01")
+
 func CalcPrincipal(db *gorm.DB, portfolioID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	return calcPrincipalByQuery(db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
@@ -386,7 +388,7 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		expectedTo := body.FromAmount.Mul(body.ExchangeRate)
-		if expectedTo.Sub(body.ToAmount).Abs().GreaterThan(decimal.NewFromFloat(0.01)) {
+		if expectedTo.Sub(body.ToAmount).Abs().GreaterThan(currencyConversionTolerance) {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "汇率与金额不一致"})
 			return
 		}

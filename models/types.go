@@ -250,9 +250,6 @@ func (h *Holding) RecalcFromLots() {
 	if h.Symbol != "" {
 		h.Shares = totalBuyShares.Sub(totalSellShares)
 		h.Cost = totalBuyCost.Sub(totalSellCost)
-		if h.Shares.Abs().LessThan(decimal.NewFromFloat(1e-9)) {
-			h.Shares = decimal.Zero
-		}
 		if h.Shares.IsPositive() {
 			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {
@@ -263,9 +260,6 @@ func (h *Holding) RecalcFromLots() {
 		h.Shares = totalBuyShares.Sub(totalSellShares)
 		h.Value = totalBuyValue.Sub(totalSellValue)
 		h.Cost = totalBuyCost.Sub(totalSellCost)
-		if h.Shares.Abs().LessThan(decimal.NewFromFloat(1e-9)) {
-			h.Shares = decimal.Zero
-		}
 		if h.Shares.IsPositive() {
 			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {

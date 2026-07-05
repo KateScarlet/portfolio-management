@@ -6,7 +6,7 @@ import { toDecimal } from "./utils"
 export function usePortfolio(
   portfolioId: string | null,
   displayCurrency: string = "CNY",
-  exchangeRates: Record<string, number> = {}
+  exchangeRates: Record<string, string> = {}
 ) {
   const [holdings, setHoldings] = useState<MergedHolding[]>([])
   const [history, setHistory] = useState<PortfolioRecord[]>([])
@@ -42,7 +42,7 @@ export function usePortfolio(
 
   const assets: Record<AssetId, string> = { stocks: "0", bonds: "0", cash: "0", commodities: "0" }
   holdings.forEach((h) => {
-    const rate = h.currency === displayCurrency ? 1 : exchangeRates[h.currency]
+    const rate = h.currency === displayCurrency ? "1" : exchangeRates[h.currency]
     const convertedValue = rate ? toDecimal(h.value).times(rate) : toDecimal(h.value)
     assets[h.assetId] = toDecimal(assets[h.assetId]).plus(convertedValue).toString()
   })

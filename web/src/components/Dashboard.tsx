@@ -15,7 +15,7 @@ interface DashboardProps {
   totalFees: string
   colorScheme: ColorScheme
   availableFunds: AvailableFund[]
-  exchangeRates: Record<string, number>
+  exchangeRates: Record<string, string>
   portfolios: Portfolio[]
   currentPortfolioId: string
   onRefreshFunds: () => void

@@ -141,7 +141,7 @@ func TestHolding_RecalcFromLots_SymbolBased(t *testing.T) {
 	if !h.Cost.Equal(decimal.NewFromInt(1155)) {
 		t.Errorf("expected cost=1155, got %s", h.Cost)
 	}
-	if !h.CostPrice.Equal(decimal.NewFromFloat(96.25)) {
+	if !h.CostPrice.Equal(decimal.RequireFromString("96.25")) {
 		t.Errorf("expected costPrice=96.25, got %s", h.CostPrice)
 	}
 	if !h.Value.Equal(decimal.NewFromInt(1200)) {
@@ -149,6 +149,32 @@ func TestHolding_RecalcFromLots_SymbolBased(t *testing.T) {
 	}
 	if !h.TotalFees().Equal(decimal.NewFromInt(10)) {
 		t.Errorf("expected totalFees=10, got %s", h.TotalFees())
+	}
+}
+
+func TestHolding_RecalcFromLots_PreservesTinyNonZeroShares(t *testing.T) {
+	tinyShares := decimal.RequireFromString("0.0000000001")
+	h := &Holding{
+		Symbol: "BTC",
+		Price:  decimal.NewFromInt(100),
+		Lots: []HoldingLot{
+			{
+				Type:       "",
+				Shares:     tinyShares,
+				Cost:       decimal.RequireFromString("0.000001"),
+				ValueAdded: decimal.RequireFromString("0.00001"),
+				Fee:        decimal.Zero,
+			},
+		},
+	}
+
+	h.RecalcFromLots()
+
+	if !h.Shares.Equal(tinyShares) {
+		t.Fatalf("expected tiny shares to be preserved, got %s", h.Shares)
+	}
+	if h.Value.IsZero() {
+		t.Fatalf("expected tiny value to be preserved, got %s", h.Value)
 	}
 }
 

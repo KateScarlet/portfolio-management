@@ -25,6 +25,15 @@ const OPERATION_TITLES: Record<OperationType, string> = {
 
 const CURRENCIES = ["CNY", "USD", "HKD", "EUR", "GBP", "JPY"]
 
+function parseDecimalInput(value: string) {
+  try {
+    const parsed = toDecimal(value)
+    return parsed.isFinite() && !parsed.isNaN() ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export default function FundOperationDialog({
   type,
   portfolios,
@@ -57,10 +66,10 @@ export default function FundOperationDialog({
     try {
       const res = await api.fetchExchangeRate(`${currency}${toCurrency}`)
       if (res && res.rate) {
-        setExchangeRate(toDecimal(res.rate).toFixed(4))
-        const amt = parseFloat(amount)
-        if (!isNaN(amt) && amt > 0) {
-          setToAmount(toDecimal(amt).times(res.rate).toFixed(2))
+        setExchangeRate(res.rate)
+        const amt = parseDecimalInput(amount)
+        if (amt?.isPositive()) {
+          setToAmount(amt.times(res.rate).toString())
         }
       }
     } catch {
@@ -73,29 +82,29 @@ export default function FundOperationDialog({
   const handleAmountChange = (val: string) => {
     setAmount(val)
     if (type === "convert" && exchangeRate) {
-      const amt = parseFloat(val)
-      const rate = parseFloat(exchangeRate)
-      if (!isNaN(amt) && !isNaN(rate) && amt > 0 && rate > 0) {
-        setToAmount((amt * rate).toFixed(2))
+      const amt = parseDecimalInput(val)
+      const rate = parseDecimalInput(exchangeRate)
+      if (amt?.isPositive() && rate?.isPositive()) {
+        setToAmount(amt.times(rate).toString())
       }
     }
   }
 
   const handleRateChange = (val: string) => {
     setExchangeRate(val)
-    const amt = parseFloat(amount)
-    const rate = parseFloat(val)
-    if (!isNaN(amt) && !isNaN(rate) && amt > 0 && rate > 0) {
-      setToAmount((amt * rate).toFixed(2))
+    const amt = parseDecimalInput(amount)
+    const rate = parseDecimalInput(val)
+    if (amt?.isPositive() && rate?.isPositive()) {
+      setToAmount(amt.times(rate).toString())
     }
   }
 
   const handleToAmountChange = (val: string) => {
     setToAmount(val)
-    const amt = parseFloat(amount)
-    const toAmt = parseFloat(val)
-    if (!isNaN(amt) && !isNaN(toAmt) && amt > 0 && toAmt > 0) {
-      setExchangeRate((toAmt / amt).toFixed(4))
+    const amt = parseDecimalInput(amount)
+    const toAmt = parseDecimalInput(val)
+    if (amt?.isPositive() && toAmt?.isPositive()) {
+      setExchangeRate(toAmt.div(amt).toString())
     }
   }
 
@@ -104,15 +113,15 @@ export default function FundOperationDialog({
     setToCurrency(currency)
     setAmount(toAmount)
     setToAmount(amount)
-    const rate = parseFloat(exchangeRate)
-    if (!isNaN(rate) && rate > 0) {
-      setExchangeRate((1 / rate).toFixed(4))
+    const rate = parseDecimalInput(exchangeRate)
+    if (rate?.isPositive()) {
+      setExchangeRate(toDecimal(1).div(rate).toString())
     }
   }
 
   const handleSubmit = async () => {
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) {
+    const amt = parseDecimalInput(amount)
+    if (!amt?.isPositive()) {
       showToast("请输入有效金额", "error")
       return
     }
@@ -141,14 +150,14 @@ export default function FundOperationDialog({
           )
           break
         case "convert": {
-          const toAmt = parseFloat(toAmount)
-          const rate = parseFloat(exchangeRate)
-          if (isNaN(toAmt) || toAmt <= 0) {
+          const toAmt = parseDecimalInput(toAmount)
+          const rate = parseDecimalInput(exchangeRate)
+          if (!toAmt?.isPositive()) {
             showToast("请输入有效的目标金额", "error")
             setSubmitting(false)
             return
           }
-          if (isNaN(rate) || rate <= 0) {
+          if (!rate?.isPositive()) {
             showToast("请输入有效的汇率", "error")
             setSubmitting(false)
             return

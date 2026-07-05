@@ -13,6 +13,15 @@ interface SellModalProps {
   accounts?: Account[]
 }
 
+function parseDecimalInput(value: string) {
+  try {
+    const parsed = toDecimal(value)
+    return parsed.isFinite() && !parsed.isNaN() ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export default function SellModal({
   portfolioId,
   holding,
@@ -43,17 +52,17 @@ export default function SellModal({
     const dateMs = new Date(sellDate).getTime()
 
     if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
-      const sShares = parseFloat(sellShares)
-      const sPrice = parseFloat(sellPrice)
-      if (isNaN(sShares) || sShares <= 0) {
+      const sShares = parseDecimalInput(sellShares)
+      const sPrice = parseDecimalInput(sellPrice)
+      if (!sShares?.isPositive()) {
         showToast("请输入有效的卖出份额", "error")
         return
       }
-      if (toDecimal(sShares).greaterThan(holding.shares)) {
+      if (sShares.greaterThan(holding.shares)) {
         showToast(`卖出份额不能超过持有量 ${holding.shares}`, "error")
         return
       }
-      if (isNaN(sPrice) || sPrice < 0) {
+      if (!sPrice || sPrice.isNegative()) {
         showToast("请输入有效的卖出价格", "error")
         return
       }
@@ -80,12 +89,12 @@ export default function SellModal({
         showToast(e instanceof Error ? e.message : "卖出失败，请重试", "error")
       }
     } else {
-      const sValue = parseFloat(sellPrice)
-      if (isNaN(sValue) || sValue <= 0) {
+      const sValue = parseDecimalInput(sellPrice)
+      if (!sValue?.isPositive()) {
         showToast("请输入有效的卖出金额", "error")
         return
       }
-      if (toDecimal(sValue).greaterThan(holding.value)) {
+      if (sValue.greaterThan(holding.value)) {
         showToast(
           `卖出金额不能超过持有值 ${formatCurrencyByCode(holding.value, displayCurrency)}`,
           "error"

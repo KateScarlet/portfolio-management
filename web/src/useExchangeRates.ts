@@ -4,8 +4,8 @@ import * as api from "./api"
 import { useToast } from "./components/toast-context"
 
 export function useExchangeRates(availableFunds: AvailableFund[], displayCurrency: string = "CNY") {
-  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({
-    [displayCurrency]: 1,
+  const [exchangeRates, setExchangeRates] = useState<Record<string, string>>({
+    [displayCurrency]: "1",
   })
   const { showToast } = useToast()
   const prevDisplayCurrency = useRef(displayCurrency)
@@ -13,7 +13,7 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
   useEffect(() => {
     if (prevDisplayCurrency.current !== displayCurrency) {
       prevDisplayCurrency.current = displayCurrency
-      setExchangeRates({ [displayCurrency]: 1 })
+      setExchangeRates({ [displayCurrency]: "1" })
     }
 
     const currencies = availableFunds.map((f) => f.currency).filter((c) => c !== displayCurrency)
@@ -26,9 +26,9 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
       unique.map(async (cur) => {
         try {
           const res = await api.fetchExchangeRate(`${cur}${displayCurrency}`)
-          return { currency: cur, rate: Number(res.rate), ok: true }
+          return { currency: cur, rate: res.rate, ok: true }
         } catch {
-          return { currency: cur, rate: 0, ok: false }
+          return { currency: cur, rate: "0", ok: false }
         }
       })
     ).then((results) => {
@@ -39,7 +39,7 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
         showToast(`汇率获取失败: ${failed.map((r) => r.currency).join(", ")}`, "error")
       }
 
-      const rates: Record<string, number> = { [displayCurrency]: 1 }
+      const rates: Record<string, string> = { [displayCurrency]: "1" }
       results.forEach((r) => {
         if (r.ok) rates[r.currency] = r.rate
       })

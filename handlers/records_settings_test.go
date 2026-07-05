@@ -383,3 +383,50 @@ func TestTransferIn_MissingCurrency(t *testing.T) {
 		t.Errorf("expected 400 for missing currency, got %d", c.Response.StatusCode())
 	}
 }
+
+func TestConvertCurrency_AllowsTinyNonZeroRemainder(t *testing.T) {
+	db := setupRecordsTestDB(t)
+	fromAmount := decimal.RequireFromString("0.00000002")
+	toAmount := decimal.RequireFromString("0.00000014")
+	rate := decimal.RequireFromString("7")
+
+	if err := db.Create(&models.AvailableFund{
+		ID:          uuid.New().String(),
+		UserID:      testUserID,
+		PortfolioID: testPortfolioID,
+		Currency:    "USD",
+		Amount:      decimal.RequireFromString("0.00000003"),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("POST", "/api/funds/convert", map[string]any{
+		"fromCurrency": "USD",
+		"toCurrency":   "CNY",
+		"fromAmount":   fromAmount,
+		"toAmount":     toAmount,
+		"exchangeRate": rate,
+	})
+	ConvertCurrency(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+
+	var usd models.AvailableFund
+	if err := db.Where("portfolio_id = ? AND currency = ?", testPortfolioID, "USD").First(&usd).Error; err != nil {
+		t.Fatal(err)
+	}
+	expectedRemainder := decimal.RequireFromString("0.00000001")
+	if !usd.Amount.Equal(expectedRemainder) {
+		t.Fatalf("expected tiny USD remainder %s, got %s", expectedRemainder, usd.Amount)
+	}
+
+	var cny models.AvailableFund
+	if err := db.Where("portfolio_id = ? AND currency = ?", testPortfolioID, "CNY").First(&cny).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !cny.Amount.Equal(toAmount) {
+		t.Fatalf("expected CNY amount %s, got %s", toAmount, cny.Amount)
+	}
+}
