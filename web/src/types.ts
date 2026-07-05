@@ -101,7 +101,7 @@ export interface AssetInfo {
 export interface HoldingLot {
   id: string
   type?: string // 'sell' for sell records, empty/undefined for buy
-  date: number
+  date: string
   shares: string
   costPrice?: string
   cost?: string
@@ -123,7 +123,7 @@ export interface Holding {
   value: string // Current total value
   cost?: string // Total cost basis
   totalDividends?: string // 累计分红金额
-  date?: number // Original purchase date for the lot being added
+  date?: string // Original purchase date for the lot being added
   fee?: string // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
   accountId?: string // 所属账户ID

@@ -7,6 +7,7 @@ import (
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
@@ -359,7 +360,7 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	id := uuid.New().String()
 	lots := models.JSONColumn{
-		{ID: uuid.New().String(), Date: 1000, Cost: decimal.NewFromInt(5000), ValueAdded: decimal.NewFromInt(5000)},
+		{ID: uuid.New().String(), Date: time.UnixMilli(1000), Cost: decimal.NewFromInt(5000), ValueAdded: decimal.NewFromInt(5000)},
 	}
 	h := models.Holding{
 		ID:          id,
@@ -428,7 +429,7 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	newLots := []map[string]any{
-		{"id": uuid.New().String(), "date": 1000, "shares": 20, "costPrice": 50, "cost": 1000, "valueAdded": 2000},
+		{"id": uuid.New().String(), "date": "1970-01-01T00:00:01Z", "shares": 20, "costPrice": 50, "cost": 1000, "valueAdded": 2000},
 	}
 	body := map[string]any{"lots": newLots}
 

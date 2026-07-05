@@ -6,6 +6,7 @@ import (
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
@@ -48,7 +49,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		lots = models.JSONColumn{
 			{
 				ID:         uuid.New().String(),
-				Date:       1000000,
+				Date:       time.UnixMilli(1000000),
 				Shares:     dShares,
 				CostPrice:  dCost.Div(dShares),
 				Cost:       dCost,
@@ -60,7 +61,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		lots = models.JSONColumn{
 			{
 				ID:         uuid.New().String(),
-				Date:       1000000,
+				Date:       time.UnixMilli(1000000),
 				Shares:     decimal.Zero,
 				Cost:       dCost,
 				ValueAdded: dPrice,
@@ -252,7 +253,7 @@ func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, s
 	lots := models.JSONColumn{
 		{
 			ID:         uuid.New().String(),
-			Date:       1000000,
+			Date:       time.UnixMilli(1000000),
 			Shares:     dShares,
 			CostPrice:  dCost.Div(dShares),
 			Cost:       dCost,

@@ -74,7 +74,7 @@ export async function sellHolding(
   price: string,
   fee: string,
   value: string,
-  date?: number
+  date?: string
 ): Promise<{ soldHolding: Holding; availableFunds: string }> {
   return request<{ soldHolding: Holding; availableFunds: string }>(
     `/api/portfolios/${pid}/holdings/${id}/sell`,

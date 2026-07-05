@@ -37,7 +37,7 @@ export default function BuyModal({
 
   const handleConfirm = async () => {
     const feeNum = new Decimal(buyFee || "0")
-    const dateMs = new Date(buyDate).getTime()
+    const dateMs = new Date(buyDate).toISOString()
 
     if (isSymbolBased) {
       const sharesNum = new Decimal(buyShares)

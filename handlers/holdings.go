@@ -263,8 +263,8 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 				ValueAdded: input.Value,
 				Fee:        input.Fee,
 			}
-			if lot.Date == 0 {
-				lot.Date = time.Now().UnixMilli()
+			if lot.Date.IsZero() {
+				lot.Date = time.Now()
 			}
 			newLot = &lot
 		}

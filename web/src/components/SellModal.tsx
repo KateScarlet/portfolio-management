@@ -49,7 +49,7 @@ export default function SellModal({
 
   const confirmSell = async () => {
     const feeStr = sellFee || "0"
-    const dateMs = new Date(sellDate).getTime()
+    const dateMs = new Date(sellDate).toISOString()
 
     if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
       const sShares = parseDecimalInput(sellShares)

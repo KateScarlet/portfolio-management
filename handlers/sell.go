@@ -21,7 +21,7 @@ type SellRequest struct {
 	Price  decimal.Decimal `json:"price"`
 	Value  decimal.Decimal `json:"value"`
 	Fee    decimal.Decimal `json:"fee"`
-	Date   *int64          `json:"date,omitempty"`
+	Date   *time.Time      `json:"date,omitempty"`
 }
 
 func SellHolding(db *gorm.DB) app.HandlerFunc {
@@ -128,8 +128,8 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return &httpError{status: consts.StatusBadRequest, msg: "手续费不能超过卖出收入"}
 			}
 
-			sellDate := time.Now().UnixMilli()
-			if input.Date != nil && *input.Date > 0 {
+			sellDate := time.Now()
+			if input.Date != nil && !input.Date.IsZero() {
 				sellDate = *input.Date
 			}
 			sellLot := models.HoldingLot{

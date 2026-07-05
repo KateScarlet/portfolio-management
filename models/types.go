@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -11,12 +12,39 @@ import (
 type HoldingLot struct {
 	ID         string          `json:"id"`
 	Type       string          `gorm:"size:10;default:''" json:"type,omitempty"`
-	Date       int64           `json:"date"`
+	Date       time.Time       `json:"date"`
 	Shares     decimal.Decimal `json:"shares"`
 	CostPrice  decimal.Decimal `json:"costPrice"`
 	Cost       decimal.Decimal `json:"cost"`
 	ValueAdded decimal.Decimal `json:"valueAdded"`
 	Fee        decimal.Decimal `json:"fee"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling to handle both
+// legacy int64 (Unix milliseconds) and new ISO string date formats.
+func (h *HoldingLot) UnmarshalJSON(data []byte) error {
+	type Alias HoldingLot
+	aux := &struct {
+		Date json.RawMessage `json:"date"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.Date) > 0 && string(aux.Date) != "null" {
+		var t time.Time
+		if err := json.Unmarshal(aux.Date, &t); err != nil {
+			var ms int64
+			if err2 := json.Unmarshal(aux.Date, &ms); err2 == nil {
+				h.Date = time.UnixMilli(ms)
+			}
+		} else {
+			h.Date = t
+		}
+	}
+	return nil
 }
 
 type JSONColumn []HoldingLot
@@ -105,7 +133,7 @@ type Holding struct {
 	Value          decimal.Decimal `gorm:"default:0" json:"value"`
 	Cost           decimal.Decimal `gorm:"default:0" json:"cost"`
 	TotalDividends decimal.Decimal `gorm:"default:0" json:"totalDividends"`
-	Date           int64           `gorm:"default:0" json:"date,omitempty"`
+	Date           time.Time       `json:"date"`
 	Fee            decimal.Decimal `gorm:"-" json:"fee"`
 	Lots           JSONColumn      `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
 }

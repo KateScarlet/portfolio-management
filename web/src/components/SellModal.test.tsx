@@ -62,7 +62,7 @@ describe("SellModal", () => {
       "100000",
       "0",
       "0",
-      expect.any(Number)
+      expect.any(String)
     )
   })
 })

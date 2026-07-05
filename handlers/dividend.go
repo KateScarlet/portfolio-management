@@ -121,7 +121,7 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 				lot := models.HoldingLot{
 					ID:         uuid.New().String(),
 					Type:       "buy",
-					Date:       time.Now().UnixMilli(),
+					Date:       time.Now(),
 					Shares:     reinvestShares,
 					CostPrice:  req.ReinvestPrice,
 					Cost:       netAmount,
@@ -392,7 +392,7 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 				lot := models.HoldingLot{
 					ID:         uuid.New().String(),
 					Type:       "buy",
-					Date:       time.Now().UnixMilli(),
+					Date:       time.Now(),
 					Shares:     reinvestShares,
 					CostPrice:  req.ReinvestPrice,
 					Cost:       newNetAmount,

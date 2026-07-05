@@ -180,9 +180,9 @@ export default function HoldingsManager({
               <span className="text-[9px] text-[#ADB5BD] uppercase">日期</span>
               <input
                 type="date"
-                value={new Date(lot.date).toISOString().split("T")[0]}
+                value={lot.date ? lot.date.split("T")[0] : ""}
                 onChange={(e) => {
-                  saveEditLot(holdingId, h, lot.id, { date: new Date(e.target.value).getTime() || lot.date })
+                  saveEditLot(holdingId, h, lot.id, { date: e.target.value ? new Date(e.target.value).toISOString() : lot.date })
                 }}
                 className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
               />
