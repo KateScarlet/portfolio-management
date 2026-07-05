@@ -2,15 +2,12 @@ package tencent
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 
 	"portfolio-management/marketsource"
 )
@@ -57,7 +54,7 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 		return nil, fmt.Errorf("tencent returned status %d", resp.StatusCode())
 	}
 
-	body := gbkToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Body())
 	if market == "FUND" {
 		return parseFundQuote(body, symbol)
 	}
@@ -66,18 +63,6 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 
 func (c *Client) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	return decimal.Zero, marketsource.ErrNotSupported
-}
-
-func gbkToUTF8(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-	reader := transform.NewReader(strings.NewReader(string(data)), simplifiedchinese.GBK.NewDecoder())
-	decoded, err := io.ReadAll(reader)
-	if err != nil {
-		return string(data)
-	}
-	return string(decoded)
 }
 
 func parseQuote(body, originalSymbol string) (*marketsource.Quote, error) {

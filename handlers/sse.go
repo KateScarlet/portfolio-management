@@ -43,7 +43,7 @@ func (h *SSEHandler) Handle(ctx context.Context, c *app.RequestContext) {
 	h.connMu.Lock()
 	if h.userConns[user.UserID] >= maxConnsPerUser {
 		h.connMu.Unlock()
-		c.JSON(http.StatusTooManyRequests, map[string]string{"error": "too many connections"})
+		c.JSON(http.StatusTooManyRequests, map[string]string{"error": "连接数过多"})
 		return
 	}
 	h.userConns[user.UserID]++
@@ -63,7 +63,10 @@ func (h *SSEHandler) Handle(ctx context.Context, c *app.RequestContext) {
 	ch, unsub := h.eventBus.Subscribe(user.UserID)
 	defer unsub()
 
-	_ = w.WriteEvent("", "connected", []byte("{}"))
+	if err := w.WriteEvent("", "connected", []byte("{}")); err != nil {
+		slog.Debug("sse: client disconnected during initial write", "userID", user.UserID)
+		return
+	}
 
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
@@ -73,7 +76,10 @@ func (h *SSEHandler) Handle(ctx context.Context, c *app.RequestContext) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = w.WriteKeepAlive()
+			if err := w.WriteKeepAlive(); err != nil {
+				slog.Debug("sse: client disconnected during heartbeat", "userID", user.UserID)
+				return
+			}
 		case event, ok := <-ch:
 			if !ok {
 				return
@@ -83,7 +89,10 @@ func (h *SSEHandler) Handle(ctx context.Context, c *app.RequestContext) {
 				slog.Error("failed to marshal sse event", "error", err)
 				continue
 			}
-			_ = w.WriteEvent("", event.Type, data)
+			if err := w.WriteEvent("", event.Type, data); err != nil {
+				slog.Debug("sse: client disconnected during event write", "userID", user.UserID, "eventType", event.Type)
+				return
+			}
 		}
 	}
 }

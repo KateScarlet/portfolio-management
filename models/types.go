@@ -297,25 +297,25 @@ func (h *Holding) BuyFees() decimal.Decimal {
 }
 
 type Dividend struct {
-	ID              string          `gorm:"primaryKey" json:"id"`
-	UserID          string          `gorm:"index;not null" json:"userId"`
-	PortfolioID     string          `gorm:"index;not null" json:"portfolioId"`
-	HoldingID       string          `gorm:"index;not null" json:"holdingId"`
-	AssetId         string          `gorm:"size:20;not null" json:"assetId"`
-	Symbol          string          `gorm:"size:20;default:''" json:"symbol"`
-	Amount          decimal.Decimal `gorm:"not null" json:"amount"`
-	TaxWithheld     decimal.Decimal `gorm:"default:0" json:"taxWithheld"`
-	NetAmount       decimal.Decimal `gorm:"not null" json:"netAmount"`
-	Currency        string          `gorm:"size:10;not null" json:"currency"`
-	SharesHeld      decimal.Decimal `gorm:"default:0" json:"sharesHeld"`
+	ID               string          `gorm:"primaryKey" json:"id"`
+	UserID           string          `gorm:"index;not null" json:"userId"`
+	PortfolioID      string          `gorm:"index;not null" json:"portfolioId"`
+	HoldingID        string          `gorm:"index;not null" json:"holdingId"`
+	AssetId          string          `gorm:"size:20;not null" json:"assetId"`
+	Symbol           string          `gorm:"size:20;default:''" json:"symbol"`
+	Amount           decimal.Decimal `gorm:"not null" json:"amount"`
+	TaxWithheld      decimal.Decimal `gorm:"default:0" json:"taxWithheld"`
+	NetAmount        decimal.Decimal `gorm:"not null" json:"netAmount"`
+	Currency         string          `gorm:"size:10;not null" json:"currency"`
+	SharesHeld       decimal.Decimal `gorm:"default:0" json:"sharesHeld"`
 	DividendPerShare decimal.Decimal `gorm:"default:0" json:"dividendPerShare"`
-	ExDate          int64           `json:"exDate,omitempty"`
-	PayDate         int64           `json:"payDate,omitempty"`
-	Reinvest        bool            `gorm:"default:false" json:"reinvest"`
-	ReinvestPrice   decimal.Decimal `gorm:"default:0" json:"reinvestPrice"`
-	ReinvestShares  decimal.Decimal `gorm:"default:0" json:"reinvestShares"`
-	HoldingLotID    string          `gorm:"size:50;default:''" json:"holdingLotId,omitempty"`
-	FundTxID        string          `gorm:"size:50;default:''" json:"fundTxId,omitempty"`
-	Note            string          `gorm:"size:500;default:''" json:"note,omitempty"`
-	CreatedAt       int64           `json:"createdAt"`
+	ExDate           int64           `json:"exDate,omitempty"`
+	PayDate          int64           `json:"payDate,omitempty"`
+	Reinvest         bool            `gorm:"default:false" json:"reinvest"`
+	ReinvestPrice    decimal.Decimal `gorm:"default:0" json:"reinvestPrice"`
+	ReinvestShares   decimal.Decimal `gorm:"default:0" json:"reinvestShares"`
+	HoldingLotID     string          `gorm:"size:50;default:''" json:"holdingLotId,omitempty"`
+	FundTxID         string          `gorm:"size:50;default:''" json:"fundTxId,omitempty"`
+	Note             string          `gorm:"size:500;default:''" json:"note,omitempty"`
+	CreatedAt        int64           `json:"createdAt"`
 }

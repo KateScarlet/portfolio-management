@@ -23,8 +23,8 @@ export interface SyncFailedData {
 
 export interface HoldingUpdate {
   symbol: string
-  price: number
-  value: number
+  price: string
+  value: string
 }
 
 export interface PriceUpdatedData {

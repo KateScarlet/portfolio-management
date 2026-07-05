@@ -558,3 +558,24 @@ export async function deleteDividend(pid: string, id: string): Promise<void> {
     method: "DELETE",
   })
 }
+
+export async function updateDividend(
+  pid: string,
+  id: string,
+  data: {
+    amount: string
+    taxWithheld?: string
+    currency?: string
+    dividendPerShare?: string
+    exDate?: number
+    payDate?: number
+    reinvest: boolean
+    reinvestPrice?: string
+    note?: string
+  }
+): Promise<Dividend> {
+  return request<Dividend>(`/api/portfolios/${pid}/dividends/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}

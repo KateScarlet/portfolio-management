@@ -116,7 +116,7 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		if total.IsZero() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "No data to record"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有数据可记录"})
 			return
 		}
 
@@ -173,7 +173,7 @@ func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if rows == 0 {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Record not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "记录不存在"})
 			return
 		}
 		c.JSON(consts.StatusOK, map[string]bool{"success": true})

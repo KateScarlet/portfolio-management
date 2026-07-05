@@ -82,7 +82,7 @@ func UpdateAccount(db *gorm.DB) app.HandlerFunc {
 		id := c.Param("id")
 		account, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Account not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "账户不存在"})
 			return
 		}
 
@@ -108,7 +108,7 @@ func UpdateAccount(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if len(updates) == 0 {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no fields to update"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
 			return
 		}
 
@@ -138,7 +138,7 @@ func DeleteAccount(db *gorm.DB) app.HandlerFunc {
 
 		_, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Account not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "账户不存在"})
 			return
 		}
 
@@ -242,7 +242,7 @@ func ListAccountHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 		// Verify account ownership
 		_, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, accountID).First(ctx)
 		if err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Account not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "账户不存在"})
 			return
 		}
 

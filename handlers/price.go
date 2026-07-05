@@ -14,7 +14,7 @@ func GetPrice(router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		symbol := c.Param("symbol")
 		if symbol == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Symbol is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "股票代码不能为空"})
 			return
 		}
 

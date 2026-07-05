@@ -151,6 +151,7 @@ func main() {
 
 	pf.POST("/dividends", handlers.RecordDividend(database))
 	pf.GET("/dividends", handlers.ListDividends(database))
+	pf.PATCH("/dividends/:id", handlers.UpdateDividend(database))
 	pf.DELETE("/dividends/:id", handlers.DeleteDividend(database))
 
 	admin := api.Group("")

@@ -81,18 +81,18 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 		if body.Value == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "value is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "value 不能为空"})
 			return
 		}
 
 		if key == "syncInterval" {
 			mins, err := strconv.Atoi(body.Value)
 			if err != nil {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be a valid integer"})
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval 必须为有效整数"})
 				return
 			}
 			if mins < 0 || mins > 10080 {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be between 0 and 10080 minutes (7 days)"})
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval 必须在 0 到 10080 分钟之间（7天）"})
 				return
 			}
 		}
@@ -191,14 +191,14 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 			return
 		}
 		if len(body) == 0 {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no settings provided"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "未提供设置项"})
 			return
 		}
 
 		for key, value := range body {
 			if key == "syncInterval" || key == "driftThreshold" {
 				if value == "" {
-					c.JSON(consts.StatusBadRequest, map[string]string{"error": "value is required for key: " + key})
+					c.JSON(consts.StatusBadRequest, map[string]string{"error": key + " 的 value 不能为空"})
 					return
 				}
 			}
@@ -207,11 +207,11 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 		if syncVal, ok := body["syncInterval"]; ok {
 			mins, err := strconv.Atoi(syncVal)
 			if err != nil {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be a valid integer"})
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval 必须为有效整数"})
 				return
 			}
 			if mins < 0 || mins > 10080 {
-				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval must be between 0 and 10080 minutes (7 days)"})
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "syncInterval 必须在 0 到 10080 分钟之间（7天）"})
 				return
 			}
 		}
@@ -411,7 +411,7 @@ func testSingleSource(router *marketsource.Router, market, source string) map[st
 	if !ok {
 		return map[string]any{
 			"success": false,
-			"error":   "unsupported market: " + market,
+			"error":   "不支持的市场: " + market,
 			"latency": time.Since(start).Milliseconds(),
 		}
 	}

@@ -75,7 +75,7 @@ func UpdatePortfolio(db *gorm.DB) app.HandlerFunc {
 		id := c.Param("id")
 		portfolio, err := gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Portfolio not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "投资组合不存在"})
 			return
 		}
 
@@ -97,7 +97,7 @@ func UpdatePortfolio(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if len(updates) == 0 {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no fields to update"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
 			return
 		}
 
@@ -127,7 +127,7 @@ func DeletePortfolio(db *gorm.DB) app.HandlerFunc {
 
 		portfolio, err := gorm.G[models.Portfolio](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Portfolio not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "投资组合不存在"})
 			return
 		}
 

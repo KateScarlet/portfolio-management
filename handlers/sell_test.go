@@ -120,7 +120,7 @@ func TestSell_FeeExceedsProceeds_ShareBased(t *testing.T) {
 	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp["error"] != "Fee cannot exceed sell proceeds" {
+	if resp["error"] != "手续费不能超过卖出收入" {
 		t.Errorf("unexpected error: %q", resp["error"])
 	}
 }

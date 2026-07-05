@@ -341,8 +341,8 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 			if holdings[i].Symbol == symbol {
 				updates = append(updates, HoldingUpdate{
 					Symbol: symbol,
-					Price:  price.InexactFloat64(),
-					Value:  holdings[i].Shares.Mul(price).InexactFloat64(),
+					Price:  price.String(),
+					Value:  holdings[i].Shares.Mul(price).String(),
 				})
 				break
 			}

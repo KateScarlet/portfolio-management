@@ -218,28 +218,28 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if input.AssetId == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId 不能为空"})
 			return
 		}
 		validAssets := map[string]bool{"stocks": true, "bonds": true, "cash": true, "commodities": true}
 		if !validAssets[input.AssetId] {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid assetId"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的 assetId"})
 			return
 		}
 		if input.Shares.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "shares cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "股数不能为负数"})
 			return
 		}
 		if input.Cost.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "cost cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "成本不能为负数"})
 			return
 		}
 		if input.CostPrice.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "costPrice cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "成本价不能为负数"})
 			return
 		}
 		if input.Fee.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fee cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "手续费不能为负数"})
 			return
 		}
 
@@ -405,7 +405,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		id := c.Param("id")
 		var holding models.Holding
 		if err := db.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "Holding not found"})
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "持仓不存在"})
 			return
 		}
 
@@ -427,12 +427,12 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if _, ok := updates["assetId"]; ok {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "assetId cannot be changed"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能修改 assetId"})
 			return
 		}
 
 		if _, ok := safeUpdates["value"]; ok && holding.Symbol != "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "cannot directly update value for symbol-based holding"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能直接更新股票类持仓的价值"})
 			return
 		}
 
@@ -445,19 +445,19 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 							lots[i].ID = uuid.New().String()
 						}
 						if lots[i].Shares.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot shares cannot be negative"})
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录股数不能为负数"})
 							return
 						}
 						if lots[i].Cost.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot cost cannot be negative"})
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录成本不能为负数"})
 							return
 						}
 						if lots[i].Fee.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot fee cannot be negative"})
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录手续费不能为负数"})
 							return
 						}
 						if lots[i].Type != "" && lots[i].Type != "buy" && lots[i].Type != "sell" {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "lot type must be 'buy' or 'sell'"})
+							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录类型必须为 'buy' 或 'sell'"})
 							return
 						}
 					}
@@ -524,7 +524,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		if len(safeUpdates) == 0 {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "no valid fields to update"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
 			return
 		}
 

@@ -28,7 +28,7 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			return
 		}
 		if body.BotToken == "" || body.ChatID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "botToken and chatID are required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "botToken 和 chatID 不能为空"})
 			return
 		}
 
@@ -135,7 +135,7 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 
 		default:
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid test type: " + body.Type})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的测试类型: " + body.Type})
 			return
 		}
 

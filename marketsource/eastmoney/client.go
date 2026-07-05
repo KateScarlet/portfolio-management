@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -36,7 +37,7 @@ var (
 	}
 
 	// US stock secid cache: ticker -> secid (e.g., "AAPL" -> "105.AAPL")
-	usSecidCache = make(map[string]string)
+	usSecidCache sync.Map
 )
 
 type eastmoneyResponse struct {
@@ -93,8 +94,8 @@ func resolveUSSecid(ticker string) (string, error) {
 	}
 
 	// Check cache first
-	if secid, ok := usSecidCache[ticker]; ok {
-		return secid, nil
+	if secid, ok := usSecidCache.Load(ticker); ok {
+		return secid.(string), nil
 	}
 
 	var resp searchResponse
@@ -116,7 +117,7 @@ func resolveUSSecid(ticker string) (string, error) {
 	for _, item := range resp.QuotationCodeTable.Data {
 		if item.QuoteID != "" {
 			secid := item.QuoteID
-			usSecidCache[ticker] = secid
+			usSecidCache.Store(ticker, secid)
 			return secid, nil
 		}
 	}
@@ -429,16 +430,22 @@ func fetchFundName(queryCode string) string {
 		SetHeader("Accept", "*/*").
 		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", queryCode))
 	if err != nil {
-		return ""
+		slog.Debug("eastmoney: failed to fetch fund name", "code", queryCode, "error", err)
+		return queryCode
 	}
 	body := strings.TrimSpace(r.String())
 	m := jsonpRe.FindStringSubmatch(body)
 	if len(m) < 2 {
-		return ""
+		slog.Debug("eastmoney: fund name not found in response", "code", queryCode)
+		return queryCode
 	}
 	var resp fundGZResponse
 	if err := json.Unmarshal([]byte(m[1]), &resp); err != nil {
-		return ""
+		slog.Debug("eastmoney: failed to parse fund name response", "code", queryCode, "error", err)
+		return queryCode
+	}
+	if resp.Name == "" {
+		return queryCode
 	}
 	return resp.Name
 }

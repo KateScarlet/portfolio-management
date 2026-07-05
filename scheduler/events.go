@@ -29,9 +29,9 @@ type SyncFailedData struct {
 }
 
 type HoldingUpdate struct {
-	Symbol string  `json:"symbol"`
-	Price  float64 `json:"price"`
-	Value  float64 `json:"value"`
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
+	Value  string `json:"value"`
 }
 
 type PriceUpdatedData struct {

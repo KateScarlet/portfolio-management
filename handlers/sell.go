@@ -52,19 +52,19 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if input.Fee.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Fee cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "手续费不能为负数"})
 			return
 		}
 		if input.Shares.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "股数不能为负数"})
 			return
 		}
 		if input.Value.IsNegative() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Value cannot be negative"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "金额不能为负数"})
 			return
 		}
 		if input.Shares.IsZero() && input.Value.IsZero() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Shares or value required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "需要提供股数或金额"})
 			return
 		}
 
@@ -76,7 +76,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		err = db.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return &httpError{status: consts.StatusNotFound, msg: "Holding not found"}
+					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
 				}
 				return err
 			}
@@ -84,10 +84,10 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			switch {
 			case input.Shares.IsPositive():
 				if input.Shares.GreaterThan(holding.Shares) {
-					return &httpError{status: consts.StatusBadRequest, msg: "Shares exceed holding"}
+					return &httpError{status: consts.StatusBadRequest, msg: "卖出股数超过持仓"}
 				}
 				if !input.Price.IsPositive() {
-					return &httpError{status: consts.StatusBadRequest, msg: "Price must be greater than 0"}
+					return &httpError{status: consts.StatusBadRequest, msg: "价格必须大于0"}
 				}
 				realizedValue = input.Shares.Mul(input.Price).Sub(input.Fee)
 				if holding.Shares.IsPositive() {
@@ -102,7 +102,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					return &httpError{status: consts.StatusBadRequest, msg: "股票类持仓必须使用股数卖出，不能使用金额卖出"}
 				}
 				if input.Value.GreaterThan(holding.Value) {
-					return &httpError{status: consts.StatusBadRequest, msg: "Value exceed holding"}
+					return &httpError{status: consts.StatusBadRequest, msg: "卖出金额超过持仓"}
 				}
 				realizedValue = input.Value.Sub(input.Fee)
 				if holding.Value.IsPositive() {
@@ -115,7 +115,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					costReduction = holding.Cost
 				}
 			default:
-				return &httpError{status: consts.StatusBadRequest, msg: "Shares or value required"}
+				return &httpError{status: consts.StatusBadRequest, msg: "需要提供股数或金额"}
 			}
 
 			var grossProceeds decimal.Decimal
@@ -125,21 +125,21 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				grossProceeds = input.Value
 			}
 			if input.Fee.IsPositive() && !input.Fee.LessThan(grossProceeds) {
-				return &httpError{status: consts.StatusBadRequest, msg: "Fee cannot exceed sell proceeds"}
+				return &httpError{status: consts.StatusBadRequest, msg: "手续费不能超过卖出收入"}
 			}
 
-		sellDate := time.Now().UnixMilli()
-		if input.Date != nil && *input.Date > 0 {
-			sellDate = *input.Date
-		}
-		sellLot := models.HoldingLot{
-			ID:        uuid.New().String(),
-			Type:      "sell",
-			Date:      sellDate,
-			CostPrice: holding.CostPrice,
-			Cost:      costReduction,
-			Fee:       input.Fee,
-		}
+			sellDate := time.Now().UnixMilli()
+			if input.Date != nil && *input.Date > 0 {
+				sellDate = *input.Date
+			}
+			sellLot := models.HoldingLot{
+				ID:        uuid.New().String(),
+				Type:      "sell",
+				Date:      sellDate,
+				CostPrice: holding.CostPrice,
+				Cost:      costReduction,
+				Fee:       input.Fee,
+			}
 			if input.Shares.IsPositive() {
 				sellLot.Shares = input.Shares
 				sellLot.ValueAdded = input.Shares.Mul(input.Price)

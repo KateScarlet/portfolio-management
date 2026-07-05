@@ -14,7 +14,7 @@ func GetExchange(router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		pair := c.Param("pair")
 		if pair == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "Pair is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "货币对不能为空"})
 			return
 		}
 

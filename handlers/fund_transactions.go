@@ -123,11 +123,11 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if body.Currency == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency 不能为空"})
 			return
 		}
 		if !body.Amount.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "金额必须大于0"})
 			return
 		}
 
@@ -190,11 +190,11 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if body.Currency == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency 不能为空"})
 			return
 		}
 		if !body.Amount.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "金额必须大于0"})
 			return
 		}
 
@@ -259,15 +259,15 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if body.Currency == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "currency 不能为空"})
 			return
 		}
 		if !body.Amount.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "amount must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "金额必须大于0"})
 			return
 		}
 		if body.TargetPortfolioID == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "targetPortfolioId is required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "targetPortfolioId 不能为空"})
 			return
 		}
 		if body.TargetPortfolioID == portfolioID {
@@ -366,7 +366,7 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if body.FromCurrency == "" || body.ToCurrency == "" {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fromCurrency and toCurrency are required"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fromCurrency 和 toCurrency 不能为空"})
 			return
 		}
 		if body.FromCurrency == body.ToCurrency {
@@ -374,15 +374,15 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if !body.FromAmount.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fromAmount must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "fromAmount 必须大于0"})
 			return
 		}
 		if !body.ToAmount.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "toAmount must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "toAmount 必须大于0"})
 			return
 		}
 		if !body.ExchangeRate.IsPositive() {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "exchangeRate must be positive"})
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "exchangeRate 必须大于0"})
 			return
 		}
 		expectedTo := body.FromAmount.Mul(body.ExchangeRate)

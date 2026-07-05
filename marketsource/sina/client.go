@@ -1,17 +1,13 @@
 package sina
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 
 	"portfolio-management/marketsource"
 )
@@ -60,7 +56,7 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	}
 
 	// Sina returns GBK-encoded data, convert to UTF-8
-	body := gbkToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Body())
 	return parseQuote(body, symbol, market)
 }
 
@@ -85,7 +81,7 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("sina forex returned status %d", resp.StatusCode())
 	}
 
-	body := gbkToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Body())
 	body = strings.TrimSpace(body)
 	if body == "" || body == "var hq_str_=\"\"" {
 		return decimal.Zero, fmt.Errorf("sina no data for forex pair %s", pair)
@@ -115,18 +111,6 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 
 	slog.Info("sina forex rate fetched", "pair", pair, "rate", rate)
 	return rate, nil
-}
-
-func gbkToUTF8(data []byte) string {
-	if len(data) == 0 {
-		return ""
-	}
-	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
-	decoded, err := io.ReadAll(reader)
-	if err != nil {
-		return string(data)
-	}
-	return string(decoded)
 }
 
 func parseQuote(body, originalSymbol, market string) (*marketsource.Quote, error) {

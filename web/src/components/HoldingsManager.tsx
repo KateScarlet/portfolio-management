@@ -64,6 +64,8 @@ export default function HoldingsManager({
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
   const [dividendHolding, setDividendHolding] = useState<Holding | null>(null)
   const [expandedDividends, setExpandedDividends] = useState<Dividend[]>([])
+  const [editingDividend, setEditingDividend] = useState<Dividend | null>(null)
+  const [deletingDividend, setDeletingDividend] = useState<Dividend | null>(null)
 
   useEffect(() => {
     if (!expandedId) return
@@ -641,7 +643,7 @@ export default function HoldingsManager({
                                           </span>
                                           {new Date(div.createdAt).toLocaleDateString()}
                                         </span>
-                                        <div className="flex items-center gap-4 text-right">
+                                        <div className="flex items-center gap-2 text-right">
                                           <span className="w-24 text-right text-yellow-600">
                                             +
                                             {formatCurrencyByCode(
@@ -654,6 +656,18 @@ export default function HoldingsManager({
                                               ×{div.reinvestShares}
                                             </span>
                                           )}
+                                          <button
+                                            onClick={() => setEditingDividend(div)}
+                                            className="text-[10px] text-[#ADB5BD] hover:text-[#495057] transition-colors"
+                                          >
+                                            编辑
+                                          </button>
+                                          <button
+                                            onClick={() => setDeletingDividend(div)}
+                                            className="text-[10px] text-[#ADB5BD] hover:text-red-500 transition-colors"
+                                          >
+                                            删除
+                                          </button>
                                         </div>
                                       </div>
                                     ))}
@@ -713,6 +727,51 @@ export default function HoldingsManager({
           onCancel={() => setDeletingHolding(null)}
         />
       )}
+
+      {deletingDividend && (
+        <ConfirmDialog
+          title="删除分红记录"
+          message={`确定删除此分红记录？${deletingDividend.reinvest ? "再投资份额将被撤销。" : "可用资金将被扣除。"}此操作不可撤销。`}
+          onConfirm={async () => {
+            try {
+              await api.deleteDividend(portfolioId, deletingDividend.id)
+              setExpandedDividends((prev) => prev.filter((d) => d.id !== deletingDividend.id))
+              const freshHoldings = await api.fetchHoldings(portfolioId)
+              setHoldings(freshHoldings)
+              onRefreshAvailableFunds()
+            } catch (e) {
+              // error handled by api layer
+            }
+            setDeletingDividend(null)
+          }}
+          onCancel={() => setDeletingDividend(null)}
+        />
+      )}
+
+      {editingDividend &&
+        (() => {
+          const h = holdings.find((h) => h.id === editingDividend.holdingId)
+          if (!h) return null
+          return (
+            <DividendModal
+              portfolioId={portfolioId}
+              holding={h}
+              dividend={editingDividend}
+              onConfirm={async () => {
+                setEditingDividend(null)
+                const freshDividends = await api.fetchDividends(
+                  portfolioId,
+                  editingDividend.holdingId
+                )
+                setExpandedDividends(freshDividends)
+                const freshHoldings = await api.fetchHoldings(portfolioId)
+                setHoldings(freshHoldings)
+                onRefreshAvailableFunds()
+              }}
+              onClose={() => setEditingDividend(null)}
+            />
+          )
+        })()}
     </div>
   )
 }

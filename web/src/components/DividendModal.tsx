@@ -1,12 +1,13 @@
 import { useState } from "react"
 import Decimal from "decimal.js"
-import { Holding } from "../types"
+import { Dividend, Holding } from "../types"
 import * as api from "../api"
 import { useToast } from "./toast-context"
 
 interface DividendModalProps {
   portfolioId: string
   holding: Holding
+  dividend?: Dividend
   onConfirm: (updatedHolding: Holding) => void
   onClose: () => void
 }
@@ -14,17 +15,24 @@ interface DividendModalProps {
 export default function DividendModal({
   portfolioId,
   holding,
+  dividend,
   onConfirm,
   onClose,
 }: DividendModalProps) {
-  const [amount, setAmount] = useState("")
-  const [taxWithheld, setTaxWithheld] = useState("")
-  const [currency, setCurrency] = useState(holding.currency || "CNY")
-  const [dividendPerShare, setDividendPerShare] = useState("")
-  const [payDate, setPayDate] = useState(new Date().toISOString().split("T")[0])
-  const [reinvest, setReinvest] = useState(false)
-  const [reinvestPrice, setReinvestPrice] = useState(holding.price ? holding.price.toString() : "")
-  const [note, setNote] = useState("")
+  const [amount, setAmount] = useState(dividend?.amount || "")
+  const [taxWithheld, setTaxWithheld] = useState(dividend?.taxWithheld || "")
+  const [currency, setCurrency] = useState(dividend?.currency || holding.currency || "CNY")
+  const [dividendPerShare, setDividendPerShare] = useState(dividend?.dividendPerShare || "")
+  const [payDate, setPayDate] = useState(
+    dividend?.payDate
+      ? new Date(dividend.payDate).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0]
+  )
+  const [reinvest, setReinvest] = useState(dividend?.reinvest || false)
+  const [reinvestPrice, setReinvestPrice] = useState(
+    dividend?.reinvestPrice || (holding.price ? holding.price.toString() : "")
+  )
+  const [note, setNote] = useState(dividend?.note || "")
 
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToast()
@@ -54,39 +62,58 @@ export default function DividendModal({
 
     setSubmitting(true)
     try {
-      const result = await api.recordDividend(portfolioId, {
-        holdingId: holding.id,
-        amount: amountNum.toString(),
-        taxWithheld: taxNum.isZero() ? undefined : taxNum.toString(),
-        currency,
-        dividendPerShare: dividendPerShare || undefined,
-        payDate: new Date(payDate).getTime() || undefined,
-        reinvest,
-        reinvestPrice: reinvest ? reinvestPrice : undefined,
-        note: note || undefined,
-      })
+      if (dividend) {
+        await api.updateDividend(portfolioId, dividend.id, {
+          amount: amountNum.toString(),
+          taxWithheld: taxNum.isZero() ? undefined : taxNum.toString(),
+          currency,
+          dividendPerShare: dividendPerShare || undefined,
+          payDate: new Date(payDate).getTime() || undefined,
+          reinvest,
+          reinvestPrice: reinvest ? reinvestPrice : undefined,
+          note: note || undefined,
+        })
+        onConfirm(holding)
+        onClose()
+        showToast("分红记录已更新", "success")
+      } else {
+        const result = await api.recordDividend(portfolioId, {
+          holdingId: holding.id,
+          amount: amountNum.toString(),
+          taxWithheld: taxNum.isZero() ? undefined : taxNum.toString(),
+          currency,
+          dividendPerShare: dividendPerShare || undefined,
+          payDate: new Date(payDate).getTime() || undefined,
+          reinvest,
+          reinvestPrice: reinvest ? reinvestPrice : undefined,
+          note: note || undefined,
+        })
 
-      const updatedHolding: Holding = {
-        ...holding,
-        totalDividends: new Decimal(holding.totalDividends || "0")
-          .plus(new Decimal(result.netAmount))
-          .toString(),
+        const updatedHolding: Holding = {
+          ...holding,
+          totalDividends: new Decimal(holding.totalDividends || "0")
+            .plus(new Decimal(result.netAmount))
+            .toString(),
+        }
+
+        if (result.reinvest && result.reinvestShares) {
+          updatedHolding.shares = new Decimal(holding.shares || "0")
+            .plus(new Decimal(result.reinvestShares))
+            .toString()
+          updatedHolding.cost = new Decimal(holding.cost || "0")
+            .plus(new Decimal(result.netAmount))
+            .toString()
+        }
+
+        onConfirm(updatedHolding)
+        onClose()
+        showToast("分红记录成功", "success")
       }
-
-      if (result.reinvest && result.reinvestShares) {
-        updatedHolding.shares = new Decimal(holding.shares || "0")
-          .plus(new Decimal(result.reinvestShares))
-          .toString()
-        updatedHolding.cost = new Decimal(holding.cost || "0")
-          .plus(new Decimal(result.netAmount))
-          .toString()
-      }
-
-      onConfirm(updatedHolding)
-      onClose()
-      showToast("分红记录成功", "success")
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "记录分红失败", "error")
+      showToast(
+        e instanceof Error ? e.message : dividend ? "更新分红失败" : "记录分红失败",
+        "error"
+      )
     } finally {
       setSubmitting(false)
     }
@@ -96,7 +123,7 @@ export default function DividendModal({
     <div className="fixed inset-0 bg-[#1A1A1A]/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl flex flex-col gap-6">
         <div>
-          <h3 className="text-lg font-bold text-[#1A1A1A]">记录分红</h3>
+          <h3 className="text-lg font-bold text-[#1A1A1A]">{dividend ? "编辑分红" : "记录分红"}</h3>
           <p className="text-sm text-[#6C757D] mt-1">{holding.name || holding.symbol}</p>
         </div>
 
@@ -226,7 +253,7 @@ export default function DividendModal({
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-[#1A1A1A] hover:opacity-90 rounded-xl transition-opacity shadow-sm disabled:opacity-50"
           >
-            {submitting ? "提交中..." : "确认记录"}
+            {submitting ? "提交中..." : dividend ? "确认修改" : "确认记录"}
           </button>
         </div>
       </div>
