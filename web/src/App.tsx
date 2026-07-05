@@ -475,9 +475,7 @@ export default function App() {
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans flex flex-col overflow-x-hidden">
       <header className="h-20 bg-white border-b border-[#E9ECEF] flex items-center justify-between px-6 sm:px-10 shrink-0 lg:sticky lg:top-0 lg:z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
-            <div className="w-4 h-4 border-2 border-white rounded-full"></div>
-          </div>
+          <img src="/logo.svg" alt="投资组合管理" className="w-8 h-8 shrink-0" />
           <h1 className="text-xl font-semibold tracking-tight">投资组合管理</h1>
           <div className="flex items-center bg-[#F8F9FA] rounded-md p-0.5 ml-2">
             <button

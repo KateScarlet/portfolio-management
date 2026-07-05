@@ -66,9 +66,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-[#1A1A1A] rounded-md flex items-center justify-center">
-              <div className="w-4 h-4 border-2 border-white rounded-full"></div>
-            </div>
+            <img src="/logo.svg" alt="投资组合管理" className="w-8 h-8 shrink-0" />
             <h1 className="text-lg font-semibold text-[#1A1A1A]">投资组合管理</h1>
           </div>
           <p className="text-sm text-[#6C757D]">请登录以继续</p>
