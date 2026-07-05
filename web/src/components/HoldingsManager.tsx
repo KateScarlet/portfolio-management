@@ -739,7 +739,7 @@ export default function HoldingsManager({
               const freshHoldings = await api.fetchHoldings(portfolioId)
               setHoldings(freshHoldings)
               onRefreshAvailableFunds()
-            } catch (e) {
+            } catch {
               // error handled by api layer
             }
             setDeletingDividend(null)

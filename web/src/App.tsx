@@ -195,18 +195,22 @@ export default function App() {
     }
   }, [setCurrentPortfolio])
 
+  const applyAccounts = useCallback((list: Account[]) => {
+    setAccounts(list)
+    setCurrentAccount((prev) => {
+      if (!prev) return null
+      return list.find((a) => a.id === prev.id) || null
+    })
+  }, [])
+
   const loadAccounts = useCallback(async () => {
     try {
       const list = await api.fetchAccounts()
-      setAccounts(list)
-      setCurrentAccount((prev) => {
-        if (!prev) return null
-        return list.find((a) => a.id === prev.id) || null
-      })
+      applyAccounts(list)
     } catch (e) {
       console.error("Failed to load accounts", e)
     }
-  }, [])
+  }, [applyAccounts])
 
   useEffect(() => {
     if (!user) return
@@ -245,8 +249,20 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return
-    loadAccounts()
-  }, [user, loadAccounts])
+    let cancelled = false
+    const fetchAccounts = async () => {
+      try {
+        const list = await api.fetchAccounts()
+        if (!cancelled) applyAccounts(list)
+      } catch (e) {
+        console.error("Failed to load accounts", e)
+      }
+    }
+    fetchAccounts()
+    return () => {
+      cancelled = true
+    }
+  }, [user, applyAccounts])
 
   useEffect(() => {
     if (!currentPortfolio) return
