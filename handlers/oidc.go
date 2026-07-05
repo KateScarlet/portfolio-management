@@ -142,7 +142,7 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			user = models.User{
-				ID:          uuid.New().String(),
+				ID:          uuid.New(),
 				Username:    username,
 				Password:    "",
 				Role:        "user",

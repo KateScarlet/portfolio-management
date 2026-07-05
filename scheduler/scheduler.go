@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -40,8 +41,8 @@ type syncState struct {
 	mu              sync.Mutex
 }
 
-func syncKey(userID, portfolioID string) string {
-	return userID + ":" + portfolioID
+func syncKey(userID, portfolioID uuid.UUID) string {
+	return userID.String() + ":" + portfolioID.String()
 }
 
 func New(db *gorm.DB, router *marketsource.Router) *PriceScheduler {
@@ -100,7 +101,7 @@ func (s *PriceScheduler) loadAndScheduleAll() {
 	}
 }
 
-func (s *PriceScheduler) schedulePortfolio(userID, portfolioID string) {
+func (s *PriceScheduler) schedulePortfolio(userID, portfolioID uuid.UUID) {
 	var setting models.Setting
 	if err := s.db.Where("`key` = ? AND portfolio_id = ?", "syncInterval", portfolioID).First(&setting).Error; err != nil {
 		return
@@ -152,10 +153,10 @@ func (s *PriceScheduler) schedulePortfolio(userID, portfolioID string) {
 	})
 	state.mu.Unlock()
 
-	slog.Info("scheduled portfolio sync", "userId", userID, "portfolioId", portfolioID, "delay", delay)
+	slog.Info("scheduled portfolio sync", "userId", userID.String(), "portfolioId", portfolioID.String(), "delay", delay)
 }
 
-func (s *PriceScheduler) stopSchedule(userID, portfolioID string) {
+func (s *PriceScheduler) stopSchedule(userID, portfolioID uuid.UUID) {
 	key := syncKey(userID, portfolioID)
 	s.mu.Lock()
 	state, exists := s.states[key]
@@ -171,11 +172,11 @@ func (s *PriceScheduler) stopSchedule(userID, portfolioID string) {
 	s.mu.Unlock()
 
 	if exists {
-		slog.Info("stopped portfolio sync", "userId", userID, "portfolioId", portfolioID)
+		slog.Info("stopped portfolio sync", "userId", userID.String(), "portfolioId", portfolioID.String())
 	}
 }
 
-func (s *PriceScheduler) syncAndReschedule(userID, portfolioID string, state *syncState, version uint64) {
+func (s *PriceScheduler) syncAndReschedule(userID, portfolioID uuid.UUID, state *syncState, version uint64) {
 	s.mu.RLock()
 	stopped := s.stopped
 	s.mu.RUnlock()
@@ -215,7 +216,7 @@ const (
 	fetchRateLimit     = 50 * time.Millisecond
 )
 
-func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncState) {
+func (s *PriceScheduler) syncPortfolio(userID, portfolioID uuid.UUID, state *syncState) {
 	state.mu.Lock()
 	if state.syncing {
 		state.mu.Unlock()
@@ -232,20 +233,20 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 		state.mu.Unlock()
 	}()
 
-	slog.Info("starting price sync", "userId", userID, "portfolioId", portfolioID)
+	slog.Info("starting price sync", "userId", userID.String(), "portfolioId", portfolioID.String())
 
 	var holdings []models.Holding
 	if err := s.db.Where("portfolio_id = ? AND symbol != ''", portfolioID).Find(&holdings).Error; err != nil {
 		state.mu.Lock()
 		state.lastSyncErr = err.Error()
 		state.mu.Unlock()
-		slog.Error("failed to query holdings", "userId", userID, "portfolioId", portfolioID, "error", err)
+		slog.Error("failed to query holdings", "userId", userID.String(), "portfolioId", portfolioID.String(), "error", err)
 		s.publishEvent(userID, portfolioID, EventSyncFailed, SyncFailedData{Error: err.Error()})
 		return
 	}
 
 	if len(holdings) == 0 {
-		slog.Info("no holdings with symbols to sync", "userId", userID, "portfolioId", portfolioID)
+		slog.Info("no holdings with symbols to sync", "userId", userID.String(), "portfolioId", portfolioID.String())
 		state.mu.Lock()
 		state.lastSyncAt = time.Now()
 		state.lastSyncErr = ""
@@ -292,7 +293,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 
 	for r := range results {
 		if r.err != nil {
-			slog.Error("failed to fetch price", "userId", userID, "portfolioId", portfolioID, "name", r.holding.Name, "symbol", r.holding.Symbol, "error", r.err)
+			slog.Error("failed to fetch price", "userId", userID.String(), "portfolioId", portfolioID.String(), "name", r.holding.Name, "symbol", r.holding.Symbol, "error", r.err)
 			failed++
 			continue
 		}
@@ -302,14 +303,14 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 			"value": r.holding.Shares.Mul(r.result.Price),
 		}
 		if err := s.db.Model(&models.Holding{}).Where("id = ? AND portfolio_id = ?", r.holding.ID, portfolioID).Updates(updates).Error; err != nil {
-			slog.Error("failed to update holding", "userId", userID, "portfolioId", portfolioID, "id", r.holding.ID, "error", err)
+			slog.Error("failed to update holding", "userId", userID.String(), "portfolioId", portfolioID.String(), "id", r.holding.ID, "error", err)
 			failed++
 			continue
 		}
 
 		synced++
 		syncedPrices[r.holding.Symbol] = r.result.Price
-		slog.Info("synced holding", "userId", userID, "portfolioId", portfolioID, "name", r.holding.Name, "symbol", r.holding.Symbol, "price", r.result.Price)
+		slog.Info("synced holding", "userId", userID.String(), "portfolioId", portfolioID.String(), "name", r.holding.Name, "symbol", r.holding.Symbol, "price", r.result.Price)
 	}
 
 	state.mu.Lock()
@@ -323,7 +324,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 	lastSyncErr := state.lastSyncErr
 	state.mu.Unlock()
 
-	slog.Info("sync completed", "userId", userID, "portfolioId", portfolioID, "synced", synced, "failed", failed)
+	slog.Info("sync completed", "userId", userID.String(), "portfolioId", portfolioID.String(), "synced", synced, "failed", failed)
 
 	if lastSyncErr != "" {
 		s.publishEvent(userID, portfolioID, EventSyncFailed, SyncFailedData{Error: lastSyncErr})
@@ -357,7 +358,7 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID string, state *syncSt
 	}
 }
 
-func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) bool {
+func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID uuid.UUID) bool {
 	key := syncKey(userID, portfolioID)
 	s.mu.Lock()
 	state, exists := s.states[key]
@@ -372,7 +373,7 @@ func (s *PriceScheduler) TriggerSyncForPortfolio(userID, portfolioID string) boo
 	return true
 }
 
-func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string) (SyncStatus, bool) {
+func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID uuid.UUID) (SyncStatus, bool) {
 	key := syncKey(userID, portfolioID)
 	s.mu.Lock()
 	state, exists := s.states[key]
@@ -395,7 +396,7 @@ func (s *PriceScheduler) TriggerSyncForPortfolioSync(userID, portfolioID string)
 }
 
 // UpdateSchedule reschedules sync for a portfolio (called when settings change)
-func (s *PriceScheduler) UpdateSchedule(userID, portfolioID string) {
+func (s *PriceScheduler) UpdateSchedule(userID, portfolioID uuid.UUID) {
 	s.schedulePortfolio(userID, portfolioID)
 }
 
@@ -407,13 +408,13 @@ func (s *PriceScheduler) SetEventBus(eb *EventBus) {
 	s.eventBus = eb
 }
 
-func (s *PriceScheduler) publishEvent(userID, portfolioID, eventType string, data any) {
+func (s *PriceScheduler) publishEvent(userID, portfolioID uuid.UUID, eventType string, data any) {
 	if s.eventBus == nil {
 		return
 	}
 	s.eventBus.Publish(userID, Event{
 		Type:        eventType,
-		PortfolioID: portfolioID,
+		PortfolioID: portfolioID.String(),
 		Data:        data,
 		Timestamp:   time.Now(),
 	})

@@ -13,11 +13,6 @@ tmp/
 # Go coverage
 *.out
 
-# SQLite database files
-*.db
-*.db-shm
-*.db-wal
-
 # Config directory (may contain credentials)
 config/
 

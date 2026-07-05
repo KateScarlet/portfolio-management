@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"slices"
 	"testing"
 
 	"portfolio-management/marketsource"
@@ -104,13 +105,7 @@ func TestSupportedMarkets_IncludesExchange(t *testing.T) {
 	c := &Client{}
 	markets := c.SupportedMarkets()
 
-	found := false
-	for _, m := range markets {
-		if m == "EXCHANGE" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(markets, "EXCHANGE")
 	if !found {
 		t.Error("expected EXCHANGE in supported markets")
 	}

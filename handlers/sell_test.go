@@ -17,8 +17,8 @@ import (
 	"gorm.io/gorm"
 )
 
-const testUserID = "test-user-id"
-const testPortfolioID = "test-portfolio-id"
+var testUserID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+var testPortfolioID = uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -30,7 +30,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}, &models.FundTransaction{}); err != nil {
+	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}, &models.FundTransaction{}); err != nil {
 		t.Fatal(err)
 	}
 	db.Create(&models.Portfolio{
@@ -48,32 +48,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 	dShares := decimal.NewFromFloat(shares)
 	dPrice := decimal.NewFromFloat(price)
 	dCost := decimal.NewFromFloat(cost)
-	id := uuid.New().String()
-	var lots models.JSONColumn
-	if shares > 0 {
-		lots = models.JSONColumn{
-			{
-				ID:         uuid.New().String(),
-				Date:       time.UnixMilli(1000000),
-				Shares:     dShares,
-				CostPrice:  dCost.Div(dShares),
-				Cost:       dCost,
-				ValueAdded: dShares.Mul(dPrice),
-				Fee:        decimal.Zero,
-			},
-		}
-	} else {
-		lots = models.JSONColumn{
-			{
-				ID:         uuid.New().String(),
-				Date:       time.UnixMilli(1000000),
-				Shares:     decimal.Zero,
-				Cost:       dCost,
-				ValueAdded: dPrice,
-				Fee:        decimal.Zero,
-			},
-		}
-	}
+	id := uuid.New()
 	h := models.Holding{
 		ID:          id,
 		UserID:      testUserID,
@@ -85,7 +60,6 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		Price:       dPrice,
 		Value:       dShares.Mul(dPrice),
 		Cost:        dCost,
-		Lots:        lots,
 	}
 	if shares > 0 {
 		h.CostPrice = dCost.Div(dShares)
@@ -93,13 +67,31 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 	if err := db.Create(&h).Error; err != nil {
 		t.Fatal(err)
 	}
-	return id
+
+	lot := models.HoldingLot{
+		ID:        uuid.New(),
+		HoldingID: id,
+		Date:      time.UnixMilli(1000000),
+		Shares:    dShares,
+		CostPrice: dCost.Div(dShares),
+		Cost:      dCost,
+		Fee:       decimal.Zero,
+	}
+	if shares > 0 {
+		lot.ValueAdded = dShares.Mul(dPrice)
+	} else {
+		lot.ValueAdded = dPrice
+	}
+	if err := db.Create(&lot).Error; err != nil {
+		t.Fatal(err)
+	}
+	return id.String()
 }
 
 func newCtx(id string, body any) *app.RequestContext {
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id + "/sell")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id + "/sell")
 	c.Request.Header.SetMethod("POST")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)
@@ -187,7 +179,7 @@ func TestSell_ProceedsGoToCorrectCurrencyFund(t *testing.T) {
 	id := createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
 
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "USD", Amount: decimal.NewFromInt(1000),
 	})
 
@@ -254,18 +246,7 @@ func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, s
 	dShares := decimal.NewFromFloat(shares)
 	dPrice := decimal.NewFromFloat(price)
 	dCost := decimal.NewFromFloat(cost)
-	id := uuid.New().String()
-	lots := models.JSONColumn{
-		{
-			ID:         uuid.New().String(),
-			Date:       time.UnixMilli(1000000),
-			Shares:     dShares,
-			CostPrice:  dCost.Div(dShares),
-			Cost:       dCost,
-			ValueAdded: dShares.Mul(dPrice),
-			Fee:        decimal.Zero,
-		},
-	}
+	id := uuid.New()
 	h := models.Holding{
 		ID:          id,
 		UserID:      testUserID,
@@ -279,10 +260,23 @@ func createTestHoldingWithCurrency(t *testing.T, db *gorm.DB, currency string, s
 		Value:       dShares.Mul(dPrice),
 		Cost:        dCost,
 		CostPrice:   dCost.Div(dShares),
-		Lots:        lots,
 	}
 	if err := db.Create(&h).Error; err != nil {
 		t.Fatal(err)
 	}
-	return id
+
+	lot := models.HoldingLot{
+		ID:         uuid.New(),
+		HoldingID:  id,
+		Date:       time.UnixMilli(1000000),
+		Shares:     dShares,
+		CostPrice:  dCost.Div(dShares),
+		Cost:       dCost,
+		ValueAdded: dShares.Mul(dPrice),
+		Fee:        decimal.Zero,
+	}
+	if err := db.Create(&lot).Error; err != nil {
+		t.Fatal(err)
+	}
+	return id.String()
 }

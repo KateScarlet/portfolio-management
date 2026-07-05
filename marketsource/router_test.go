@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -36,11 +37,11 @@ func TestFetchQuote_CachesResult(t *testing.T) {
 	src := &mockSource{name: "eastmoney", markets: []string{"US"}}
 	r := newTestRouter(t, src)
 
-	q1, err := r.FetchQuote("", "AAPL", "US")
+	q1, err := r.FetchQuote(uuid.UUID{}, "AAPL", "US")
 	if err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	q2, err := r.FetchQuote("", "AAPL", "US")
+	q2, err := r.FetchQuote(uuid.UUID{}, "AAPL", "US")
 	if err != nil {
 		t.Fatalf("second call: %v", err)
 	}
@@ -57,11 +58,11 @@ func TestExchangeRate_CachesResult(t *testing.T) {
 	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
 	r := newTestRouter(t, src)
 
-	rate1, err := r.ExchangeRate("", "USD/CNY")
+	rate1, err := r.ExchangeRate(uuid.UUID{}, "USD/CNY")
 	if err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	rate2, err := r.ExchangeRate("", "USD/CNY")
+	rate2, err := r.ExchangeRate(uuid.UUID{}, "USD/CNY")
 	if err != nil {
 		t.Fatalf("second call: %v", err)
 	}
@@ -79,9 +80,9 @@ func TestFetchQuote_CacheExpires(t *testing.T) {
 	r := newTestRouter(t, src)
 	r.cacheTTL = 50 * time.Millisecond
 
-	_, _ = r.FetchQuote("", "AAPL", "US")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
 	time.Sleep(60 * time.Millisecond)
-	_, _ = r.FetchQuote("", "AAPL", "US")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
 
 	if src.quoteCalls.Load() != 2 {
 		t.Errorf("expected source called twice after expiry, got %d", src.quoteCalls.Load())
@@ -92,12 +93,12 @@ func TestClearAllCaches(t *testing.T) {
 	src := &mockSource{name: "sina", markets: []string{"US", "EXCHANGE"}}
 	r := newTestRouter(t, src)
 
-	_, _ = r.FetchQuote("", "AAPL", "US")
-	_, _ = r.ExchangeRate("", "USD/CNY")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USD/CNY")
 	r.ClearAllCaches()
 
-	_, _ = r.FetchQuote("", "AAPL", "US")
-	_, _ = r.ExchangeRate("", "USD/CNY")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USD/CNY")
 
 	if src.quoteCalls.Load() != 2 {
 		t.Errorf("expected 2 quote calls after clear, got %d", src.quoteCalls.Load())
@@ -111,9 +112,9 @@ func TestFetchQuote_DifferentKeysCachedSeparately(t *testing.T) {
 	src := &mockSource{name: "eastmoney", markets: []string{"US"}}
 	r := newTestRouter(t, src)
 
-	_, _ = r.FetchQuote("", "AAPL", "US")
-	_, _ = r.FetchQuote("", "MSFT", "US")
-	_, _ = r.FetchQuote("", "AAPL", "US")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
+	_, _ = r.FetchQuote(uuid.UUID{}, "MSFT", "US")
+	_, _ = r.FetchQuote(uuid.UUID{}, "AAPL", "US")
 
 	if src.quoteCalls.Load() != 2 {
 		t.Errorf("expected 2 calls for 2 distinct symbols, got %d", src.quoteCalls.Load())
@@ -122,8 +123,8 @@ func TestFetchQuote_DifferentKeysCachedSeparately(t *testing.T) {
 
 // Ensure Router still satisfies its usage (compile-time check).
 var _ interface {
-	FetchQuote(userID, symbol, market string) (*Quote, error)
-	ExchangeRate(userID, pair string) (decimal.Decimal, error)
+	FetchQuote(userID uuid.UUID, symbol, market string) (*Quote, error)
+	ExchangeRate(userID uuid.UUID, pair string) (decimal.Decimal, error)
 	ClearAllCaches()
 } = (*Router)(nil)
 
@@ -133,7 +134,7 @@ func TestExchangeRate_UsesExchangeMarketCategory(t *testing.T) {
 	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
 	r := newTestRouter(t, src)
 
-	rate, err := r.ExchangeRate("", "USDCNY")
+	rate, err := r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestExchangeRate_FallbackToNextSource(t *testing.T) {
 		"yahoo": src2,
 	})
 
-	rate, err := r.ExchangeRate("", "USDCNY")
+	rate, err := r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestExchangeRate_SkipsNotSupported(t *testing.T) {
 		"sina":      src2,
 	})
 
-	rate, err := r.ExchangeRate("", "USDCNY")
+	rate, err := r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestExchangeRate_AllSourcesFail(t *testing.T) {
 		"sina":      src2,
 	})
 
-	_, err := r.ExchangeRate("", "USDCNY")
+	_, err := r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	if err == nil {
 		t.Fatal("expected error when all sources fail")
 	}
@@ -200,9 +201,9 @@ func TestExchangeRate_DifferentPairsCachedSeparately(t *testing.T) {
 	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
 	r := newTestRouter(t, src)
 
-	_, _ = r.ExchangeRate("", "USDCNY")
-	_, _ = r.ExchangeRate("", "EURCNY")
-	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "EURCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
 
 	if src.exchangeCalls.Load() != 2 {
 		t.Errorf("expected 2 calls for 2 distinct pairs, got %d", src.exchangeCalls.Load())
@@ -214,9 +215,9 @@ func TestExchangeRate_CacheExpires(t *testing.T) {
 	r := newTestRouter(t, src)
 	r.cacheTTL = 50 * time.Millisecond
 
-	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	time.Sleep(60 * time.Millisecond)
-	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
 
 	if src.exchangeCalls.Load() != 2 {
 		t.Errorf("expected source called twice after expiry, got %d", src.exchangeCalls.Load())
@@ -227,9 +228,9 @@ func TestExchangeRate_ClearCacheRefetches(t *testing.T) {
 	src := &mockSource{name: "sina", markets: []string{"EXCHANGE"}}
 	r := newTestRouter(t, src)
 
-	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
 	r.ClearAllCaches()
-	_, _ = r.ExchangeRate("", "USDCNY")
+	_, _ = r.ExchangeRate(uuid.UUID{}, "USDCNY")
 
 	if src.exchangeCalls.Load() != 2 {
 		t.Errorf("expected 2 calls after cache clear, got %d", src.exchangeCalls.Load())

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -68,7 +69,7 @@ func TestPriceScheduler_TriggerSyncForPortfolio(t *testing.T) {
 	s := New(db, setupTestRouter(db))
 	s.Stop()
 
-	if !s.TriggerSyncForPortfolio("user1", "portfolio1") {
+	if !s.TriggerSyncForPortfolio(uuid.MustParse("00000000-0000-0000-0000-000000000001"), uuid.MustParse("00000000-0000-0000-0000-000000000010")) {
 		t.Error("expected first trigger to succeed")
 	}
 }
@@ -85,7 +86,7 @@ func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 	for range goroutines {
 		go func() {
 			defer wg.Done()
-			s.TriggerSyncForPortfolio("concurrent-user", "concurrent-portfolio")
+			s.TriggerSyncForPortfolio(uuid.MustParse("00000000-0000-0000-0000-000000000099"), uuid.MustParse("00000000-0000-0000-0000-000000000099"))
 		}()
 	}
 
@@ -93,7 +94,7 @@ func TestPriceScheduler_ConcurrentTriggerSync_NoDuplicateStates(t *testing.T) {
 
 	s.mu.RLock()
 	count := len(s.states)
-	_, exists := s.states[syncKey("concurrent-user", "concurrent-portfolio")]
+	_, exists := s.states[syncKey(uuid.MustParse("00000000-0000-0000-0000-000000000099"), uuid.MustParse("00000000-0000-0000-0000-000000000099"))]
 	s.mu.RUnlock()
 
 	if count != 1 {
@@ -116,7 +117,7 @@ func TestPriceScheduler_ConcurrentTriggerSyncForPortfolioSync_NoDuplicateStates(
 	for range goroutines {
 		go func() {
 			defer wg.Done()
-			s.TriggerSyncForPortfolioSync("sync-user", "sync-portfolio")
+			s.TriggerSyncForPortfolioSync(uuid.MustParse("00000000-0000-0000-0000-000000000088"), uuid.MustParse("00000000-0000-0000-0000-000000000088"))
 		}()
 	}
 
@@ -143,7 +144,7 @@ func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 	for i := range goroutines {
 		go func(idx int) {
 			defer wg.Done()
-			s.TriggerSyncForPortfolio("user-"+string(rune('A'+idx%26)), "portfolio-"+string(rune('A'+idx%26)))
+			s.TriggerSyncForPortfolio(uuid.MustParse("00000000-0000-0000-0000-0000000000"+string(rune('A'+idx%26))), uuid.MustParse("00000000-0000-0000-0000-0000000000"+string(rune('A'+idx%26))))
 		}(i)
 	}
 

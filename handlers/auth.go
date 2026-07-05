@@ -134,7 +134,7 @@ func Register(db *gorm.DB) app.HandlerFunc {
 		}
 
 		user := models.User{
-			ID:        uuid.New().String(),
+			ID:        uuid.New(),
 			Username:  body.Username,
 			Password:  string(hashedPassword),
 			Role:      body.Role,
@@ -181,7 +181,12 @@ func ListUsers(db *gorm.DB) app.HandlerFunc {
 
 func DeleteUser(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		id := c.Param("id")
+		idStr := c.Param("id")
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的用户ID"})
+			return
+		}
 
 		claims := middleware.GetUser(c)
 		if claims != nil && claims.UserID == id {
@@ -189,7 +194,7 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			if _, err := gorm.G[models.Holding](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
@@ -243,7 +248,7 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 	}
 
 	user := models.User{
-		ID:        uuid.New().String(),
+		ID:        uuid.New(),
 		Username:  username,
 		Password:  string(hashedPassword),
 		Role:      role,
@@ -257,14 +262,14 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 	return ensureDefaultPortfolio(db, user.ID)
 }
 
-func ensureDefaultPortfolio(db *gorm.DB, userID string) error {
+func ensureDefaultPortfolio(db *gorm.DB, userID uuid.UUID) error {
 	var count int64
 	db.Model(&models.Portfolio{}).Where("user_id = ?", userID).Count(&count)
 	if count > 0 {
 		return nil
 	}
 	portfolio := models.Portfolio{
-		ID:        uuid.New().String(),
+		ID:        uuid.New(),
 		UserID:    userID,
 		Name:      "默认组合",
 		IsDefault: true,
@@ -274,13 +279,13 @@ func ensureDefaultPortfolio(db *gorm.DB, userID string) error {
 	if err := gorm.G[models.Portfolio](db).Create(ctx, &portfolio); err != nil {
 		return err
 	}
-	if _, err := gorm.G[models.Holding](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
+	if _, err := gorm.G[models.Holding](db).Where("user_id = ? AND portfolio_id IS NULL", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
-	if _, err := gorm.G[models.PortfolioRecord](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
+	if _, err := gorm.G[models.PortfolioRecord](db).Where("user_id = ? AND portfolio_id IS NULL", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
-	if _, err := gorm.G[models.Setting](db).Where("user_id = ? AND (portfolio_id = '' OR portfolio_id IS NULL)", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
+	if _, err := gorm.G[models.Setting](db).Where("user_id = ? AND portfolio_id IS NULL", userID).Update(ctx, "portfolio_id", portfolio.ID); err != nil {
 		return err
 	}
 	return nil

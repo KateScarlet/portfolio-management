@@ -26,7 +26,7 @@ type UpdateDividendRequest struct {
 }
 
 type RecordDividendRequest struct {
-	HoldingID        string          `json:"holdingId" binding:"required"`
+	HoldingID        uuid.UUID       `json:"holdingId" binding:"required"`
 	Amount           decimal.Decimal `json:"amount" binding:"required"`
 	TaxWithheld      decimal.Decimal `json:"taxWithheld"`
 	Currency         string          `json:"currency"`
@@ -46,7 +46,11 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
+			return
+		}
 
 		var req RecordDividendRequest
 		if err := c.BindAndValidate(&req); err != nil {
@@ -84,9 +88,9 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 
 		var dividend models.Dividend
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			dividend = models.Dividend{
-				ID:               uuid.New().String(),
+				ID:               uuid.New(),
 				UserID:           user.UserID,
 				PortfolioID:      portfolioID,
 				HoldingID:        req.HoldingID,
@@ -119,7 +123,8 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 				reinvestShares := netAmount.Div(req.ReinvestPrice)
 
 				lot := models.HoldingLot{
-					ID:         uuid.New().String(),
+					ID:         uuid.New(),
+					HoldingID:  holding.ID,
 					Type:       "buy",
 					Date:       time.Now(),
 					Shares:     reinvestShares,
@@ -129,25 +134,32 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 					Fee:        decimal.Zero,
 				}
 
-				holding.Lots = append(holding.Lots, lot)
-				holding.RecalcFromLots()
+				if err := models.CreateLot(tx, &lot); err != nil {
+					return err
+				}
+
+				lots, err := models.LoadLots(tx, holding.ID)
+				if err != nil {
+					return err
+				}
+				models.RecalcFromLots(&holding, lots)
 				if err := tx.Save(&holding).Error; err != nil {
 					return err
 				}
 
-				dividend.HoldingLotID = lot.ID
+				dividend.HoldingLotID = &lot.ID
 				if err := tx.Save(&dividend).Error; err != nil {
 					return err
 				}
 
 				fundTx := models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
 					PortfolioID: portfolioID,
 					Type:        "dividend_reinvest",
 					Amount:      netAmount,
 					Currency:    currency,
-					HoldingID:   req.HoldingID,
+					HoldingID:   &req.HoldingID,
 					Note:        req.Note,
 					CreatedAt:   time.Now().UnixMilli(),
 				}
@@ -155,7 +167,7 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 					return err
 				}
 
-				dividend.FundTxID = fundTx.ID
+				dividend.FundTxID = &fundTx.ID
 				if err := tx.Save(&dividend).Error; err != nil {
 					return err
 				}
@@ -165,13 +177,13 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 				}
 
 				fundTx := models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
 					PortfolioID: portfolioID,
 					Type:        "dividend",
 					Amount:      netAmount,
 					Currency:    currency,
-					HoldingID:   req.HoldingID,
+					HoldingID:   &req.HoldingID,
 					Note:        req.Note,
 					CreatedAt:   time.Now().UnixMilli(),
 				}
@@ -179,7 +191,7 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 					return err
 				}
 
-				dividend.FundTxID = fundTx.ID
+				dividend.FundTxID = &fundTx.ID
 				if err := tx.Save(&dividend).Error; err != nil {
 					return err
 				}
@@ -208,7 +220,11 @@ func ListDividends(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
+			return
+		}
 
 		var portfolio models.Portfolio
 		if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
@@ -218,8 +234,13 @@ func ListDividends(db *gorm.DB) app.HandlerFunc {
 
 		query := db.Where("portfolio_id = ? AND user_id = ?", portfolioID, user.UserID)
 
-		holdingID := c.Query("holdingId")
-		if holdingID != "" {
+		holdingIDStr := c.Query("holdingId")
+		if holdingIDStr != "" {
+			holdingID, err := uuid.Parse(holdingIDStr)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的持仓ID"})
+				return
+			}
 			query = query.Where("holding_id = ?", holdingID)
 		}
 
@@ -241,8 +262,16 @@ func DeleteDividend(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		dividendID := c.Param("id")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
+			return
+		}
+		dividendID, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的分红记录ID"})
+			return
+		}
 
 		var dividend models.Dividend
 		if err := db.Where("id = ? AND portfolio_id = ? AND user_id = ?", dividendID, portfolioID, user.UserID).First(&dividend).Error; err != nil {
@@ -250,21 +279,21 @@ func DeleteDividend(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
-			if dividend.Reinvest && dividend.HoldingLotID != "" {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if dividend.Reinvest && dividend.HoldingLotID != nil {
+				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
+					return err
+				}
+
+				lots, err := models.LoadLots(tx, dividend.HoldingID)
+				if err != nil {
+					return err
+				}
 				var holding models.Holding
 				if err := tx.Where("id = ? AND user_id = ?", dividend.HoldingID, user.UserID).First(&holding).Error; err != nil {
 					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
 				}
-
-				var updatedLots []models.HoldingLot
-				for _, lot := range holding.Lots {
-					if lot.ID != dividend.HoldingLotID {
-						updatedLots = append(updatedLots, lot)
-					}
-				}
-				holding.Lots = updatedLots
-				holding.RecalcFromLots()
+				models.RecalcFromLots(&holding, lots)
 				if err := tx.Save(&holding).Error; err != nil {
 					return err
 				}
@@ -282,8 +311,8 @@ func DeleteDividend(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			if dividend.FundTxID != "" {
-				if err := tx.Where("id = ?", dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
+			if dividend.FundTxID != nil {
+				if err := tx.Where("id = ?", *dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
 					return err
 				}
 			}
@@ -315,8 +344,16 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		dividendID := c.Param("id")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
+			return
+		}
+		dividendID, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的分红记录ID"})
+			return
+		}
 
 		var req UpdateDividendRequest
 		if err := c.BindAndValidate(&req); err != nil {
@@ -352,17 +389,18 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			currency = dividend.Currency
 		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		err = db.Transaction(func(tx *gorm.DB) error {
 			// 1. Reverse old side effects
-			if dividend.Reinvest && dividend.HoldingLotID != "" {
-				var updatedLots []models.HoldingLot
-				for _, lot := range holding.Lots {
-					if lot.ID != dividend.HoldingLotID {
-						updatedLots = append(updatedLots, lot)
-					}
+			if dividend.Reinvest && dividend.HoldingLotID != nil {
+				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
+					return err
 				}
-				holding.Lots = updatedLots
-				holding.RecalcFromLots()
+
+				lots, err := models.LoadLots(tx, dividend.HoldingID)
+				if err != nil {
+					return err
+				}
+				models.RecalcFromLots(&holding, lots)
 				if err := tx.Save(&holding).Error; err != nil {
 					return err
 				}
@@ -377,8 +415,8 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			if dividend.FundTxID != "" {
-				if err := tx.Where("id = ?", dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
+			if dividend.FundTxID != nil {
+				if err := tx.Where("id = ?", *dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
 					return err
 				}
 			}
@@ -390,7 +428,8 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 				reinvestShares := newNetAmount.Div(req.ReinvestPrice)
 
 				lot := models.HoldingLot{
-					ID:         uuid.New().String(),
+					ID:         uuid.New(),
+					HoldingID:  holding.ID,
 					Type:       "buy",
 					Date:       time.Now(),
 					Shares:     reinvestShares,
@@ -400,49 +439,56 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 					Fee:        decimal.Zero,
 				}
 
-				holding.Lots = append(holding.Lots, lot)
-				holding.RecalcFromLots()
+				if err := models.CreateLot(tx, &lot); err != nil {
+					return err
+				}
+
+				lots, err := models.LoadLots(tx, holding.ID)
+				if err != nil {
+					return err
+				}
+				models.RecalcFromLots(&holding, lots)
 				if err := tx.Save(&holding).Error; err != nil {
 					return err
 				}
 
-				dividend.HoldingLotID = lot.ID
+				dividend.HoldingLotID = &lot.ID
 
 				fundTx := models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
 					PortfolioID: portfolioID,
 					Type:        "dividend_reinvest",
 					Amount:      newNetAmount,
 					Currency:    currency,
-					HoldingID:   dividend.HoldingID,
+					HoldingID:   &dividend.HoldingID,
 					Note:        req.Note,
 					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err
 				}
-				dividend.FundTxID = fundTx.ID
+				dividend.FundTxID = &fundTx.ID
 			} else {
 				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, newNetAmount); err != nil {
 					return err
 				}
 
 				fundTx := models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
 					PortfolioID: portfolioID,
 					Type:        "dividend",
 					Amount:      newNetAmount,
 					Currency:    currency,
-					HoldingID:   dividend.HoldingID,
+					HoldingID:   &dividend.HoldingID,
 					Note:        req.Note,
 					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err
 				}
-				dividend.FundTxID = fundTx.ID
+				dividend.FundTxID = &fundTx.ID
 			}
 
 			// 3. Update dividend record fields

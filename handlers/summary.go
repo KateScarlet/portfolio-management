@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -58,7 +59,18 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				return
 			}
 
-			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
+			// Load lots for currency conversion
+			holdingIDs := make([]uuid.UUID, len(holdings))
+			for i, h := range holdings {
+				holdingIDs[i] = h.ID
+			}
+			lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
+			if err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+
+			if err := convertHoldingsCurrency(holdings, lotsMap, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
@@ -104,7 +116,7 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 
 			summary.Portfolios = append(summary.Portfolios, PortfolioSummaryItem{
-				ID:        p.ID,
+				ID:        p.ID.String(),
 				Name:      p.Name,
 				Total:     portfolioTotal,
 				Principal: principal,

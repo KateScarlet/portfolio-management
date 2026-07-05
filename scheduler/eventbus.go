@@ -3,22 +3,24 @@ package scheduler
 import (
 	"log/slog"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 const subscriberBufferSize = 64
 
 type EventBus struct {
 	mu   sync.RWMutex
-	subs map[string][]chan Event
+	subs map[uuid.UUID][]chan Event
 }
 
 func NewEventBus() *EventBus {
 	return &EventBus{
-		subs: make(map[string][]chan Event),
+		subs: make(map[uuid.UUID][]chan Event),
 	}
 }
 
-func (eb *EventBus) Subscribe(userID string) (events <-chan Event, unsubscribe func()) {
+func (eb *EventBus) Subscribe(userID uuid.UUID) (events <-chan Event, unsubscribe func()) {
 	ch := make(chan Event, subscriberBufferSize)
 
 	eb.mu.Lock()
@@ -44,7 +46,7 @@ func (eb *EventBus) Subscribe(userID string) (events <-chan Event, unsubscribe f
 	return ch, unsubscribe
 }
 
-func (eb *EventBus) Publish(userID string, event Event) {
+func (eb *EventBus) Publish(userID uuid.UUID, event Event) {
 	eb.mu.RLock()
 	defer eb.mu.RUnlock()
 

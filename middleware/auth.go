@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -14,9 +15,9 @@ type contextKey string
 const UserContextKey contextKey = "user"
 
 type JWTClaims struct {
-	UserID   string `json:"userId"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID   uuid.UUID `json:"userId"`
+	Username string    `json:"username"`
+	Role     string    `json:"role"`
 	jwt.RegisteredClaims
 }
 

@@ -27,7 +27,14 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, router *marketsource.Router, userID string) error {
+func accountIDString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
+}
+
+func convertHoldingsCurrency(holdings []models.Holding, lotsMap map[uuid.UUID][]models.HoldingLot, targetCurrency string, router *marketsource.Router, userID uuid.UUID) error {
 	for i := range holdings {
 		h := &holdings[i]
 		if h.Currency == "" || h.Currency == targetCurrency {
@@ -41,11 +48,12 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, r
 		h.Value = h.Value.Mul(rate)
 		h.Cost = h.Cost.Mul(rate)
 		h.CostPrice = h.CostPrice.Mul(rate)
-		for j := range h.Lots {
-			h.Lots[j].Fee = h.Lots[j].Fee.Mul(rate)
-			h.Lots[j].Cost = h.Lots[j].Cost.Mul(rate)
-			h.Lots[j].CostPrice = h.Lots[j].CostPrice.Mul(rate)
-			h.Lots[j].ValueAdded = h.Lots[j].ValueAdded.Mul(rate)
+		lots := lotsMap[h.ID]
+		for j := range lots {
+			lots[j].Fee = lots[j].Fee.Mul(rate)
+			lots[j].Cost = lots[j].Cost.Mul(rate)
+			lots[j].CostPrice = lots[j].CostPrice.Mul(rate)
+			lots[j].ValueAdded = lots[j].ValueAdded.Mul(rate)
 		}
 		h.Currency = targetCurrency
 	}
@@ -54,19 +62,26 @@ func convertHoldingsCurrency(holdings []models.Holding, targetCurrency string, r
 
 // MergedHoldingAccount is one account's position within a merged holding.
 type MergedHoldingAccount struct {
-	HoldingID   string            `json:"holdingId"`
-	AccountID   string            `json:"accountId"`
-	AccountName string            `json:"accountName"`
-	Shares      decimal.Decimal   `json:"shares"`
-	Cost        decimal.Decimal   `json:"cost"`
-	Value       decimal.Decimal   `json:"value"`
-	Lots        models.JSONColumn `json:"lots"`
+	HoldingID   string              `json:"holdingId"`
+	AccountID   string              `json:"accountId"`
+	AccountName string              `json:"accountName"`
+	Shares      decimal.Decimal     `json:"shares"`
+	Cost        decimal.Decimal     `json:"cost"`
+	Value       decimal.Decimal     `json:"value"`
+	Lots        []models.HoldingLot `json:"lots"`
 }
 
 // MergedHolding is a holding merged across accounts by symbol.
 type MergedHolding struct {
 	models.Holding
 	Accounts []MergedHoldingAccount `json:"accounts"`
+	Lots     []models.HoldingLot    `json:"lots"`
+}
+
+// HoldingResponse is a holding with lots attached for API responses.
+type HoldingResponse struct {
+	models.Holding
+	Lots []models.HoldingLot `json:"lots"`
 }
 
 func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
@@ -78,7 +93,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -95,8 +110,19 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
+		// Load lots for all holdings
+		holdingIDs := make([]uuid.UUID, len(holdings))
+		for i, h := range holdings {
+			holdingIDs[i] = h.ID
+		}
+		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
 		if displayCurrency := c.Query("currency"); displayCurrency != "" {
-			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
+			if err := convertHoldingsCurrency(holdings, lotsMap, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
@@ -110,7 +136,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
-			accountNameMap := make(map[string]string, len(accounts))
+			accountNameMap := make(map[uuid.UUID]string, len(accounts))
 			for _, a := range accounts {
 				accountNameMap[a.ID] = a.Name
 			}
@@ -131,7 +157,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 							ID:          h.ID,
 							UserID:      h.UserID,
 							PortfolioID: h.PortfolioID,
-							AccountID:   "",
+							AccountID:   nil,
 							AssetId:     h.AssetId,
 							Symbol:      h.Symbol,
 							Name:        h.Name,
@@ -145,15 +171,18 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 					merged[key] = mh
 				}
 
-				accountName := accountNameMap[h.AccountID]
+				var accountName string
+				if h.AccountID != nil {
+					accountName = accountNameMap[*h.AccountID]
+				}
 				mh.Accounts = append(mh.Accounts, MergedHoldingAccount{
-					HoldingID:   h.ID,
-					AccountID:   h.AccountID,
+					HoldingID:   h.ID.String(),
+					AccountID:   accountIDString(h.AccountID),
 					AccountName: accountName,
 					Shares:      h.Shares,
 					Cost:        h.Cost,
 					Value:       h.Value,
-					Lots:        h.Lots,
+					Lots:        lotsMap[h.ID],
 				})
 
 				mh.Shares = mh.Shares.Add(h.Shares)
@@ -168,7 +197,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 					mh.CostPrice = mh.Cost.Div(mh.Shares)
 				}
 				// Collect all lots from all accounts
-				allLots := models.JSONColumn{}
+				var allLots []models.HoldingLot
 				for _, acc := range mh.Accounts {
 					allLots = append(allLots, acc.Lots...)
 				}
@@ -179,14 +208,19 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				if result[i].AssetId != result[j].AssetId {
 					return result[i].AssetId < result[j].AssetId
 				}
-				return result[i].ID < result[j].ID
+				return result[i].ID.String() < result[j].ID.String()
 			})
 
 			c.JSON(consts.StatusOK, result)
 			return
 		}
 
-		c.JSON(consts.StatusOK, holdings)
+		// Non-merge mode: attach lots to each holding
+		resp := make([]HoldingResponse, len(holdings))
+		for i, h := range holdings {
+			resp[i] = HoldingResponse{Holding: h, Lots: lotsMap[h.ID]}
+		}
+		c.JSON(consts.StatusOK, resp)
 	}
 }
 
@@ -203,7 +237,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -252,71 +286,111 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 		isRegisterOnly := input.Shares.IsZero() && input.Cost.IsZero()
 
-		var newLot *models.HoldingLot
-		if !isRegisterOnly {
-			lot := models.HoldingLot{
-				ID:         uuid.New().String(),
-				Date:       input.Date,
-				Shares:     input.Shares,
-				CostPrice:  input.CostPrice,
-				Cost:       input.Cost,
-				ValueAdded: input.Value,
-				Fee:        input.Fee,
-			}
-			if lot.Date.IsZero() {
-				lot.Date = time.Now()
-			}
-			newLot = &lot
-		}
-
 		var created bool
 		var result models.Holding
+		var resultLots []models.HoldingLot
 		err = db.Transaction(func(tx *gorm.DB) error {
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
-				res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id = ? AND symbol != ''", portfolioID, input.Symbol, input.AccountID).First(&existing)
+				if input.AccountID != nil {
+					res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id = ? AND symbol != ''", portfolioID, input.Symbol, *input.AccountID).First(&existing)
+				} else {
+					res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id IS NULL AND symbol != ''", portfolioID, input.Symbol).First(&existing)
+				}
 			} else {
-				res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId, input.AccountID).First(&existing)
+				if input.AccountID != nil {
+					res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId, *input.AccountID).First(&existing)
+				} else {
+					res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id IS NULL AND symbol = ''", portfolioID, input.Name, input.AssetId).First(&existing)
+				}
 			}
 
 			if res.Error == nil {
 				if isRegisterOnly {
 					return &httpError{status: consts.StatusBadRequest, msg: "该资产已存在"}
 				}
-				existing.Lots = append(existing.Lots, *newLot)
+				// Load existing lots, append new lot, replace all
+				existingLots, err := models.LoadLots(tx, existing.ID)
+				if err != nil {
+					return err
+				}
+				newLot := models.HoldingLot{
+					ID:         uuid.New(),
+					HoldingID:  existing.ID,
+					Date:       input.Date,
+					Shares:     input.Shares,
+					CostPrice:  input.CostPrice,
+					Cost:       input.Cost,
+					ValueAdded: input.Value,
+					Fee:        input.Fee,
+				}
+				if newLot.Date.IsZero() {
+					newLot.Date = time.Now()
+				}
+				existingLots = append(existingLots, newLot)
 				if existing.Symbol != "" && input.Price.IsPositive() {
 					existing.Price = input.Price
 				}
-				existing.RecalcFromLots()
+				models.RecalcFromLots(&existing, existingLots)
 				created = false
 				result = existing
 				if err := tx.Save(&existing).Error; err != nil {
 					return err
 				}
+				if err := models.ReplaceLots(tx, existing.ID, existingLots); err != nil {
+					return err
+				}
+				resultLots = existingLots
 			} else {
 				if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
 					return res.Error
 				}
 
-				input.ID = uuid.New().String()
+				input.ID = uuid.New()
 				input.UserID = user.UserID
-				input.PortfolioID = portfolioID
-				if newLot != nil {
-					input.Lots = models.JSONColumn{*newLot}
-				} else {
-					input.Lots = models.JSONColumn{}
-				}
-				input.RecalcFromLots()
+				input.PortfolioID = uuid.MustParse(portfolioID)
 				created = true
 				result = input.Holding
 				if err := tx.Create(&input.Holding).Error; err != nil {
 					return err
 				}
+				if !isRegisterOnly {
+					newLot := models.HoldingLot{
+						ID:         uuid.New(),
+						HoldingID:  input.ID,
+						Date:       input.Date,
+						Shares:     input.Shares,
+						CostPrice:  input.CostPrice,
+						Cost:       input.Cost,
+						ValueAdded: input.Value,
+						Fee:        input.Fee,
+					}
+					if newLot.Date.IsZero() {
+						newLot.Date = time.Now()
+					}
+					if err := models.CreateLot(tx, &newLot); err != nil {
+						return err
+					}
+					resultLots = []models.HoldingLot{newLot}
+					models.RecalcFromLots(&result, resultLots)
+					if err := tx.Save(&result).Error; err != nil {
+						return err
+					}
+				} else {
+					resultLots = nil
+				}
 			}
 
-			if newLot != nil {
-				addedCost := newLot.Cost.Add(input.Fee)
+			if !isRegisterOnly {
+				var lotFee decimal.Decimal
+				if created {
+					lotFee = input.Fee
+				} else {
+					// fee from the new lot just appended
+					lotFee = input.Fee
+				}
+				addedCost := input.Cost.Add(lotFee)
 				if addedCost.IsPositive() {
 					holdingCurrency := input.Currency
 					if holdingCurrency == "" {
@@ -344,9 +418,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					} else {
 						if newAmount.IsPositive() {
 							if err := tx.Create(&models.AvailableFund{
-								ID:          uuid.New().String(),
+								ID:          uuid.New(),
 								UserID:      user.UserID,
-								PortfolioID: portfolioID,
+								PortfolioID: uuid.MustParse(portfolioID),
 								Currency:    holdingCurrency,
 								Amount:      newAmount,
 							}).Error; err != nil {
@@ -356,13 +430,13 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					}
 
 					if err := tx.Create(&models.FundTransaction{
-						ID:          uuid.New().String(),
+						ID:          uuid.New(),
 						UserID:      user.UserID,
-						PortfolioID: portfolioID,
+						PortfolioID: uuid.MustParse(portfolioID),
 						Type:        "buy",
 						Amount:      addedCost,
 						Currency:    holdingCurrency,
-						HoldingID:   result.ID,
+						HoldingID:   &result.ID,
 						CreatedAt:   time.Now().UnixMilli(),
 					}).Error; err != nil {
 						return err
@@ -382,9 +456,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 		if created {
-			c.JSON(consts.StatusCreated, result)
+			c.JSON(consts.StatusCreated, HoldingResponse{Holding: result, Lots: resultLots})
 		} else {
-			c.JSON(consts.StatusOK, result)
+			c.JSON(consts.StatusOK, HoldingResponse{Holding: result, Lots: resultLots})
 		}
 	}
 }
@@ -398,7 +472,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -448,9 +522,10 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 				var lots []models.HoldingLot
 				if json.Unmarshal(lotsBytes, &lots) == nil {
 					for i := range lots {
-						if lots[i].ID == "" {
-							lots[i].ID = uuid.New().String()
+						if lots[i].ID == uuid.Nil {
+							lots[i].ID = uuid.New()
 						}
+						lots[i].HoldingID = holding.ID
 						if lots[i].Shares.IsNegative() {
 							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录股数不能为负数"})
 							return
@@ -468,9 +543,8 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 							return
 						}
 					}
-					holding.Lots = lots
 					priceBefore := holding.Price
-					holding.RecalcFromLots()
+					models.RecalcFromLots(&holding, lots)
 					if holding.Symbol != "" && priceBefore.IsPositive() {
 						holding.Price = priceBefore
 						holding.Value = holding.Shares.Mul(holding.Price)
@@ -479,7 +553,11 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 						return
 					}
-					c.JSON(consts.StatusOK, holding)
+					if err := models.ReplaceLots(db, holding.ID, lots); err != nil {
+						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+						return
+					}
+					c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: lots})
 					return
 				}
 			}
@@ -503,11 +581,16 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 				return
 			}
 			oldVal := holding.Value
-			if !newVal.Equal(oldVal) && len(holding.Lots) > 0 {
+			lots, err := models.LoadLots(db, holding.ID)
+			if err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+			if !newVal.Equal(oldVal) && len(lots) > 0 {
 				diff := newVal.Sub(oldVal)
 				lastBuyIdx := -1
-				for i := len(holding.Lots) - 1; i >= 0; i-- {
-					if holding.Lots[i].Type != "sell" {
+				for i := len(lots) - 1; i >= 0; i-- {
+					if lots[i].Type != "sell" {
 						lastBuyIdx = i
 						break
 					}
@@ -517,18 +600,24 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 					return
 				}
 				err := db.Transaction(func(tx *gorm.DB) error {
-					holding.Lots[lastBuyIdx].ValueAdded = holding.Lots[lastBuyIdx].ValueAdded.Add(diff)
-					holding.RecalcFromLots()
-					return tx.Save(&holding).Error
+					lots[lastBuyIdx].ValueAdded = lots[lastBuyIdx].ValueAdded.Add(diff)
+					models.RecalcFromLots(&holding, lots)
+					if err := tx.Save(&holding).Error; err != nil {
+						return err
+					}
+					return models.ReplaceLots(tx, holding.ID, lots)
 				})
 				if err != nil {
 					c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 					return
 				}
-				c.JSON(consts.StatusOK, holding)
+				c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: lots})
 				return
 			}
 		}
+
+		// Remove "lots" from safeUpdates since it's handled separately
+		delete(safeUpdates, "lots")
 
 		if len(safeUpdates) == 0 {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
@@ -544,7 +633,8 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		c.JSON(consts.StatusOK, holding)
+		lots, _ := models.LoadLots(db, holding.ID)
+		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: lots})
 	}
 }
 
@@ -557,7 +647,7 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -579,27 +669,36 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			refundAmount := holding.Cost.Add(holding.BuyFees())
+			lots, err := models.LoadLots(tx, holding.ID)
+			if err != nil {
+				return err
+			}
+
+			refundAmount := holding.Cost.Add(models.BuyFees(lots))
 			if refundAmount.IsPositive() {
 				currency := holding.Currency
 				if currency == "" {
 					currency = "CNY"
 				}
-				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, refundAmount); err != nil {
+				if err := addAvailableFund(tx, user.UserID, uuid.MustParse(portfolioID), currency, refundAmount); err != nil {
 					return err
 				}
 				if err := tx.Create(&models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
-					PortfolioID: portfolioID,
+					PortfolioID: uuid.MustParse(portfolioID),
 					Type:        "delete",
 					Amount:      refundAmount,
 					Currency:    currency,
-					HoldingID:   holding.ID,
+					HoldingID:   &holding.ID,
 					CreatedAt:   time.Now().UnixMilli(),
 				}).Error; err != nil {
 					return err
 				}
+			}
+
+			if err := models.DeleteLotsByHoldingID(tx, holding.ID); err != nil {
+				return err
 			}
 
 			if err := tx.Delete(&holding).Error; err != nil {
@@ -621,7 +720,7 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func userOwnsPortfolio(db *gorm.DB, userID, portfolioID string) (bool, error) {
+func userOwnsPortfolio(db *gorm.DB, userID, portfolioID uuid.UUID) (bool, error) {
 	var count int64
 	if err := db.Model(&models.Portfolio{}).Where("id = ? AND user_id = ?", portfolioID, userID).Count(&count).Error; err != nil {
 		return false, err

@@ -9,13 +9,14 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 func init() {
 	SetJWTSecret("test-secret-key-for-unit-tests")
 }
 
-func makeToken(userID, username, role string, expired bool) string {
+func makeToken(userID uuid.UUID, username, role string, expired bool) string {
 	claims := &JWTClaims{
 		UserID:   userID,
 		Username: username,
@@ -42,7 +43,7 @@ func newRequestContext() *app.RequestContext {
 
 func TestAuthRequired_ValidToken(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "alice", "user", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "alice", "user", false)
 	c.Request.Header.Set("Authorization", "Bearer "+token)
 
 	handler := AuthRequired()
@@ -59,7 +60,7 @@ func TestAuthRequired_ValidToken(t *testing.T) {
 	if !ok {
 		t.Fatal("expected *JWTClaims type")
 	}
-	if jwtClaims.UserID != "u1" {
+	if jwtClaims.UserID != uuid.MustParse("00000000-0000-0000-0000-000000000001") {
 		t.Errorf("expected UserID=u1, got %q", jwtClaims.UserID)
 	}
 	if jwtClaims.Username != "alice" {
@@ -95,7 +96,7 @@ func TestAuthRequired_InvalidToken(t *testing.T) {
 
 func TestAuthRequired_ExpiredToken(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "alice", "user", true)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "alice", "user", true)
 	c.Request.Header.Set("Authorization", "Bearer "+token)
 
 	handler := AuthRequired()
@@ -110,7 +111,7 @@ func TestAuthRequired_WrongSecret(t *testing.T) {
 	c := newRequestContext()
 	// Generate token with a different secret
 	claims := &JWTClaims{
-		UserID:   "u1",
+		UserID:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Username: "alice",
 		Role:     "user",
 	}
@@ -129,7 +130,7 @@ func TestAuthRequired_WrongSecret(t *testing.T) {
 
 func TestAuthRequired_FromCookie(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "alice", "user", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "alice", "user", false)
 	c.Request.Header.Set("Cookie", "auth_token="+token)
 
 	handler := AuthRequired()
@@ -142,7 +143,7 @@ func TestAuthRequired_FromCookie(t *testing.T) {
 
 func TestAuthRequired_BearerPrefixRequired(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "alice", "user", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "alice", "user", false)
 	// Set without "Bearer " prefix
 	c.Request.Header.Set("Authorization", token)
 
@@ -160,7 +161,7 @@ func TestAuthRequired_BearerPrefixRequired(t *testing.T) {
 func TestAdminRequired_AdminRole(t *testing.T) {
 	c := newRequestContext()
 	c.Set(string(UserContextKey), &JWTClaims{
-		UserID: "u1", Username: "admin", Role: "admin",
+		UserID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), Username: "admin", Role: "admin",
 	})
 
 	handler := AdminRequired()
@@ -174,7 +175,7 @@ func TestAdminRequired_AdminRole(t *testing.T) {
 func TestAdminRequired_NonAdminRole(t *testing.T) {
 	c := newRequestContext()
 	c.Set(string(UserContextKey), &JWTClaims{
-		UserID: "u1", Username: "alice", Role: "user",
+		UserID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), Username: "alice", Role: "user",
 	})
 
 	handler := AdminRequired()
@@ -212,7 +213,7 @@ func TestAdminRequired_WrongType(t *testing.T) {
 
 func TestGetUser_Exists(t *testing.T) {
 	c := newRequestContext()
-	expected := &JWTClaims{UserID: "u1", Username: "alice", Role: "user"}
+	expected := &JWTClaims{UserID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), Username: "alice", Role: "user"}
 	c.Set(string(UserContextKey), expected)
 
 	result := GetUser(c)
@@ -300,7 +301,7 @@ func TestExtractToken_BearerEmpty(t *testing.T) {
 
 func TestFullFlow_AuthThenAdmin(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "admin", "admin", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "admin", "admin", false)
 	c.Request.Header.Set("Authorization", "Bearer "+token)
 
 	// Step 1: AuthRequired
@@ -320,7 +321,7 @@ func TestFullFlow_AuthThenAdmin(t *testing.T) {
 
 func TestFullFlow_AuthThenAdmin_NonAdmin(t *testing.T) {
 	c := newRequestContext()
-	token := makeToken("u1", "alice", "user", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000001"), "alice", "user", false)
 	c.Request.Header.Set("Authorization", "Bearer "+token)
 
 	// Step 1: AuthRequired passes
@@ -383,7 +384,7 @@ func TestAuthRequired_MalformedBearerFormat(t *testing.T) {
 }
 
 func TestJWTClaims_Fields(t *testing.T) {
-	token := makeToken("u123", "bob", "admin", false)
+	token := makeToken(uuid.MustParse("00000000-0000-0000-0000-000000000123"), "bob", "admin", false)
 	claims := &JWTClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
 		return JWTSecret, nil
@@ -392,7 +393,7 @@ func TestJWTClaims_Fields(t *testing.T) {
 		t.Fatalf("failed to parse token: %v", err)
 	}
 	c := parsed.Claims.(*JWTClaims)
-	if c.UserID != "u123" {
+	if c.UserID != uuid.MustParse("00000000-0000-0000-0000-000000000123") {
 		t.Errorf("expected UserID=u123, got %q", c.UserID)
 	}
 	if c.Username != "bob" {

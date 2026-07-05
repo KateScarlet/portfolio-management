@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 )
 
 func GetPrice(router *marketsource.Router) app.HandlerFunc {
@@ -26,7 +27,7 @@ func GetPrice(router *marketsource.Router) app.HandlerFunc {
 		}
 
 		// Try to get userID from auth context (may be empty for unauthenticated requests)
-		var userID string
+		var userID uuid.UUID
 		if user := middleware.GetUser(c); user != nil {
 			userID = user.UserID
 		}

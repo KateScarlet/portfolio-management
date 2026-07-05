@@ -13,6 +13,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
+	"github.com/google/uuid"
 )
 
 const (
@@ -22,14 +23,14 @@ const (
 
 type SSEHandler struct {
 	eventBus  *scheduler.EventBus
-	userConns map[string]int
+	userConns map[uuid.UUID]int
 	connMu    sync.RWMutex
 }
 
 func NewSSEHandler(eventBus *scheduler.EventBus) *SSEHandler {
 	return &SSEHandler{
 		eventBus:  eventBus,
-		userConns: make(map[string]int),
+		userConns: make(map[uuid.UUID]int),
 	}
 }
 

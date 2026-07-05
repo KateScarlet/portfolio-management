@@ -54,7 +54,7 @@ func CreateAccount(db *gorm.DB) app.HandlerFunc {
 		}
 
 		account := models.Account{
-			ID:          uuid.New().String(),
+			ID:          uuid.New(),
 			UserID:      user.UserID,
 			Name:        body.Name,
 			Description: body.Description,
@@ -144,7 +144,7 @@ func DeleteAccount(db *gorm.DB) app.HandlerFunc {
 
 		err = db.Transaction(func(tx *gorm.DB) error {
 			// Clear account_id on holdings belonging to this account
-			if _, err := gorm.G[map[string]any](tx).Table("holdings").Where("user_id = ? AND account_id = ?", user.UserID, id).Updates(ctx, map[string]any{"account_id": ""}); err != nil {
+			if _, err := gorm.G[map[string]any](tx).Table("holdings").Where("user_id = ? AND account_id = ?", user.UserID, id).Updates(ctx, map[string]any{"account_id": nil}); err != nil {
 				return err
 			}
 			// Delete the account
@@ -165,7 +165,8 @@ func DeleteAccount(db *gorm.DB) app.HandlerFunc {
 // HoldingWithAccount is a Holding enriched with account name for the account view.
 type HoldingWithAccount struct {
 	models.Holding
-	AccountName string `json:"accountName"`
+	AccountName string              `json:"accountName"`
+	Lots        []models.HoldingLot `json:"lots"`
 }
 
 // ListAllAccountHoldings returns all holdings across all portfolios with account names.
@@ -183,7 +184,7 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		accountNameMap := make(map[string]string, len(accounts))
+		accountNameMap := make(map[uuid.UUID]string, len(accounts))
 		for _, a := range accounts {
 			accountNameMap[a.ID] = a.Name
 		}
@@ -195,12 +196,23 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 			return
 		}
 
+		// Load lots for all holdings
+		holdingIDs := make([]uuid.UUID, len(holdings))
+		for i, h := range holdings {
+			holdingIDs[i] = h.ID
+		}
+		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
 		// Filter by account_id if specified
 		filterAccountID := c.Query("account_id")
 		if filterAccountID != "" {
 			filtered := make([]models.Holding, 0)
 			for i := range holdings {
-				if holdings[i].AccountID == filterAccountID {
+				if holdings[i].AccountID != nil && holdings[i].AccountID.String() == filterAccountID {
 					filtered = append(filtered, holdings[i])
 				}
 			}
@@ -209,7 +221,7 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 
 		// Currency conversion
 		if displayCurrency := c.Query("currency"); displayCurrency != "" {
-			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
+			if err := convertHoldingsCurrency(holdings, lotsMap, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
@@ -218,9 +230,14 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 		// Enrich with account names
 		result := make([]HoldingWithAccount, len(holdings))
 		for i := range holdings {
+			var accountName string
+			if holdings[i].AccountID != nil {
+				accountName = accountNameMap[*holdings[i].AccountID]
+			}
 			result[i] = HoldingWithAccount{
 				Holding:     holdings[i],
-				AccountName: accountNameMap[holdings[i].AccountID],
+				AccountName: accountName,
+				Lots:        lotsMap[holdings[i].ID],
 			}
 		}
 
@@ -252,13 +269,34 @@ func ListAccountHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			return
 		}
 
+		// Load lots for all holdings
+		holdingIDs := make([]uuid.UUID, len(holdings))
+		for i, h := range holdings {
+			holdingIDs[i] = h.ID
+		}
+		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
 		if displayCurrency := c.Query("currency"); displayCurrency != "" {
-			if err := convertHoldingsCurrency(holdings, displayCurrency, router, user.UserID); err != nil {
+			if err := convertHoldingsCurrency(holdings, lotsMap, displayCurrency, router, user.UserID); err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 				return
 			}
 		}
 
-		c.JSON(consts.StatusOK, holdings)
+		// Attach lots to response
+		type HoldingWithLots struct {
+			models.Holding
+			Lots []models.HoldingLot `json:"lots"`
+		}
+		result := make([]HoldingWithLots, len(holdings))
+		for i, h := range holdings {
+			result[i] = HoldingWithLots{Holding: h, Lots: lotsMap[h.ID]}
+		}
+
+		c.JSON(consts.StatusOK, result)
 	}
 }

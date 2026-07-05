@@ -21,7 +21,7 @@ func setupRecordsTestDB(t *testing.T) *gorm.DB {
 
 func createTestRecord(t *testing.T, db *gorm.DB, timestamp int64) string {
 	t.Helper()
-	id := uuid.New().String()
+	id := uuid.New()
 	r := models.PortfolioRecord{
 		ID:          id,
 		UserID:      testUserID,
@@ -34,7 +34,7 @@ func createTestRecord(t *testing.T, db *gorm.DB, timestamp int64) string {
 	if err := db.Create(&r).Error; err != nil {
 		t.Fatal(err)
 	}
-	return id
+	return id.String()
 }
 
 // --- ListRecords ---
@@ -95,10 +95,13 @@ func TestListRecords_Unauthorized(t *testing.T) {
 func TestCreateRecord_FromHoldings(t *testing.T) {
 	db := setupRecordsTestDB(t)
 	// Need holdings for CreateRecord to work
+	holdingID := uuid.New()
 	db.Create(&models.Holding{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID, AssetId: "stocks",
+		ID: holdingID, UserID: testUserID, PortfolioID: testPortfolioID, AssetId: "stocks",
 		Symbol: "AAPL", Shares: decimal.NewFromInt(10), Price: decimal.NewFromInt(100), Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(900),
-		Lots: models.JSONColumn{{ID: uuid.New().String(), Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(900), ValueAdded: decimal.NewFromInt(1000)}},
+	})
+	db.Create(&models.HoldingLot{
+		ID: uuid.New(), HoldingID: holdingID, Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(900), ValueAdded: decimal.NewFromInt(1000),
 	})
 
 	c := newUserCtx("POST", "/api/records", nil)
@@ -150,8 +153,8 @@ func TestDeleteRecord_Success(t *testing.T) {
 	id := createTestRecord(t, db, 1000)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/records/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/records/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID: testUserID, Username: "testuser", Role: "user",
@@ -174,8 +177,8 @@ func TestDeleteRecord_NotFound(t *testing.T) {
 	db := setupRecordsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/records/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/records/nonexistent")
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID: testUserID, Username: "testuser", Role: "user",
@@ -249,7 +252,7 @@ func TestGetAvailableFunds_Default(t *testing.T) {
 func TestGetAvailableFunds_WithValue(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID:          uuid.New().String(),
+		ID:          uuid.New(),
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
@@ -272,11 +275,11 @@ func TestGetAvailableFunds_WithValue(t *testing.T) {
 func TestGetAvailableFunds_MultipleCurrencies(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "USD", Amount: decimal.NewFromInt(5000),
 	})
 
@@ -293,11 +296,11 @@ func TestGetAvailableFunds_MultipleCurrencies(t *testing.T) {
 func TestGetAvailableFunds_HidesZeroAmount(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "CNY", Amount: decimal.Zero,
 	})
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "USD", Amount: decimal.NewFromInt(100),
 	})
 
@@ -340,7 +343,7 @@ func TestTransferIn_Success(t *testing.T) {
 func TestTransferOut_InsufficientFunds(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "HKD", Amount: decimal.NewFromInt(100),
 	})
 
@@ -355,7 +358,7 @@ func TestTransferOut_InsufficientFunds(t *testing.T) {
 func TestTransferOut_Success(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "HKD", Amount: decimal.NewFromInt(100),
 	})
 
@@ -391,7 +394,7 @@ func TestConvertCurrency_AllowsTinyNonZeroRemainder(t *testing.T) {
 	rate := decimal.RequireFromString("7")
 
 	if err := db.Create(&models.AvailableFund{
-		ID:          uuid.New().String(),
+		ID:          uuid.New(),
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "USD",

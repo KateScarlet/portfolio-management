@@ -34,7 +34,7 @@ func newUserCtx(method, path string, body any) *app.RequestContext {
 		b, _ := json.Marshal(body)
 		c.Request.SetBodyRaw(b)
 	}
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}}
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}}
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
 		Username: "testuser",
@@ -89,15 +89,16 @@ func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	createTestHolding(t, db, 10, 100, 900)
 
-	otherPortfolioID := "other-portfolio-id"
-	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: "other-user", Name: "Other", IsDefault: true, CreatedAt: 1000})
+	otherPortfolioID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	otherUserID := uuid.MustParse("00000000-0000-0000-0000-000000000099")
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true, CreatedAt: 1000})
 
 	c := app.NewContext(1)
-	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID + "/holdings")
+	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID.String() + "/holdings")
 	c.Request.Header.SetMethod("GET")
-	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID}}
+	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID.String()}}
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
-		UserID:   "other-user",
+		UserID:   otherUserID,
 		Username: "other",
 		Role:     "user",
 	})
@@ -131,7 +132,7 @@ func TestListHoldings_Unauthorized(t *testing.T) {
 func TestCreateHolding_NewStockHolding(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	body := map[string]any{
@@ -166,7 +167,7 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "CNY", Amount: decimal.NewFromInt(10000),
 	})
 	createTestHolding(t, db, 10, 100, 900)
@@ -187,15 +188,15 @@ func TestCreateHolding_MergesIntoExisting(t *testing.T) {
 	if c.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200 (merge), got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
-	var holding models.Holding
-	if err := json.Unmarshal(c.Response.Body(), &holding); err != nil {
+	var resp HoldingResponse
+	if err := json.Unmarshal(c.Response.Body(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if !holding.Shares.Equal(decimal.NewFromInt(15)) {
-		t.Errorf("expected merged shares 15, got %s", holding.Shares)
+	if !resp.Shares.Equal(decimal.NewFromInt(15)) {
+		t.Errorf("expected merged shares 15, got %s", resp.Shares)
 	}
-	if len(holding.Lots) != 2 {
-		t.Errorf("expected 2 lots, got %d", len(holding.Lots))
+	if len(resp.Lots) != 2 {
+		t.Errorf("expected 2 lots, got %d", len(resp.Lots))
 	}
 }
 
@@ -229,7 +230,7 @@ func TestCreateHolding_ValidationErrors(t *testing.T) {
 func TestCreateHolding_DeductFromCash(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID:          uuid.New().String(),
+		ID:          uuid.New(),
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
@@ -265,7 +266,7 @@ func TestCreateHolding_DeductFromCash(t *testing.T) {
 func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID:          uuid.New().String(),
+		ID:          uuid.New(),
 		UserID:      testUserID,
 		PortfolioID: testPortfolioID,
 		Currency:    "CNY",
@@ -292,7 +293,7 @@ func TestCreateHolding_DeductFromCash_InsufficientFunds(t *testing.T) {
 func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "USD", Amount: decimal.NewFromInt(5000),
 	})
 
@@ -331,7 +332,7 @@ func TestCreateHolding_DeductFromCash_USD(t *testing.T) {
 func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	db.Create(&models.AvailableFund{
-		ID: uuid.New().String(), UserID: testUserID, PortfolioID: testPortfolioID,
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
 		Currency: "USD", Amount: decimal.NewFromInt(100),
 	})
 
@@ -358,10 +359,7 @@ func TestCreateHolding_DeductFromCash_USD_Insufficient(t *testing.T) {
 
 func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 	db := setupHoldingsTestDB(t)
-	id := uuid.New().String()
-	lots := models.JSONColumn{
-		{ID: uuid.New().String(), Date: time.UnixMilli(1000), Cost: decimal.NewFromInt(5000), ValueAdded: decimal.NewFromInt(5000)},
-	}
+	id := uuid.New()
 	h := models.Holding{
 		ID:          id,
 		UserID:      testUserID,
@@ -370,13 +368,21 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 		Name:        "手工债券",
 		Value:       decimal.NewFromInt(5000),
 		Cost:        decimal.NewFromInt(5000),
-		Lots:        lots,
 	}
 	db.Create(&h)
 
+	lot := models.HoldingLot{
+		ID:         uuid.New(),
+		HoldingID:  id,
+		Date:       time.UnixMilli(1000),
+		Cost:       decimal.NewFromInt(5000),
+		ValueAdded: decimal.NewFromInt(5000),
+	}
+	db.Create(&lot)
+
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id.String()}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id.String())
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"value": 6000}`))
@@ -392,7 +398,7 @@ func TestUpdateHolding_ManualValueUpdate(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 
-	var updated models.Holding
+	var updated HoldingResponse
 	if err := json.Unmarshal(c.Response.Body(), &updated); err != nil {
 		t.Fatal(err)
 	}
@@ -406,8 +412,8 @@ func TestUpdateHolding_BlockAssetIdChange(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"assetId": "bonds"}`))
@@ -429,13 +435,13 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	newLots := []map[string]any{
-		{"id": uuid.New().String(), "date": "1970-01-01T00:00:01Z", "shares": 20, "costPrice": 50, "cost": 1000, "valueAdded": 2000},
+		{"id": uuid.New(), "date": "1970-01-01T00:00:01Z", "shares": 20, "costPrice": 50, "cost": 1000, "valueAdded": 2000},
 	}
 	body := map[string]any{"lots": newLots}
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id)
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	b, _ := json.Marshal(body)
@@ -452,7 +458,7 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 
-	var updated models.Holding
+	var updated HoldingResponse
 	if err := json.Unmarshal(c.Response.Body(), &updated); err != nil {
 		t.Fatal(err)
 	}
@@ -468,8 +474,8 @@ func TestUpdateHolding_NotFound(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/nonexistent")
 	c.Request.Header.SetMethod("PATCH")
 	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
 	c.Request.SetBodyRaw([]byte(`{"name": "new"}`))
@@ -493,8 +499,8 @@ func TestDeleteHolding_Success(t *testing.T) {
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -519,8 +525,8 @@ func TestDeleteHolding_NotFound(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID + "/holdings/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: "nonexistent"}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/nonexistent")
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   testUserID,
@@ -539,15 +545,16 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
-	otherPortfolioID := "other-portfolio-id"
-	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: "other-user", Name: "Other", IsDefault: true, CreatedAt: 1000})
+	otherPortfolioID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	otherUserID := uuid.MustParse("00000000-0000-0000-0000-000000000099")
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true, CreatedAt: 1000})
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID}, {Key: "id", Value: id}}
-	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID + "/holdings/" + id)
+	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID.String() + "/holdings/" + id)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
-		UserID:   "other-user",
+		UserID:   otherUserID,
 		Username: "other",
 		Role:     "user",
 	})
@@ -569,7 +576,8 @@ func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80)},
 	}
-	if err := convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID); err != nil {
+	lotsMap := make(map[uuid.UUID][]models.HoldingLot)
+	if err := convertHoldingsCurrency(holdings, lotsMap, "CNY", testRouter(), testUserID); err != nil {
 		t.Fatal(err)
 	}
 	if !holdings[0].Value.Equal(decimal.NewFromInt(1000)) {
@@ -584,7 +592,8 @@ func TestConvertHoldingsCurrency_EmptyCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "", Value: decimal.NewFromInt(500), Cost: decimal.NewFromInt(400), Price: decimal.NewFromInt(50), CostPrice: decimal.NewFromInt(40)},
 	}
-	if err := convertHoldingsCurrency(holdings, "CNY", testRouter(), testUserID); err != nil {
+	lotsMap := make(map[uuid.UUID][]models.HoldingLot)
+	if err := convertHoldingsCurrency(holdings, lotsMap, "CNY", testRouter(), testUserID); err != nil {
 		t.Fatal(err)
 	}
 	if !holdings[0].Value.Equal(decimal.NewFromInt(500)) {

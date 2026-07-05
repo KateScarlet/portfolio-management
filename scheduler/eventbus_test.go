@@ -4,11 +4,18 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+)
+
+var (
+	user1 = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	user2 = uuid.MustParse("00000000-0000-0000-0000-000000000002")
 )
 
 func TestEventBus_Subscribe(t *testing.T) {
 	eb := NewEventBus()
-	ch, unsub := eb.Subscribe("user1")
+	ch, unsub := eb.Subscribe(user1)
 	defer unsub()
 
 	if ch == nil {
@@ -18,7 +25,7 @@ func TestEventBus_Subscribe(t *testing.T) {
 
 func TestEventBus_Publish(t *testing.T) {
 	eb := NewEventBus()
-	ch, unsub := eb.Subscribe("user1")
+	ch, unsub := eb.Subscribe(user1)
 	defer unsub()
 
 	event := Event{
@@ -28,7 +35,7 @@ func TestEventBus_Publish(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	eb.Publish("user1", event)
+	eb.Publish(user1, event)
 
 	select {
 	case received := <-ch:
@@ -45,8 +52,8 @@ func TestEventBus_Publish(t *testing.T) {
 
 func TestEventBus_PublishToMultipleSubscribers(t *testing.T) {
 	eb := NewEventBus()
-	ch1, unsub1 := eb.Subscribe("user1")
-	ch2, unsub2 := eb.Subscribe("user1")
+	ch1, unsub1 := eb.Subscribe(user1)
+	ch2, unsub2 := eb.Subscribe(user1)
 	defer unsub1()
 	defer unsub2()
 
@@ -57,7 +64,7 @@ func TestEventBus_PublishToMultipleSubscribers(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	eb.Publish("user1", event)
+	eb.Publish(user1, event)
 
 	for i, ch := range []<-chan Event{ch1, ch2} {
 		select {
@@ -73,8 +80,8 @@ func TestEventBus_PublishToMultipleSubscribers(t *testing.T) {
 
 func TestEventBus_PublishOnlyToUser(t *testing.T) {
 	eb := NewEventBus()
-	ch1, unsub1 := eb.Subscribe("user1")
-	ch2, unsub2 := eb.Subscribe("user2")
+	ch1, unsub1 := eb.Subscribe(user1)
+	ch2, unsub2 := eb.Subscribe(user2)
 	defer unsub1()
 	defer unsub2()
 
@@ -85,7 +92,7 @@ func TestEventBus_PublishOnlyToUser(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	eb.Publish("user1", event)
+	eb.Publish(user1, event)
 
 	select {
 	case <-ch1:
@@ -104,7 +111,7 @@ func TestEventBus_PublishOnlyToUser(t *testing.T) {
 
 func TestEventBus_Unsubscribe(t *testing.T) {
 	eb := NewEventBus()
-	ch, unsub := eb.Subscribe("user1")
+	ch, unsub := eb.Subscribe(user1)
 
 	unsub()
 
@@ -115,7 +122,7 @@ func TestEventBus_Unsubscribe(t *testing.T) {
 		Timestamp:   time.Now(),
 	}
 
-	eb.Publish("user1", event)
+	eb.Publish(user1, event)
 
 	select {
 	case _, ok := <-ch:
@@ -129,7 +136,7 @@ func TestEventBus_Unsubscribe(t *testing.T) {
 
 func TestEventBus_BufferFull_DropsEvent(t *testing.T) {
 	eb := NewEventBus()
-	ch, unsub := eb.Subscribe("user1")
+	ch, unsub := eb.Subscribe(user1)
 	defer unsub()
 
 	event := Event{
@@ -141,11 +148,11 @@ func TestEventBus_BufferFull_DropsEvent(t *testing.T) {
 
 	// Fill the buffer
 	for range subscriberBufferSize {
-		eb.Publish("user1", event)
+		eb.Publish(user1, event)
 	}
 
 	// This should be dropped
-	eb.Publish("user1", event)
+	eb.Publish(user1, event)
 
 	// Drain the buffer
 	for range subscriberBufferSize {
@@ -163,7 +170,7 @@ func TestEventBus_BufferFull_DropsEvent(t *testing.T) {
 
 func TestEventBus_ConcurrentPublish(t *testing.T) {
 	eb := NewEventBus()
-	ch, unsub := eb.Subscribe("user1")
+	ch, unsub := eb.Subscribe(user1)
 	defer unsub()
 
 	const goroutines = 100
@@ -173,7 +180,7 @@ func TestEventBus_ConcurrentPublish(t *testing.T) {
 	for range goroutines {
 		go func() {
 			defer wg.Done()
-			eb.Publish("user1", Event{
+			eb.Publish(user1, Event{
 				Type:        EventSyncStarted,
 				PortfolioID: "portfolio1",
 				Data:        SyncStartedData{},
@@ -209,7 +216,7 @@ func TestEventBus_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	for range goroutines {
 		go func() {
 			defer wg.Done()
-			ch, unsub := eb.Subscribe("user1")
+			ch, unsub := eb.Subscribe(user1)
 			// Immediately unsubscribe
 			unsub()
 			// Channel should be closed
@@ -225,13 +232,13 @@ func TestEventBus_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 
 func TestEventBus_SubscribeUserIsolation(t *testing.T) {
 	eb := NewEventBus()
-	ch1, unsub1 := eb.Subscribe("user1")
-	ch2, unsub2 := eb.Subscribe("user2")
+	ch1, unsub1 := eb.Subscribe(user1)
+	ch2, unsub2 := eb.Subscribe(user2)
 	defer unsub1()
 	defer unsub2()
 
 	// Publish to user1
-	eb.Publish("user1", Event{
+	eb.Publish(user1, Event{
 		Type:        EventSyncStarted,
 		PortfolioID: "p1",
 		Data:        SyncStartedData{},
@@ -239,7 +246,7 @@ func TestEventBus_SubscribeUserIsolation(t *testing.T) {
 	})
 
 	// Publish to user2
-	eb.Publish("user2", Event{
+	eb.Publish(user2, Event{
 		Type:        EventSyncCompleted,
 		PortfolioID: "p2",
 		Data:        SyncCompletedData{},

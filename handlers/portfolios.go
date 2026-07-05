@@ -47,7 +47,7 @@ func CreatePortfolio(db *gorm.DB) app.HandlerFunc {
 		}
 
 		portfolio := models.Portfolio{
-			ID:          uuid.New().String(),
+			ID:          uuid.New(),
 			UserID:      user.UserID,
 			Name:        body.Name,
 			Description: body.Description,

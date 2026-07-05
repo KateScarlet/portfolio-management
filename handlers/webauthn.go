@@ -94,7 +94,7 @@ func (u *webauthnUser) WebAuthnName() string                       { return u.na
 func (u *webauthnUser) WebAuthnDisplayName() string                { return u.displayName }
 func (u *webauthnUser) WebAuthnCredentials() []webauthn.Credential { return u.credentials }
 
-func loadUserCredentials(gormDB *gorm.DB, userID string) []webauthn.Credential {
+func loadUserCredentials(gormDB *gorm.DB, userID uuid.UUID) []webauthn.Credential {
 	var creds []models.WebAuthnCredential
 	gormDB.Where("user_id = ?", userID).Find(&creds)
 	result := make([]webauthn.Credential, len(creds))
@@ -112,21 +112,24 @@ func loadUserCredentials(gormDB *gorm.DB, userID string) []webauthn.Credential {
 	return result
 }
 
-func loadUserByID(gormDB *gorm.DB, id string) (*models.User, error) {
+func loadUserByID(gormDB *gorm.DB, id uuid.UUID) (*models.User, error) {
 	var user models.User
 	err := gormDB.Where("id = ?", id).First(&user).Error
 	return &user, err
 }
 
 func loadWebAuthnUser(gormDB *gorm.DB, userHandle []byte) (*webauthnUser, error) {
-	userID := string(userHandle)
+	userID, err := uuid.FromBytes(userHandle)
+	if err != nil {
+		return nil, err
+	}
 	user, err := loadUserByID(gormDB, userID)
 	if err != nil {
 		return nil, err
 	}
 	creds := loadUserCredentials(gormDB, user.ID)
 	return &webauthnUser{
-		id:          []byte(user.ID),
+		id:          user.ID[:],
 		name:        user.Username,
 		displayName: user.Username,
 		credentials: creds,
@@ -175,7 +178,7 @@ func WebAuthnRegisterStart(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 		existingCreds := loadUserCredentials(gormDB, user.ID)
 		webUser := &webauthnUser{
-			id:          []byte(user.ID),
+			id:          user.ID[:],
 			name:        user.Username,
 			displayName: user.Username,
 			credentials: existingCreds,
@@ -273,7 +276,7 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 
 		existingCreds := loadUserCredentials(gormDB, user.ID)
 		webUser := &webauthnUser{
-			id:          []byte(user.ID),
+			id:          user.ID[:],
 			name:        user.Username,
 			displayName: user.Username,
 			credentials: existingCreds,
@@ -306,7 +309,7 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		newCred := models.WebAuthnCredential{
-			ID:           uuid.New().String(),
+			ID:           uuid.New(),
 			UserID:       user.ID,
 			Name:         credName,
 			CredentialID: credential.ID,
@@ -428,7 +431,12 @@ func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		var dbUser models.User
-		if err := gormDB.Where("id = ?", string(user.WebAuthnID())).First(&dbUser).Error; err != nil {
+		webAuthnID, err := uuid.FromBytes(user.WebAuthnID())
+		if err != nil {
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
+			return
+		}
+		if err := gormDB.Where("id = ?", webAuthnID).First(&dbUser).Error; err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return
 		}

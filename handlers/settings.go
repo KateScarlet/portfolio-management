@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +28,11 @@ func ListSettings(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -60,7 +65,11 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -111,7 +120,7 @@ func UpdateSetting(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 	}
 }
 
-func upsertSetting(db *gorm.DB, ctx context.Context, key, value, userID, portfolioID string) error {
+func upsertSetting(db *gorm.DB, ctx context.Context, key, value string, userID, portfolioID uuid.UUID) error {
 	_, err := gorm.G[models.Setting](db).Where("key = ? AND user_id = ? AND portfolio_id = ?", key, userID, portfolioID).First(ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return gorm.G[models.Setting](db).Create(ctx, &models.Setting{Key: key, Value: value, UserID: userID, PortfolioID: portfolioID})
@@ -131,7 +140,11 @@ func GetAvailableFunds(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -173,7 +186,11 @@ func BatchUpdateSettings(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFu
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)

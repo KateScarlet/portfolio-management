@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +21,11 @@ func TriggerSync(db *gorm.DB, s *scheduler.PriceScheduler) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)

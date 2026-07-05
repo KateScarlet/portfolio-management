@@ -24,7 +24,11 @@ func ListRecords(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -53,7 +57,11 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -94,16 +102,28 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 		}
 
-		// Deep copy holdings for summary computation (convertHoldingsCurrency mutates in-place)
-		convertedHoldings := make([]models.Holding, len(holdings))
-		for i := range holdings {
-			convertedHoldings[i] = holdings[i]
-			if len(holdings[i].Lots) > 0 {
-				convertedHoldings[i].Lots = make(models.JSONColumn, len(holdings[i].Lots))
-				copy(convertedHoldings[i].Lots, holdings[i].Lots)
-			}
+		// Load lots for currency conversion
+		holdingIDs := make([]uuid.UUID, len(holdings))
+		for i, h := range holdings {
+			holdingIDs[i] = h.ID
 		}
-		if err := convertHoldingsCurrency(convertedHoldings, displayCurrency, router, user.UserID); err != nil {
+		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		// Deep copy lots for summary computation (convertHoldingsCurrency mutates in-place)
+		convertedLotsMap := make(map[uuid.UUID][]models.HoldingLot, len(lotsMap))
+		for k, lots := range lotsMap {
+			cp := make([]models.HoldingLot, len(lots))
+			copy(cp, lots)
+			convertedLotsMap[k] = cp
+		}
+
+		convertedHoldings := make([]models.Holding, len(holdings))
+		copy(convertedHoldings, holdings)
+		if err := convertHoldingsCurrency(convertedHoldings, convertedLotsMap, displayCurrency, router, user.UserID); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -127,7 +147,7 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		record := models.PortfolioRecord{
-			ID:          uuid.New().String(),
+			ID:          uuid.New(),
 			UserID:      user.UserID,
 			PortfolioID: portfolioID,
 			Timestamp:   time.Now().UnixMilli(),
@@ -154,7 +174,11 @@ func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -166,7 +190,11 @@ func DeleteRecord(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		id := c.Param("id")
+		id, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的记录ID"})
+			return
+		}
 		rows, err := gorm.G[models.PortfolioRecord](db).Where("portfolio_id = ? AND id = ?", portfolioID, id).Delete(ctx)
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

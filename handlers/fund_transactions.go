@@ -20,11 +20,11 @@ import (
 
 var currencyConversionTolerance = decimal.RequireFromString("0.01")
 
-func CalcPrincipal(db *gorm.DB, portfolioID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
+func CalcPrincipal(db *gorm.DB, portfolioID uuid.UUID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	return calcPrincipalByQuery(db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
-func CalcPrincipalByUser(db *gorm.DB, userID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
+func CalcPrincipalByUser(db *gorm.DB, userID uuid.UUID, targetCurrency string, router *marketsource.Router) (decimal.Decimal, error) {
 	return calcPrincipalByQuery(db.Where("user_id = ? AND type IN ?", userID, []string{"transfer_in", "transfer_out"}), targetCurrency, router)
 }
 
@@ -49,7 +49,7 @@ func calcPrincipalByQuery(query *gorm.DB, targetCurrency string, router *markets
 			total = total.Add(amount)
 			continue
 		}
-		rate, err := router.ExchangeRate("", currency+targetCurrency)
+		rate, err := router.ExchangeRate(uuid.UUID{}, currency+targetCurrency)
 		if err != nil {
 			return decimal.Zero, fmt.Errorf("获取 %s 汇率失败: %w", currency+targetCurrency, err)
 		}
@@ -66,7 +66,11 @@ func ListFundTransactions(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid portfolio id"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -103,7 +107,11 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid portfolio id"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -138,7 +146,7 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			return tx.Create(&models.FundTransaction{
-				ID:          uuid.New().String(),
+				ID:          uuid.New(),
 				UserID:      user.UserID,
 				PortfolioID: portfolioID,
 				Type:        "transfer_in",
@@ -170,7 +178,11 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid portfolio id"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -205,7 +217,7 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			return tx.Create(&models.FundTransaction{
-				ID:          uuid.New().String(),
+				ID:          uuid.New(),
 				UserID:      user.UserID,
 				PortfolioID: portfolioID,
 				Type:        "transfer_out",
@@ -238,7 +250,11 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid portfolio id"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -272,11 +288,16 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "targetPortfolioId 不能为空"})
 			return
 		}
-		if body.TargetPortfolioID == portfolioID {
+		targetPortfolioID, err := uuid.Parse(body.TargetPortfolioID)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid target portfolio id"})
+			return
+		}
+		if targetPortfolioID == portfolioID {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能划转到同一个组合"})
 			return
 		}
-		ownsTarget, err := userOwnsPortfolio(db, user.UserID, body.TargetPortfolioID)
+		ownsTarget, err := userOwnsPortfolio(db, user.UserID, targetPortfolioID)
 		if err != nil {
 			slog.Error("failed to check target portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -291,32 +312,32 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 			if err := deductAvailableFund(tx, user.UserID, portfolioID, body.Currency, body.Amount); err != nil {
 				return err
 			}
-			if err := addAvailableFund(tx, user.UserID, body.TargetPortfolioID, body.Currency, body.Amount); err != nil {
+			if err := addAvailableFund(tx, user.UserID, targetPortfolioID, body.Currency, body.Amount); err != nil {
 				return err
 			}
 
 			now := time.Now().UnixMilli()
 			if err := tx.Create(&models.FundTransaction{
-				ID:                uuid.New().String(),
+				ID:                uuid.New(),
 				UserID:            user.UserID,
 				PortfolioID:       portfolioID,
 				Type:              "transfer_out",
 				Amount:            body.Amount,
 				Currency:          body.Currency,
-				TargetPortfolioID: body.TargetPortfolioID,
+				TargetPortfolioID: &targetPortfolioID,
 				Note:              body.Note,
 				CreatedAt:         now,
 			}).Error; err != nil {
 				return err
 			}
 			return tx.Create(&models.FundTransaction{
-				ID:                uuid.New().String(),
+				ID:                uuid.New(),
 				UserID:            user.UserID,
-				PortfolioID:       body.TargetPortfolioID,
+				PortfolioID:       targetPortfolioID,
 				Type:              "transfer_in",
 				Amount:            body.Amount,
 				Currency:          body.Currency,
-				TargetPortfolioID: portfolioID,
+				TargetPortfolioID: &portfolioID,
 				Note:              "从其他组合划转转入",
 				CreatedAt:         now,
 			}).Error
@@ -344,7 +365,11 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid portfolio id"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -401,7 +426,7 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			return tx.Create(&models.FundTransaction{
-				ID:             uuid.New().String(),
+				ID:             uuid.New(),
 				UserID:         user.UserID,
 				PortfolioID:    portfolioID,
 				Type:           "convert",
@@ -428,12 +453,12 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
-func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
+func addAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, amount decimal.Decimal) error {
 	var af models.AvailableFund
 	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return tx.Create(&models.AvailableFund{
-			ID:          uuid.New().String(),
+			ID:          uuid.New(),
 			UserID:      userID,
 			PortfolioID: portfolioID,
 			Currency:    currency,
@@ -447,7 +472,7 @@ func addAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount 
 	return tx.Model(&af).Update("amount", newAmount).Error
 }
 
-func deductAvailableFund(tx *gorm.DB, userID, portfolioID, currency string, amount decimal.Decimal) error {
+func deductAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, amount decimal.Decimal) error {
 	var af models.AvailableFund
 	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

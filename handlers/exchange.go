@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 )
 
 func GetExchange(router *marketsource.Router) app.HandlerFunc {
@@ -18,7 +19,7 @@ func GetExchange(router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		var userID string
+		var userID uuid.UUID
 		if user := middleware.GetUser(c); user != nil {
 			userID = user.UserID
 		}

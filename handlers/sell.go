@@ -32,7 +32,11 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
 		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
@@ -44,7 +48,11 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		id := c.Param("id")
+		id, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的持仓ID"})
+			return
+		}
 
 		var input SellRequest
 		if err := c.BindJSON(&input); err != nil {
@@ -78,6 +86,11 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
 				}
+				return err
+			}
+
+			lots, err := models.LoadLots(tx, holding.ID)
+			if err != nil {
 				return err
 			}
 
@@ -133,7 +146,8 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				sellDate = *input.Date
 			}
 			sellLot := models.HoldingLot{
-				ID:        uuid.New().String(),
+				ID:        uuid.New(),
+				HoldingID: holding.ID,
 				Type:      "sell",
 				Date:      sellDate,
 				CostPrice: holding.CostPrice,
@@ -147,17 +161,19 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				sellLot.ValueAdded = input.Value
 			}
 
-			holding.Lots = append(holding.Lots, sellLot)
-			holding.RecalcFromLots()
+			lots = append(lots, sellLot)
+			models.RecalcFromLots(&holding, lots)
 
 			updates := map[string]any{
 				"shares":    holding.Shares,
 				"value":     holding.Value,
 				"cost":      holding.Cost,
 				"costPrice": holding.CostPrice,
-				"lots":      holding.Lots,
 			}
 			if err := tx.Model(&holding).Updates(updates).Error; err != nil {
+				return err
+			}
+			if err := models.CreateLot(tx, &sellLot); err != nil {
 				return err
 			}
 
@@ -177,7 +193,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					}
 				case errors.Is(err, gorm.ErrRecordNotFound):
 					newFundsAmount = realizedValue
-					if err := tx.Create(&models.AvailableFund{ID: uuid.New().String(), UserID: user.UserID, PortfolioID: portfolioID, Currency: currency, Amount: newFundsAmount}).Error; err != nil {
+					if err := tx.Create(&models.AvailableFund{ID: uuid.New(), UserID: user.UserID, PortfolioID: portfolioID, Currency: currency, Amount: newFundsAmount}).Error; err != nil {
 						return err
 					}
 				default:
@@ -185,13 +201,13 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				}
 
 				if err := tx.Create(&models.FundTransaction{
-					ID:          uuid.New().String(),
+					ID:          uuid.New(),
 					UserID:      user.UserID,
 					PortfolioID: portfolioID,
 					Type:        "sell",
 					Amount:      realizedValue,
 					Currency:    currency,
-					HoldingID:   holding.ID,
+					HoldingID:   &holding.ID,
 					CreatedAt:   time.Now().UnixMilli(),
 				}).Error; err != nil {
 					return err
@@ -210,8 +226,10 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// Reload lots for response
+		lots, _ := models.LoadLots(db, holding.ID)
 		c.JSON(consts.StatusOK, map[string]any{
-			"soldHolding":    holding,
+			"soldHolding":    HoldingResponse{Holding: holding, Lots: lots},
 			"availableFunds": newFundsAmount.StringFixed(2),
 		})
 	}
