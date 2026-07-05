@@ -46,7 +46,7 @@ export default function BuyModal({
         showToast("请输入有效的买入份额", "error")
         return
       }
-      if (priceNum.isNegative() || priceNum.isZero()) {
+      if (priceNum.isNegative()) {
         showToast("请输入有效的买入单价", "error")
         return
       }
@@ -92,7 +92,7 @@ export default function BuyModal({
     } else {
       const p = new Decimal(manualPrice)
       const s = new Decimal(manualShares)
-      if (p.isNegative() || p.isZero() || s.isNegative() || s.isZero()) {
+      if (p.isNegative() || s.isNegative() || s.isZero()) {
         showToast("请输入有效的单价和份额", "error")
         return
       }
