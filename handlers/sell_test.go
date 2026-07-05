@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
@@ -11,8 +12,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
 	"github.com/google/uuid"
-	"github.com/libtnb/sqlite"
 	"github.com/shopspring/decimal"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +22,11 @@ const testPortfolioID = "test-portfolio-id"
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "postgres://localhost:5432/portfolio_test?sslmode=disable"
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

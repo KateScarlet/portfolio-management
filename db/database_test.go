@@ -41,8 +41,8 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	cfg := &Config{
 		JWTSecret: "test-secret-123",
 	}
-	cfg.Database.Type = "sqlite"
-	cfg.Database.DSN = "test.db"
+	cfg.Database.Type = "postgres"
+	cfg.Database.DSN = "postgres://localhost:5432/test?sslmode=disable"
 
 	if err := SaveConfig(cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
@@ -60,7 +60,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	if !contains(content, "test-secret-123") {
 		t.Error("config file missing jwtSecret")
 	}
-	if !contains(content, "sqlite") {
+	if !contains(content, "postgres") {
 		t.Error("config file missing database type")
 	}
 }
@@ -96,38 +96,28 @@ func TestGenerateJWTSecret_Unique(t *testing.T) {
 	}
 }
 
-func TestInit_SQLite(t *testing.T) {
-	dir := t.TempDir()
+func TestInit_UnsupportedDB(t *testing.T) {
 	cfg := &Config{}
 	cfg.Database.Type = "sqlite"
-	cfg.Database.DSN = filepath.Join(dir, "test.db")
+	cfg.Database.DSN = "test.db"
 
-	db, err := Init(cfg)
-	if err != nil {
-		t.Fatalf("Init failed: %v", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sqlDB.Close() //nolint:errcheck // test cleanup
-
-	if err := sqlDB.Ping(); err != nil {
-		t.Fatalf("database not reachable: %v", err)
+	_, err := Init(cfg)
+	if err == nil {
+		t.Fatal("expected error for unsupported database type")
 	}
 }
 
 func TestInit_NilConfig(t *testing.T) {
-	dir := t.TempDir()
-	SetBaseDir(dir)
-	defer SetBaseDir("")
-
-	if err := os.MkdirAll(filepath.Join(dir, "data"), 0o750); err != nil {
-		t.Fatal(err)
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "postgres://localhost:5432/portfolio_test?sslmode=disable"
 	}
 
-	db, err := Init(nil)
+	cfg := &Config{}
+	cfg.Database.Type = "postgres"
+	cfg.Database.DSN = dsn
+
+	db, err := Init(cfg)
 	if err != nil {
 		t.Fatalf("Init with nil config failed: %v", err)
 	}

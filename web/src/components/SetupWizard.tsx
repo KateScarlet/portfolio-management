@@ -7,7 +7,7 @@ interface SetupWizardProps {
 
 export default function SetupWizard({ onComplete }: SetupWizardProps) {
   const [step, setStep] = useState(0)
-  const [databaseType, setDatabaseType] = useState("sqlite")
+  const [databaseType] = useState("postgres")
   const [databaseDsn, setDatabaseDsn] = useState("")
   const [adminUsername, setAdminUsername] = useState("")
   const [adminPassword, setAdminPassword] = useState("")
@@ -60,31 +60,32 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                 <p className="text-xs text-[#6C757D] mb-3">选择用于存储数据的数据库类型。</p>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setDatabaseType("sqlite")}
-                    className={`flex-1 px-4 py-3 rounded-lg border text-sm transition-colors ${
-                      databaseType === "sqlite"
-                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                        : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
-                    }`}
-                  >
-                    <div className="font-medium">SQLite</div>
-                    <div className="text-xs mt-1 opacity-75">零配置，适合个人使用</div>
-                  </button>
-                  <button
-                    onClick={() => setDatabaseType("postgres")}
-                    className={`flex-1 px-4 py-3 rounded-lg border text-sm transition-colors ${
-                      databaseType === "postgres"
-                        ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                        : "bg-white text-[#6C757D] border-[#E9ECEF] hover:border-[#ADB5BD]"
-                    }`}
+                    className="flex-1 px-4 py-3 rounded-lg border text-sm transition-colors bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-default"
                   >
                     <div className="font-medium">PostgreSQL</div>
-                    <div className="text-xs mt-1 opacity-75">适合多用户部署</div>
+                    <div className="text-xs mt-1 opacity-75">推荐，适合生产环境</div>
                   </button>
                 </div>
               </div>
 
-              {databaseType === "postgres" && (
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setStep(1)}
+                  className="px-4 py-2 text-sm bg-[#1A1A1A] text-white rounded-lg hover:bg-[#333] transition-colors"
+                >
+                  下一步
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                  数据库连接
+                </label>
+                <p className="text-xs text-[#6C757D] mb-3">配置 PostgreSQL 数据库连接。</p>
                 <div>
                   <label className="block text-xs font-medium text-[#6C757D] mb-1">
                     连接地址 (DSN)
@@ -100,12 +101,18 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                     格式: postgres://用户名:密码@主机:端口/数据库名?sslmode=disable
                   </p>
                 </div>
-              )}
+              </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-between pt-2">
                 <button
-                  onClick={() => setStep(1)}
-                  disabled={databaseType === "postgres" && !databaseDsn}
+                  onClick={() => setStep(0)}
+                  className="px-4 py-2 text-sm text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
+                >
+                  上一步
+                </button>
+                <button
+                  onClick={() => setStep(2)}
+                  disabled={!databaseDsn}
                   className="px-4 py-2 text-sm bg-[#1A1A1A] text-white rounded-lg hover:bg-[#333] transition-colors disabled:opacity-50"
                 >
                   下一步
@@ -114,7 +121,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
             </>
           )}
 
-          {step === 1 && (
+          {step === 2 && (
             <>
               <div>
                 <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
@@ -143,7 +150,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
               <div className="flex justify-between pt-2">
                 <button
-                  onClick={() => setStep(0)}
+                  onClick={() => setStep(1)}
                   className="px-4 py-2 text-sm text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
                 >
                   上一步

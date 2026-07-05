@@ -10,7 +10,6 @@ import (
 	"portfolio-management/models"
 	"time"
 
-	"github.com/libtnb/sqlite"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -69,8 +68,8 @@ func LoadConfig() *Config {
 	v.SetConfigFile(ConfigFile())
 	v.SetConfigType("yaml")
 
-	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.dsn", filepath.Join(BaseDir(), "data", "portfolio.db"))
+	v.SetDefault("database.type", "postgres")
+	v.SetDefault("database.dsn", "postgres://localhost:5432/portfolio?sslmode=disable")
 
 	if err := v.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
@@ -112,71 +111,18 @@ func Init(cfg *Config) (*gorm.DB, error) {
 
 	dbType := cfg.Database.Type
 	if dbType == "" {
-		dbType = "sqlite"
+		dbType = "postgres"
 	}
 	dsn := cfg.Database.DSN
 	if dsn == "" {
-		if dbType == "postgres" {
-			dsn = "postgres://localhost:5432/portfolio?sslmode=disable"
-		} else {
-			dsn = filepath.Join(BaseDir(), "data", "portfolio.db")
-		}
-	} else if dbType == "sqlite" && !filepath.IsAbs(dsn) {
-		dsn = filepath.Join(BaseDir(), dsn)
+		dsn = "postgres://localhost:5432/portfolio?sslmode=disable"
 	}
 
-	switch dbType {
-	case "postgres":
-		return initPostgres(dsn)
-	default:
-		return initSQLite(dsn)
-	}
-}
-
-func initSQLite(dsn string) (*gorm.DB, error) {
-	if dir := filepath.Dir(dsn); dir != "." {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return nil, fmt.Errorf("failed to create database directory: %w", err)
-		}
+	if dbType != "postgres" {
+		return nil, fmt.Errorf("unsupported database type: %s (only postgres is supported)", dbType)
 	}
 
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	sqlDB.SetMaxOpenConns(5)
-	sqlDB.SetMaxIdleConns(5)
-
-	db.Exec("PRAGMA journal_mode=WAL")
-
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
-		return nil, err
-	}
-
-	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_symbol")
-	db.Exec("DROP INDEX IF EXISTS idx_holdings_portfolio_name_asset")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_portfolio_ts ON portfolio_records(portfolio_id, timestamp DESC)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
-	db.Exec("DELETE FROM holdings WHERE user_id = '' OR user_id IS NULL")
-	db.Exec("DELETE FROM portfolio_records WHERE user_id = '' OR user_id IS NULL")
-	db.Exec("DELETE FROM settings WHERE user_id IS NULL")
-
-	return db, nil
+	return initPostgres(dsn)
 }
 
 func initPostgres(dsn string) (*gorm.DB, error) {

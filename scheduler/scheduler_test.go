@@ -1,19 +1,24 @@
 package scheduler
 
 import (
+	"os"
 	"portfolio-management/marketsource"
 	"portfolio-management/models"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/libtnb/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		dsn = "postgres://localhost:5432/portfolio_test?sslmode=disable"
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

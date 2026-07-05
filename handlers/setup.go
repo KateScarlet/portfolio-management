@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"path/filepath"
 	"portfolio-management/db"
 	"time"
 
@@ -33,14 +32,10 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 		}
 
 		if body.DatabaseType == "" {
-			body.DatabaseType = "sqlite"
+			body.DatabaseType = "postgres"
 		}
 		if body.DatabaseDSN == "" {
-			if body.DatabaseType == "postgres" {
-				body.DatabaseDSN = "postgres://localhost:5432/portfolio?sslmode=disable"
-			} else {
-				body.DatabaseDSN = filepath.Join(db.BaseDir(), "data", "portfolio.db")
-			}
+			body.DatabaseDSN = "postgres://localhost:5432/portfolio?sslmode=disable"
 		}
 
 		if body.Username == "" || body.Password == "" {
