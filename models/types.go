@@ -74,7 +74,7 @@ type Holding struct {
 	AssetId        string          `gorm:"size:20;not null;comment:资产类型(stock/bond/fund等)" json:"assetId"`
 	Symbol         string          `gorm:"size:20;default:'';comment:资产代码(如AAPL)" json:"symbol"`
 	Name           string          `gorm:"size:200;default:'';comment:资产名称" json:"name,omitempty"`
-	Market         string          `gorm:"size:10;default:'';comment:市场代码(如US/HK)" json:"market,omitempty"`
+	Market         string          `gorm:"size:20;default:'';comment:市场代码(如US/HK)" json:"market,omitempty"`
 	Currency       string          `gorm:"size:10;default:'CNY';comment:计价货币" json:"currency"`
 	Shares         decimal.Decimal `gorm:"type:decimal;default:0;comment:持有份额/股数" json:"shares"`
 	Price          decimal.Decimal `gorm:"type:decimal;default:0;comment:当前价格" json:"price"`
