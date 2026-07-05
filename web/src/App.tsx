@@ -307,7 +307,7 @@ export default function App() {
 
   const handleSaveSettings = useCallback(
     async (newSettings: Settings) => {
-      if (!currentPortfolio) return
+      if (!currentPortfolio) throw new Error("未选择组合")
       try {
         await api.updateSettings(currentPortfolio.id, {
           driftThreshold: String(newSettings.driftThreshold),
@@ -330,6 +330,7 @@ export default function App() {
         setSettings(newSettings)
       } catch (e) {
         console.error("Failed to save settings", e)
+        throw e
       }
     },
     [currentPortfolio]

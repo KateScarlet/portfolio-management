@@ -22,10 +22,11 @@ import {
   Loader2,
 } from "lucide-react"
 import * as api from "../api"
+import { useToast } from "./toast-context"
 
 interface SettingsPanelProps {
   settings: Settings
-  onSave: (settings: Settings) => void
+  onSave: (settings: Settings) => void | Promise<void>
   userRole: "admin" | "user"
 }
 
@@ -62,9 +63,11 @@ const SECTIONS = [
 ]
 
 export default function SettingsPanel({ settings, onSave, userRole }: SettingsPanelProps) {
+  const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState("invest")
   const [draft, setDraft] = useState(settings)
+  const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">(
@@ -129,18 +132,15 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
   }
 
   const handleSave = async () => {
-    onSave(draft)
-    if (userRole === "admin") {
-      if (oidcConfig) {
-        try {
+    setSaving(true)
+    try {
+      await onSave(draft)
+      if (userRole === "admin") {
+        if (oidcConfig) {
           const result = await api.updateOIDCConfig(oidcDraft)
           setOidcConfig(result)
           setOidcDraft(result)
-        } catch (e) {
-          console.error("Failed to save OIDC config", e)
         }
-      }
-      try {
         const origins = webauthnDraft.rpOrigins
           .split(",")
           .map((s) => s.trim())
@@ -150,17 +150,17 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
           rpid: webauthnDraft.rpid,
           rpOrigins: origins,
         })
-      } catch (e) {
-        console.error("Failed to save WebAuthn config", e)
       }
-    }
-    try {
       await api.updateMarketSources(marketSourceDraft)
+      setIsOpen(false)
+      setTestResult(null)
+      showToast("设置保存成功", "success")
     } catch (e) {
-      console.error("Failed to save market sources", e)
+      console.error("Failed to save settings", e)
+      showToast(e instanceof Error ? `设置保存失败：${e.message}` : "设置保存失败", "error")
+    } finally {
+      setSaving(false)
     }
-    setIsOpen(false)
-    setTestResult(null)
   }
 
   const handleTestConnection = async () => {
@@ -975,9 +975,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 text-sm bg-[#1A1A1A] text-white rounded-lg hover:bg-[#333] transition-colors"
+                disabled={saving}
+                className="px-4 py-2 text-sm bg-[#1A1A1A] text-white rounded-lg hover:bg-[#333] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                保存
+                {saving ? "保存中..." : "保存"}
               </button>
             </div>
           </div>
