@@ -34,6 +34,9 @@ var (
 		"scm":    "桶",
 		"cum":    "吨",
 	}
+
+	// US stock secid cache: ticker -> secid (e.g., "AAPL" -> "105.AAPL")
+	usSecidCache = make(map[string]string)
 )
 
 type eastmoneyResponse struct {
@@ -70,6 +73,56 @@ func Init() {
 			status := r.StatusCode()
 			return status == 429 || status >= 500
 		})
+}
+
+// Search API response for resolving US stock secid
+type searchResponse struct {
+	QuotationCodeTable struct {
+		Data []struct {
+			QuoteID string `json:"QuoteID"`
+			JYS     string `json:"JYS"`
+		} `json:"Data"`
+	} `json:"QuotationCodeTable"`
+}
+
+// resolveUSSecid queries the search API to get the correct secid for US stocks.
+// Different US exchanges use different market IDs: 105=NASDAQ, 106=NYSE, 107=AMEX.
+func resolveUSSecid(ticker string) (string, error) {
+	if httpClient == nil {
+		return "", fmt.Errorf("eastmoney client not initialized")
+	}
+
+	// Check cache first
+	if secid, ok := usSecidCache[ticker]; ok {
+		return secid, nil
+	}
+
+	var resp searchResponse
+	r, err := httpClient.R().
+		SetQueryParam("input", ticker).
+		SetQueryParam("type", "14").
+		SetQueryParam("token", "D43BF722C8E33BDC906FB84D85E326E8").
+		SetQueryParam("count", "5").
+		SetResult(&resp).
+		Get("https://searchapi.eastmoney.com/api/suggest/get")
+	if err != nil {
+		return "", fmt.Errorf("eastmoney search request failed: %w", err)
+	}
+	if r.IsError() {
+		return "", fmt.Errorf("eastmoney search returned status %d", r.StatusCode())
+	}
+
+	// Find the matching US stock entry
+	for _, item := range resp.QuotationCodeTable.Data {
+		if item.QuoteID != "" {
+			secid := item.QuoteID
+			usSecidCache[ticker] = secid
+			return secid, nil
+		}
+	}
+
+	// Fallback to default 105 prefix if search fails
+	return "105." + ticker, nil
 }
 
 type Client struct{}
@@ -224,7 +277,11 @@ func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney client not initialized, call eastmoney.Init() first")
 	}
 
-	secid := marketsource.NormalizeForSource(symbol, "US", "eastmoney")
+	ticker := strings.TrimSuffix(symbol, ".US")
+	secid, err := resolveUSSecid(ticker)
+	if err != nil {
+		return nil, err
+	}
 
 	var resp eastmoneyResponse
 	r, err := httpClient.R().
