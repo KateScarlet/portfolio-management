@@ -16,6 +16,7 @@ import BuyModal from "./BuyModal"
 import SellModal from "./SellModal"
 import DividendModal from "./DividendModal"
 import ConfirmDialog from "./ConfirmDialog"
+import { useToast } from "./toast-context"
 
 interface HoldingsManagerProps {
   portfolioId: string
@@ -48,6 +49,7 @@ export default function HoldingsManager({
   onSyncComplete,
   accounts = [],
 }: HoldingsManagerProps) {
+  const { showToast } = useToast()
   const [isAdding, setIsAdding] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -122,44 +124,35 @@ export default function HoldingsManager({
     [onUpdateHolding]
   )
 
-  const handleSellConfirm = useCallback(
-    (soldHolding: Holding) => {
-      setHoldings((prev) =>
-        prev.map((h) => {
-          if (h.id === soldHolding.id) return soldHolding as MergedHolding
-          return h
-        })
-      )
-      onRefreshAvailableFunds()
-    },
-    [setHoldings, onRefreshAvailableFunds]
-  )
+  const handleSellConfirm = useCallback(async () => {
+    try {
+      const freshHoldings = await api.fetchHoldings(portfolioId)
+      setHoldings(freshHoldings)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "刷新持仓失败", "error")
+    }
+    onRefreshAvailableFunds()
+  }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
-  const handleBuyConfirm = useCallback(
-    (updatedHolding: Holding) => {
-      setHoldings((prev) =>
-        prev.map((h) => {
-          if (h.id === updatedHolding.id) return updatedHolding as MergedHolding
-          return h
-        })
-      )
-      onRefreshAvailableFunds()
-    },
-    [setHoldings, onRefreshAvailableFunds]
-  )
+  const handleBuyConfirm = useCallback(async () => {
+    try {
+      const freshHoldings = await api.fetchHoldings(portfolioId)
+      setHoldings(freshHoldings)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "刷新持仓失败", "error")
+    }
+    onRefreshAvailableFunds()
+  }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
-  const handleDividendConfirm = useCallback(
-    (updatedHolding: Holding) => {
-      setHoldings((prev) =>
-        prev.map((h) => {
-          if (h.id === updatedHolding.id) return updatedHolding as MergedHolding
-          return h
-        })
-      )
-      onRefreshAvailableFunds()
-    },
-    [setHoldings, onRefreshAvailableFunds]
-  )
+  const handleDividendConfirm = useCallback(async () => {
+    try {
+      const freshHoldings = await api.fetchHoldings(portfolioId)
+      setHoldings(freshHoldings)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "刷新持仓失败", "error")
+    }
+    onRefreshAvailableFunds()
+  }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
   // Pre-compute lot groups for each holding (for merged view)
   const lotGroupsByHolding = new Map<string, { name: string; lots: HoldingLot[] }[]>()
