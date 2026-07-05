@@ -8,6 +8,7 @@ import (
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"sort"
 	"time"
 
 	"log/slog"
@@ -89,7 +90,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 		}
 
 		var holdings []models.Holding
-		if err := db.Where("portfolio_id = ?", portfolioID).Order("asset_id").Find(&holdings).Error; err != nil {
+		if err := db.Where("portfolio_id = ?", portfolioID).Order("asset_id, id").Find(&holdings).Error; err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -174,6 +175,12 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				mh.Lots = allLots
 				result = append(result, *mh)
 			}
+			sort.Slice(result, func(i, j int) bool {
+				if result[i].AssetId != result[j].AssetId {
+					return result[i].AssetId < result[j].AssetId
+				}
+				return result[i].ID < result[j].ID
+			})
 
 			c.JSON(consts.StatusOK, result)
 			return

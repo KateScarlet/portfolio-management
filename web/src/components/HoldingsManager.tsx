@@ -104,21 +104,20 @@ export default function HoldingsManager({
   }, [onSyncComplete, setHoldings, portfolioId])
 
   const saveEditLot = useCallback(
-    (h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
+    (targetHoldingId: string, h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
       if (!h.lots) return
       const updatedLots = h.lots.map((l) => (l.id === lotId ? { ...l, ...updatedFields } : l))
-      // Send only lots to backend; backend recalculates all derived fields
-      onUpdateHolding(h.id, { lots: updatedLots })
+      onUpdateHolding(targetHoldingId, { lots: updatedLots })
       setEditingLotId(null)
     },
     [onUpdateHolding]
   )
 
   const deleteEditLot = useCallback(
-    (h: Holding, lotId: string) => {
+    (targetHoldingId: string, h: Holding, lotId: string) => {
       if (!h.lots) return
       const updatedLots = h.lots.filter((l) => l.id !== lotId)
-      onUpdateHolding(h.id, { lots: updatedLots })
+      onUpdateHolding(targetHoldingId, { lots: updatedLots })
       setEditingLotId(null)
     },
     [onUpdateHolding]
@@ -155,20 +154,20 @@ export default function HoldingsManager({
   }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
   // Pre-compute lot groups for each holding (for merged view)
-  const lotGroupsByHolding = new Map<string, { name: string; lots: HoldingLot[] }[]>()
+  const lotGroupsByHolding = new Map<string, { name: string; lots: HoldingLot[]; holdingId: string }[]>()
   for (const h of holdings) {
     const accs = ("accounts" in h ? (h as MergedHolding).accounts : null) || []
     if (accs.length > 1) {
       lotGroupsByHolding.set(
         h.id,
-        accs.map((acc) => ({ name: acc.accountName || "未分配", lots: acc.lots || [] }))
+        accs.map((acc) => ({ name: acc.accountName || "未分配", lots: acc.lots || [], holdingId: acc.holdingId }))
       )
     } else {
-      lotGroupsByHolding.set(h.id, [{ name: "", lots: h.lots || [] }])
+      lotGroupsByHolding.set(h.id, [{ name: "", lots: h.lots || [], holdingId: h.id }])
     }
   }
 
-  const renderLot = (h: MergedHolding, lot: HoldingLot) => {
+  const renderLot = (h: MergedHolding, lot: HoldingLot, holdingId: string) => {
     const isEditing = editingLotId === lot.id
     return (
       <div
@@ -183,7 +182,7 @@ export default function HoldingsManager({
                 type="date"
                 value={new Date(lot.date).toISOString().split("T")[0]}
                 onChange={(e) => {
-                  saveEditLot(h, lot.id, { date: new Date(e.target.value).getTime() || lot.date })
+                  saveEditLot(holdingId, h, lot.id, { date: new Date(e.target.value).getTime() || lot.date })
                 }}
                 className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
               />
@@ -266,7 +265,7 @@ export default function HoldingsManager({
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() =>
-                  saveEditLot(h, lot.id, {
+                  saveEditLot(holdingId, h, lot.id, {
                     costPrice: h.symbol ? editingLotCostPrice : undefined,
                     shares: editingLotShares,
                     cost: editingLotCost,
@@ -339,7 +338,7 @@ export default function HoldingsManager({
                   Edit
                 </button>
                 <button
-                  onClick={() => deleteEditLot(h, lot.id)}
+                  onClick={() => deleteEditLot(holdingId, h, lot.id)}
                   className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors whitespace-nowrap"
                 >
                   Del
@@ -617,7 +616,7 @@ export default function HoldingsManager({
                                         {group.name}
                                       </div>
                                     )}
-                                    {group.lots.map((lot) => renderLot(h, lot))}
+                                    {group.lots.map((lot) => renderLot(h, lot, group.holdingId))}
                                   </div>
                                 ))}
                                 {expandedDividends.length > 0 && (
