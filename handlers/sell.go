@@ -21,6 +21,7 @@ type SellRequest struct {
 	Price  decimal.Decimal `json:"price"`
 	Value  decimal.Decimal `json:"value"`
 	Fee    decimal.Decimal `json:"fee"`
+	Date   *int64          `json:"date,omitempty"`
 }
 
 func SellHolding(db *gorm.DB) app.HandlerFunc {
@@ -127,14 +128,18 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return &httpError{status: consts.StatusBadRequest, msg: "Fee cannot exceed sell proceeds"}
 			}
 
-			sellLot := models.HoldingLot{
-				ID:        uuid.New().String(),
-				Type:      "sell",
-				Date:      time.Now().UnixMilli(),
-				CostPrice: holding.CostPrice,
-				Cost:      costReduction,
-				Fee:       input.Fee,
-			}
+		sellDate := time.Now().UnixMilli()
+		if input.Date != nil && *input.Date > 0 {
+			sellDate = *input.Date
+		}
+		sellLot := models.HoldingLot{
+			ID:        uuid.New().String(),
+			Type:      "sell",
+			Date:      sellDate,
+			CostPrice: holding.CostPrice,
+			Cost:      costReduction,
+			Fee:       input.Fee,
+		}
 			if input.Shares.IsPositive() {
 				sellLot.Shares = input.Shares
 				sellLot.ValueAdded = input.Shares.Mul(input.Price)

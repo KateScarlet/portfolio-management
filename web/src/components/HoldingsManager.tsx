@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useEffect } from "react"
 import {
   Account,
   ASSET_DEFINITIONS,
+  Dividend,
   Holding,
   HoldingLot,
   MergedHolding,
@@ -13,6 +14,7 @@ import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
 import SellModal from "./SellModal"
+import DividendModal from "./DividendModal"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HoldingsManagerProps {
@@ -60,6 +62,24 @@ export default function HoldingsManager({
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
   const [buyingHolding, setBuyingHolding] = useState<Holding | null>(null)
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
+  const [dividendHolding, setDividendHolding] = useState<Holding | null>(null)
+  const [expandedDividends, setExpandedDividends] = useState<Dividend[]>([])
+
+  useEffect(() => {
+    if (!expandedId) return
+    let cancelled = false
+    api
+      .fetchDividends(portfolioId, expandedId)
+      .then((data) => {
+        if (!cancelled) setExpandedDividends(data)
+      })
+      .catch(() => {
+        if (!cancelled) setExpandedDividends([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [expandedId, portfolioId])
 
   const computeCost = useCallback((costPriceStr: string, sharesStr: string) => {
     const p = toDecimal(costPriceStr)
@@ -94,14 +114,10 @@ export default function HoldingsManager({
     (h: Holding, lotId: string) => {
       if (!h.lots) return
       const updatedLots = h.lots.filter((l) => l.id !== lotId)
-      if (updatedLots.length === 0) {
-        onRemoveHolding(h.id)
-      } else {
-        onUpdateHolding(h.id, { lots: updatedLots })
-      }
+      onUpdateHolding(h.id, { lots: updatedLots })
       setEditingLotId(null)
     },
-    [onUpdateHolding, onRemoveHolding]
+    [onUpdateHolding]
   )
 
   const handleSellConfirm = useCallback(
@@ -118,6 +134,19 @@ export default function HoldingsManager({
   )
 
   const handleBuyConfirm = useCallback(
+    (updatedHolding: Holding) => {
+      setHoldings((prev) =>
+        prev.map((h) => {
+          if (h.id === updatedHolding.id) return updatedHolding as MergedHolding
+          return h
+        })
+      )
+      onRefreshAvailableFunds()
+    },
+    [setHoldings, onRefreshAvailableFunds]
+  )
+
+  const handleDividendConfirm = useCallback(
     (updatedHolding: Holding) => {
       setHoldings((prev) =>
         prev.map((h) => {
@@ -456,6 +485,7 @@ export default function HoldingsManager({
                             {(() => {
                               const value = toDecimal(h.value)
                               const cost = toDecimal(h.cost)
+                              const totalDividends = toDecimal(h.totalDividends || "0")
                               if (
                                 cost.isZero() ||
                                 !Number.isFinite(value.toNumber()) ||
@@ -463,7 +493,7 @@ export default function HoldingsManager({
                               ) {
                                 return <p className="text-[10px] text-[#ADB5BD]">-</p>
                               }
-                              const profit = value.minus(cost)
+                              const profit = value.minus(cost).plus(totalDividends)
                               const returnRate = profit.div(cost)
                               const rateNum = returnRate.toNumber()
                               if (!Number.isFinite(rateNum)) {
@@ -471,12 +501,23 @@ export default function HoldingsManager({
                               }
                               const isPositive = profit.isPositive()
                               return (
-                                <p
-                                  className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
-                                >
-                                  {isPositive ? "+" : ""}
-                                  {formatPercent(rateNum)}
-                                </p>
+                                <>
+                                  <p
+                                    className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
+                                  >
+                                    {isPositive ? "+" : ""}
+                                    {formatPercent(rateNum)}
+                                  </p>
+                                  {totalDividends.isPositive() && (
+                                    <p className="text-[10px] text-yellow-600">
+                                      含分红{" "}
+                                      {formatCurrencyByCode(
+                                        totalDividends.toString(),
+                                        h.currency || "CNY"
+                                      )}
+                                    </p>
+                                  )}
+                                </>
                               )
                             })()}
                           </div>
@@ -551,6 +592,13 @@ export default function HoldingsManager({
                           Sell
                         </button>
                         <button
+                          onClick={() => setDividendHolding(h)}
+                          className="text-[10px] uppercase tracking-wider text-[#1A1A1A] hover:text-yellow-600 font-bold transition-colors"
+                          title="分红"
+                        >
+                          Div
+                        </button>
+                        <button
                           onClick={() => setDeletingHolding(h)}
                           className="text-[10px] uppercase tracking-wider text-[#ADB5BD] hover:text-orange-500 font-bold transition-colors"
                         >
@@ -577,6 +625,40 @@ export default function HoldingsManager({
                                     {group.lots.map((lot) => renderLot(h, lot))}
                                   </div>
                                 ))}
+                                {expandedDividends.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-[#DEE2E6]">
+                                    <div className="text-xs font-medium text-[#6C757D] mb-2">
+                                      分红记录
+                                    </div>
+                                    {expandedDividends.map((div) => (
+                                      <div
+                                        key={div.id}
+                                        className="flex justify-between items-center text-xs font-mono pb-2"
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <span className="text-[9px] bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded font-bold">
+                                            {div.reinvest ? "再投资" : "分红"}
+                                          </span>
+                                          {new Date(div.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <div className="flex items-center gap-4 text-right">
+                                          <span className="w-24 text-right text-yellow-600">
+                                            +
+                                            {formatCurrencyByCode(
+                                              div.netAmount,
+                                              div.currency || "CNY"
+                                            )}
+                                          </span>
+                                          {div.reinvest && div.reinvestShares && (
+                                            <span className="w-20 text-right text-[#6C757D]">
+                                              ×{div.reinvestShares}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -608,6 +690,15 @@ export default function HoldingsManager({
           onConfirm={handleBuyConfirm}
           onClose={() => setBuyingHolding(null)}
           accounts={accounts}
+        />
+      )}
+
+      {dividendHolding && (
+        <DividendModal
+          portfolioId={portfolioId}
+          holding={dividendHolding}
+          onConfirm={handleDividendConfirm}
+          onClose={() => setDividendHolding(null)}
         />
       )}
 

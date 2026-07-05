@@ -12,7 +12,15 @@ export interface FundTransaction {
   id: string
   userId: string
   portfolioId: string
-  type: "transfer_in" | "transfer_out" | "transfer" | "convert" | "buy" | "sell"
+  type:
+    | "transfer_in"
+    | "transfer_out"
+    | "transfer"
+    | "convert"
+    | "buy"
+    | "sell"
+    | "dividend"
+    | "dividend_reinvest"
   amount: string
   currency: string
   targetPortfolioId?: string
@@ -114,6 +122,7 @@ export interface Holding {
   costPrice?: string // Avg cost per share for calculated holdings
   value: string // Current total value
   cost?: string // Total cost basis
+  totalDividends?: string // 累计分红金额
   date?: number // Original purchase date for the lot being added
   fee?: string // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
@@ -290,4 +299,28 @@ export interface SourceTestComplete {
   total: number
   success: number
   failed: number
+}
+
+export interface Dividend {
+  id: string
+  userId: string
+  portfolioId: string
+  holdingId: string
+  assetId: string
+  symbol: string
+  amount: string
+  taxWithheld: string
+  netAmount: string
+  currency: string
+  sharesHeld: string
+  dividendPerShare: string
+  exDate?: number
+  payDate?: number
+  reinvest: boolean
+  reinvestPrice: string
+  reinvestShares: string
+  holdingLotId?: string
+  fundTxId?: string
+  note?: string
+  createdAt: number
 }

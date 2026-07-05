@@ -32,8 +32,9 @@ func main() {
 
 	h := server.Default(server.WithHostPorts(":3000"))
 
+	h.GET("/api/setup/status", handlers.SetupStatus())
+
 	if db.IsSetupMode() {
-		h.GET("/api/setup/status", handlers.SetupStatus())
 		h.POST("/api/setup/complete", handlers.SetupComplete(h))
 		serveFrontend(h)
 		h.Spin()
@@ -147,6 +148,10 @@ func main() {
 	pf.POST("/funds/transfer", handlers.TransferBetween(database))
 	pf.POST("/funds/convert", handlers.ConvertCurrency(database))
 	pf.GET("/fund-transactions", handlers.ListFundTransactions(database))
+
+	pf.POST("/dividends", handlers.RecordDividend(database))
+	pf.GET("/dividends", handlers.ListDividends(database))
+	pf.DELETE("/dividends/:id", handlers.DeleteDividend(database))
 
 	admin := api.Group("")
 	admin.Use(middleware.AdminRequired())

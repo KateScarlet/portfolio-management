@@ -90,7 +90,11 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
   const [testingSources, setTestingSources] = useState(false)
   const [sourceTestResults, setSourceTestResults] = useState<Record<string, SourceTestResult>>({})
   const [sourceTestResultsOrder, setSourceTestResultsOrder] = useState<string[]>([])
-  const [testProgress, setTestProgress] = useState<{ tested: number; total: number; success: number } | null>(null)
+  const [testProgress, setTestProgress] = useState<{
+    tested: number
+    total: number
+    success: number
+  } | null>(null)
 
   const handleOpen = () => {
     setDraft(settings)
@@ -373,9 +377,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                     {marketSources && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium text-[#1A1A1A]">
-                            行情源配置
-                          </label>
+                          <label className="text-sm font-medium text-[#1A1A1A]">行情源配置</label>
                           <button
                             onClick={() => {
                               setTestingSources(true)
@@ -391,7 +393,11 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                   )
                                 },
                                 onComplete: (summary: SourceTestComplete) => {
-                                  setTestProgress({ tested: summary.total, total: summary.total, success: summary.success })
+                                  setTestProgress({
+                                    tested: summary.total,
+                                    total: summary.total,
+                                    success: summary.success,
+                                  })
                                   setTestingSources(false)
                                 },
                                 onError: (err) => {
@@ -524,9 +530,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                         {(testingSources || sourceTestResultsOrder.length > 0) && (
                           <div className="mt-4 border-t border-[#E9ECEF] pt-4">
                             <div className="flex items-center justify-between mb-2">
-                              <label className="text-sm font-medium text-[#1A1A1A]">
-                                测试结果
-                              </label>
+                              <label className="text-sm font-medium text-[#1A1A1A]">测试结果</label>
                               {testProgress && (
                                 <span className="text-xs text-[#6C757D]">
                                   {testingSources
@@ -537,7 +541,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                             </div>
                             <div className="space-y-3">
                               {(() => {
-                                const groups: Record<string, { key: string; src: string; result: SourceTestResult }[]> = {}
+                                const groups: Record<
+                                  string,
+                                  { key: string; src: string; result: SourceTestResult }[]
+                                > = {}
                                 for (const key of sourceTestResultsOrder) {
                                   const result = sourceTestResults[key]
                                   if (!result) continue
@@ -569,25 +576,26 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                           <span className="text-[#6C757D] w-24 shrink-0 truncate">
                                             {result.symbol || ""}
                                           </span>
-                                          <span className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`} title={result.success ? "" : (result.error || "未知错误")}>
-                                            {result.success ? (
-                                              result.rate
+                                          <span
+                                            className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`}
+                                            title={result.success ? "" : result.error || "未知错误"}
+                                          >
+                                            {result.success
+                                              ? result.rate
                                                 ? ""
                                                 : result.name || ""
-                                            ) : (
-                                              result.error || "失败"
-                                            )}
+                                              : result.error || "失败"}
                                           </span>
-                                          <span className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`}>
-                                            {result.success ? (
-                                              result.rate
+                                          <span
+                                            className={`w-24 shrink-0 truncate ${result.success ? "text-[#1A1A1A]" : "text-red-500"}`}
+                                          >
+                                            {result.success
+                                              ? result.rate
                                                 ? `${result.rate}`
                                                 : result.price
                                                   ? `${result.currency === "USD" ? "$" : result.currency === "CNY" ? "¥" : result.currency === "HKD" ? "HK$" : result.currency === "EUR" ? "€" : result.currency === "GBP" ? "£" : result.currency === "JPY" ? "¥" : ""}${result.price}`
                                                   : ""
-                                            ) : (
-                                              ""
-                                            )}
+                                              : ""}
                                           </span>
                                           {result.latency !== undefined && (
                                             <span className="text-[#6C757D] ml-auto shrink-0">
@@ -939,9 +947,9 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                                 placeholder="http://localhost:3000/api/auth/oidc/callback"
                                 className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
                               />
-                        </div>
-                      </div>
-                    )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

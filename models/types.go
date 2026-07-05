@@ -90,23 +90,24 @@ type Account struct {
 }
 
 type Holding struct {
-	ID          string          `gorm:"primaryKey" json:"id"`
-	UserID      string          `gorm:"index;not null" json:"userId"`
-	PortfolioID string          `gorm:"index;not null" json:"portfolioId"`
-	AccountID   string          `gorm:"size:50;default:'';index" json:"accountId,omitempty"`
-	AssetId     string          `gorm:"size:20;not null" json:"assetId"`
-	Symbol      string          `gorm:"size:20;default:''" json:"symbol"`
-	Name        string          `gorm:"size:200;default:''" json:"name,omitempty"`
-	Market      string          `gorm:"size:20;default:''" json:"market,omitempty"`
-	Currency    string          `gorm:"size:10;default:'CNY'" json:"currency"`
-	Shares      decimal.Decimal `gorm:"default:0" json:"shares"`
-	Price       decimal.Decimal `gorm:"default:0" json:"price"`
-	CostPrice   decimal.Decimal `gorm:"default:0" json:"costPrice"`
-	Value       decimal.Decimal `gorm:"default:0" json:"value"`
-	Cost        decimal.Decimal `gorm:"default:0" json:"cost"`
-	Date        int64           `gorm:"default:0" json:"date,omitempty"`
-	Fee         decimal.Decimal `gorm:"-" json:"fee"`
-	Lots        JSONColumn      `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
+	ID             string          `gorm:"primaryKey" json:"id"`
+	UserID         string          `gorm:"index;not null" json:"userId"`
+	PortfolioID    string          `gorm:"index;not null" json:"portfolioId"`
+	AccountID      string          `gorm:"size:50;default:'';index" json:"accountId,omitempty"`
+	AssetId        string          `gorm:"size:20;not null" json:"assetId"`
+	Symbol         string          `gorm:"size:20;default:''" json:"symbol"`
+	Name           string          `gorm:"size:200;default:''" json:"name,omitempty"`
+	Market         string          `gorm:"size:20;default:''" json:"market,omitempty"`
+	Currency       string          `gorm:"size:10;default:'CNY'" json:"currency"`
+	Shares         decimal.Decimal `gorm:"default:0" json:"shares"`
+	Price          decimal.Decimal `gorm:"default:0" json:"price"`
+	CostPrice      decimal.Decimal `gorm:"default:0" json:"costPrice"`
+	Value          decimal.Decimal `gorm:"default:0" json:"value"`
+	Cost           decimal.Decimal `gorm:"default:0" json:"cost"`
+	TotalDividends decimal.Decimal `gorm:"default:0" json:"totalDividends"`
+	Date           int64           `gorm:"default:0" json:"date,omitempty"`
+	Fee            decimal.Decimal `gorm:"-" json:"fee"`
+	Lots           JSONColumn      `gorm:"type:text;default:'[]'" json:"lots,omitempty"`
 }
 
 type HoldingSnapshot struct {
@@ -293,4 +294,28 @@ func (h *Holding) BuyFees() decimal.Decimal {
 		}
 	}
 	return total
+}
+
+type Dividend struct {
+	ID              string          `gorm:"primaryKey" json:"id"`
+	UserID          string          `gorm:"index;not null" json:"userId"`
+	PortfolioID     string          `gorm:"index;not null" json:"portfolioId"`
+	HoldingID       string          `gorm:"index;not null" json:"holdingId"`
+	AssetId         string          `gorm:"size:20;not null" json:"assetId"`
+	Symbol          string          `gorm:"size:20;default:''" json:"symbol"`
+	Amount          decimal.Decimal `gorm:"not null" json:"amount"`
+	TaxWithheld     decimal.Decimal `gorm:"default:0" json:"taxWithheld"`
+	NetAmount       decimal.Decimal `gorm:"not null" json:"netAmount"`
+	Currency        string          `gorm:"size:10;not null" json:"currency"`
+	SharesHeld      decimal.Decimal `gorm:"default:0" json:"sharesHeld"`
+	DividendPerShare decimal.Decimal `gorm:"default:0" json:"dividendPerShare"`
+	ExDate          int64           `json:"exDate,omitempty"`
+	PayDate         int64           `json:"payDate,omitempty"`
+	Reinvest        bool            `gorm:"default:false" json:"reinvest"`
+	ReinvestPrice   decimal.Decimal `gorm:"default:0" json:"reinvestPrice"`
+	ReinvestShares  decimal.Decimal `gorm:"default:0" json:"reinvestShares"`
+	HoldingLotID    string          `gorm:"size:50;default:''" json:"holdingLotId,omitempty"`
+	FundTxID        string          `gorm:"size:50;default:''" json:"fundTxId,omitempty"`
+	Note            string          `gorm:"size:500;default:''" json:"note,omitempty"`
+	CreatedAt       int64           `json:"createdAt"`
 }

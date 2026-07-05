@@ -6,6 +6,7 @@ import type {
 } from "@simplewebauthn/browser"
 import {
   Account,
+  Dividend,
   Holding,
   HoldingWithAccount,
   MergedHolding,
@@ -72,13 +73,14 @@ export async function sellHolding(
   shares: string,
   price: string,
   fee: string,
-  value: string
+  value: string,
+  date?: number
 ): Promise<{ soldHolding: Holding; availableFunds: string }> {
   return request<{ soldHolding: Holding; availableFunds: string }>(
     `/api/portfolios/${pid}/holdings/${id}/sell`,
     {
       method: "POST",
-      body: JSON.stringify({ shares, price, fee, value }),
+      body: JSON.stringify({ shares, price, fee, value, date }),
     }
   )
 }
@@ -522,4 +524,37 @@ export async function testMarketSourcesStream(
   } catch (err) {
     options.onError(err instanceof Error ? err : new Error(String(err)))
   }
+}
+
+// Dividend API
+export async function recordDividend(
+  pid: string,
+  data: {
+    holdingId: string
+    amount: string
+    taxWithheld?: string
+    currency?: string
+    dividendPerShare?: string
+    exDate?: number
+    payDate?: number
+    reinvest: boolean
+    reinvestPrice?: string
+    note?: string
+  }
+): Promise<Dividend> {
+  return request<Dividend>(`/api/portfolios/${pid}/dividends`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function fetchDividends(pid: string, holdingId?: string): Promise<Dividend[]> {
+  const params = holdingId ? `?holdingId=${holdingId}` : ""
+  return request<Dividend[]>(`/api/portfolios/${pid}/dividends${params}`)
+}
+
+export async function deleteDividend(pid: string, id: string): Promise<void> {
+  await request<{ status: string }>(`/api/portfolios/${pid}/dividends/${id}`, {
+    method: "DELETE",
+  })
 }

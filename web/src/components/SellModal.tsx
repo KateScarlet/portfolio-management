@@ -19,7 +19,6 @@ export default function SellModal({
   displayCurrency,
   onConfirm,
   onClose,
-  accounts = [],
 }: SellModalProps) {
   const mergedAccounts: MergedHoldingAccount[] =
     ("accounts" in holding ? (holding as MergedHolding).accounts : null) || []
@@ -35,11 +34,13 @@ export default function SellModal({
       : holding.value.toString()
   )
   const [sellFee, setSellFee] = useState("")
+  const [sellDate, setSellDate] = useState(new Date().toISOString().split("T")[0])
 
   const { showToast } = useToast()
 
   const confirmSell = async () => {
     const feeStr = sellFee || "0"
+    const dateMs = new Date(sellDate).getTime()
 
     if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
       const sShares = parseFloat(sellShares)
@@ -69,7 +70,8 @@ export default function SellModal({
           sellShares,
           sellPrice,
           feeStr,
-          "0"
+          "0",
+          dateMs
         )
         onConfirm(result.soldHolding)
         onClose()
@@ -103,7 +105,8 @@ export default function SellModal({
           "0",
           "0",
           feeStr,
-          sellPrice
+          sellPrice,
+          dateMs
         )
         onConfirm(result.soldHolding)
         onClose()
@@ -162,6 +165,18 @@ export default function SellModal({
               />
             </div>
           )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+            日期
+          </label>
+          <input
+            type="date"
+            value={sellDate}
+            onChange={(e) => setSellDate(e.target.value)}
+            className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+          />
         </div>
 
         <div className="flex flex-col gap-2">
