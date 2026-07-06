@@ -204,7 +204,7 @@ func (r *Router) UpdateUserConfig(userID uuid.UUID, config map[string][]string) 
 
 	// Try to find existing record first
 	var existing models.Setting
-	result := r.db.Where("key = ? AND user_id = ? AND portfolio_id = ?", "marketSources", userID, "").First(&existing)
+	result := r.db.Where("key = ? AND user_id = ? AND portfolio_id = ?", "marketSources", userID, uuid.UUID{}).First(&existing)
 	if result.Error == nil {
 		// Update existing record
 		result = r.db.Model(&existing).Update("value", string(data))
