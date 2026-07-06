@@ -292,8 +292,8 @@ type Dividend struct {
 	Currency         string          `gorm:"size:10;not null" json:"currency"`
 	SharesHeld       decimal.Decimal `gorm:"type:decimal;default:0" json:"sharesHeld"`
 	DividendPerShare decimal.Decimal `gorm:"type:decimal;default:0" json:"dividendPerShare"`
-	ExDate           time.Time       `gorm:"timestamptz" json:"exDate,omitempty"`
-	PayDate          time.Time       `gorm:"timestamptz" json:"payDate,omitempty"`
+	ExDate           time.Time       `gorm:"timestamptz" json:"exDate"`
+	PayDate          time.Time       `gorm:"timestamptz" json:"payDate"`
 	Reinvest         bool            `gorm:"default:false" json:"reinvest"`
 	ReinvestPrice    decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestPrice"`
 	ReinvestShares   decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestShares"`

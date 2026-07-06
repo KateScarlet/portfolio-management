@@ -172,6 +172,15 @@ export interface Settings {
   telegramSummary: boolean
   telegramPriceThreshold: number // 价格波动阈值百分比
   telegramSummaryInterval: string // "daily" | "weekly" | "off"
+  // Bark
+  barkDeviceKey: string
+  barkServerURL: string
+  barkEnabled: boolean
+  barkPriceAlert: boolean
+  barkDriftAlert: boolean
+  barkSummary: boolean
+  barkPriceThreshold: number
+  barkSummaryInterval: string // "daily" | "weekly" | "off"
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -191,6 +200,14 @@ export const DEFAULT_SETTINGS: Settings = {
   telegramSummary: true,
   telegramPriceThreshold: 5,
   telegramSummaryInterval: "daily",
+  barkDeviceKey: "",
+  barkServerURL: "",
+  barkEnabled: false,
+  barkPriceAlert: true,
+  barkDriftAlert: true,
+  barkSummary: true,
+  barkPriceThreshold: 5,
+  barkSummaryInterval: "daily",
 }
 
 export interface SyncStatus {

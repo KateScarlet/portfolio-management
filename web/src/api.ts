@@ -270,6 +270,27 @@ export async function testTelegramMessage(
   })
 }
 
+export async function testBarkConnection(
+  deviceKey: string,
+  serverURL: string
+): Promise<{ success: boolean; error?: string }> {
+  return request<{ success: boolean; error?: string }>("/api/bark/test", {
+    method: "POST",
+    body: JSON.stringify({ deviceKey, serverURL, type: "connection" }),
+  })
+}
+
+export async function testBarkMessage(
+  deviceKey: string,
+  serverURL: string,
+  type: "price" | "drift" | "summary"
+): Promise<{ success: boolean; error?: string }> {
+  return request<{ success: boolean; error?: string }>("/api/bark/test", {
+    method: "POST",
+    body: JSON.stringify({ deviceKey, serverURL, type }),
+  })
+}
+
 export async function fetchSetupStatus(): Promise<{ configured: boolean }> {
   return request<{ configured: boolean }>("/api/setup/status")
 }

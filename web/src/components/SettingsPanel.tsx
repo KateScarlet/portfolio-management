@@ -73,6 +73,11 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
   const [testType, setTestType] = useState<"connection" | "price" | "drift" | "summary">(
     "connection"
   )
+  const [barkTesting, setBarkTesting] = useState(false)
+  const [barkTestResult, setBarkTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [barkTestType, setBarkTestType] = useState<"connection" | "price" | "drift" | "summary">(
+    "connection"
+  )
   const [oidcConfig, setOidcConfig] = useState<api.OIDCConfig | null>(null)
   const [oidcDraft, setOidcDraft] = useState<api.OIDCConfig>({
     enabled: false,
@@ -213,6 +218,55 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
       })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleBarkTestConnection = async () => {
+    if (!draft.barkDeviceKey) {
+      setBarkTestResult({ success: false, message: "请先填写 Device Key" })
+      return
+    }
+    setBarkTesting(true)
+    setBarkTestResult(null)
+    try {
+      const result = await api.testBarkConnection(draft.barkDeviceKey, draft.barkServerURL)
+      if (result.success) {
+        setBarkTestResult({ success: true, message: "连接成功！" })
+      } else {
+        setBarkTestResult({ success: false, message: result.error || "连接失败" })
+      }
+    } catch (e) {
+      setBarkTestResult({
+        success: false,
+        message: "连接失败: " + (e instanceof Error ? e.message : "未知错误"),
+      })
+    } finally {
+      setBarkTesting(false)
+    }
+  }
+
+  const handleBarkTestMessage = async (type: "price" | "drift" | "summary") => {
+    if (!draft.barkDeviceKey) {
+      setBarkTestResult({ success: false, message: "请先填写 Device Key" })
+      return
+    }
+    setBarkTesting(true)
+    setBarkTestResult(null)
+    try {
+      const result = await api.testBarkMessage(draft.barkDeviceKey, draft.barkServerURL, type)
+      if (result.success) {
+        const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
+        setBarkTestResult({ success: true, message: `已发送${labels[type]}测试消息` })
+      } else {
+        setBarkTestResult({ success: false, message: result.error || "发送失败" })
+      }
+    } catch (e) {
+      setBarkTestResult({
+        success: false,
+        message: "发送失败: " + (e instanceof Error ? e.message : "未知错误"),
+      })
+    } finally {
+      setBarkTesting(false)
     }
   }
 
@@ -855,6 +909,188 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                         </div>
                       </div>
                     )}
+
+                    {/* Bark 通知 */}
+                    <div className="border-t border-[#E9ECEF] pt-4 mt-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[#1A1A1A]">
+                            Bark 通知
+                          </label>
+                          <p className="text-xs text-[#6C757D] mt-1">
+                            通过 Bark iOS App 接收推送通知
+                          </p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setDraft({ ...draft, barkEnabled: !draft.barkEnabled })
+                          }
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            draft.barkEnabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              draft.barkEnabled ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {draft.barkEnabled && (
+                        <div className="space-y-4 mt-4">
+                          <div>
+                            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                              Device Key
+                            </label>
+                            <input
+                              type="password"
+                              value={draft.barkDeviceKey}
+                              onChange={(e) =>
+                                setDraft({ ...draft, barkDeviceKey: e.target.value })
+                              }
+                              placeholder="从 Bark iOS App 获取"
+                              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-[#6C757D] mb-1">
+                              Server URL
+                            </label>
+                            <input
+                              type="text"
+                              value={draft.barkServerURL}
+                              onChange={(e) =>
+                                setDraft({ ...draft, barkServerURL: e.target.value })
+                              }
+                              placeholder="默认 https://api.day.app，可自建"
+                              className="w-full px-3 py-2 text-sm border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={barkTestType}
+                              onChange={(e) => setBarkTestType(e.target.value as typeof barkTestType)}
+                              className="px-2 py-1.5 text-xs border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1A1A1A]"
+                            >
+                              <option value="connection">测试连接</option>
+                              <option value="price">价格波动告警</option>
+                              <option value="drift">配比偏离提醒</option>
+                              <option value="summary">组合摘要</option>
+                            </select>
+                            <button
+                              onClick={() =>
+                                barkTestType === "connection"
+                                  ? handleBarkTestConnection()
+                                  : handleBarkTestMessage(barkTestType)
+                              }
+                              disabled={barkTesting}
+                              className="px-3 py-1.5 text-xs text-[#1A1A1A] border border-[#E9ECEF] rounded-lg hover:bg-[#F1F3F5] transition-colors disabled:opacity-50"
+                            >
+                              {barkTesting ? "发送中..." : "发送测试"}
+                            </button>
+                          </div>
+                          {barkTestResult && (
+                            <span
+                              className={`text-xs ${
+                                barkTestResult.success ? "text-green-600" : "text-red-500"
+                              }`}
+                            >
+                              {barkTestResult.message}
+                            </span>
+                          )}
+
+                          <div className="space-y-3 pt-2">
+                            <label className="block text-xs font-medium text-[#6C757D]">
+                              通知类型
+                            </label>
+
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-sm text-[#1A1A1A]">价格大幅波动</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-[#6C757D]">阈值:</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    value={draft.barkPriceThreshold}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        barkPriceThreshold: Math.max(
+                                          1,
+                                          Math.min(50, Number(e.target.value) || 1)
+                                        ),
+                                      })
+                                    }
+                                    className="w-12 px-2 py-1 text-xs text-center border border-[#E9ECEF] rounded focus:outline-none focus:ring-1 focus:ring-[#1A1A1A]"
+                                  />
+                                  <span className="text-xs text-[#6C757D]">%</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setDraft({
+                                    ...draft,
+                                    barkPriceAlert: !draft.barkPriceAlert,
+                                  })
+                                }
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                  draft.barkPriceAlert ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                    draft.barkPriceAlert ? "translate-x-4.5" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-[#1A1A1A]">配比偏离提醒</span>
+                              <button
+                                onClick={() =>
+                                  setDraft({
+                                    ...draft,
+                                    barkDriftAlert: !draft.barkDriftAlert,
+                                  })
+                                }
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                  draft.barkDriftAlert ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                    draft.barkDriftAlert ? "translate-x-4.5" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-[#1A1A1A]">定期组合摘要</span>
+                              <select
+                                value={draft.barkSummaryInterval}
+                                onChange={(e) =>
+                                  setDraft({ ...draft, barkSummaryInterval: e.target.value })
+                                }
+                                className="px-2 py-1 text-xs border border-[#E9ECEF] rounded focus:outline-none focus:ring-1 focus:ring-[#1A1A1A]"
+                              >
+                                {SUMMARY_INTERVALS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

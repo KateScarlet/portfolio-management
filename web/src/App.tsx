@@ -298,6 +298,18 @@ export default function App() {
           telegramSummaryInterval:
             s.telegramSummaryInterval || DEFAULT_SETTINGS.telegramSummaryInterval,
           displayCurrency: s.displayCurrency || DEFAULT_SETTINGS.displayCurrency,
+          barkDeviceKey: s.barkDeviceKey || DEFAULT_SETTINGS.barkDeviceKey,
+          barkServerURL: s.barkServerURL || DEFAULT_SETTINGS.barkServerURL,
+          barkEnabled: s.barkEnabled === "true",
+          barkPriceAlert: s.barkPriceAlert !== "false",
+          barkDriftAlert: s.barkDriftAlert !== "false",
+          barkSummary: s.barkSummary !== "false",
+          barkPriceThreshold:
+            s.barkPriceThreshold != null
+              ? Number(s.barkPriceThreshold)
+              : DEFAULT_SETTINGS.barkPriceThreshold,
+          barkSummaryInterval:
+            s.barkSummaryInterval || DEFAULT_SETTINGS.barkSummaryInterval,
         })
       })
       .catch(console.error)
@@ -326,6 +338,14 @@ export default function App() {
           telegramPriceThreshold: String(newSettings.telegramPriceThreshold),
           telegramSummaryInterval: newSettings.telegramSummaryInterval,
           displayCurrency: newSettings.displayCurrency,
+          barkDeviceKey: newSettings.barkDeviceKey,
+          barkServerURL: newSettings.barkServerURL,
+          barkEnabled: String(newSettings.barkEnabled),
+          barkPriceAlert: String(newSettings.barkPriceAlert),
+          barkDriftAlert: String(newSettings.barkDriftAlert),
+          barkSummary: String(newSettings.barkSummary),
+          barkPriceThreshold: String(newSettings.barkPriceThreshold),
+          barkSummaryInterval: newSettings.barkSummaryInterval,
         })
         setSettings(newSettings)
       } catch (e) {

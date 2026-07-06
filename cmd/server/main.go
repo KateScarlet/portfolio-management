@@ -120,6 +120,7 @@ func main() {
 	api.GET("/summary", handlers.GetSummary(database, router))
 
 	api.POST("/telegram/test", handlers.TestTelegramMessage(database, router))
+	api.POST("/bark/test", handlers.TestBarkNotification(database, router))
 
 	api.POST("/webauthn/register/start", handlers.WebAuthnRegisterStart(database, cfg))
 	api.POST("/webauthn/register/finish", handlers.WebAuthnRegisterFinish(database, cfg))
