@@ -103,7 +103,7 @@ func (s *PriceScheduler) loadAndScheduleAll() {
 
 func (s *PriceScheduler) schedulePortfolio(userID, portfolioID uuid.UUID) {
 	var setting models.Setting
-	if err := s.db.Where("`key` = ? AND portfolio_id = ?", "syncInterval", portfolioID).First(&setting).Error; err != nil {
+	if err := s.db.Where(`"key" = ? AND portfolio_id = ?`, "syncInterval", portfolioID).First(&setting).Error; err != nil {
 		return
 	}
 

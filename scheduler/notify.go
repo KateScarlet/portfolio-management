@@ -57,7 +57,7 @@ func (n *Notifier) loadPortfolioSettings(portfolioID uuid.UUID) map[string]strin
 
 func (n *Notifier) loadUserTelegramConfig(userID uuid.UUID) (token, chatID, enabled string) {
 	var settings []models.Setting
-	if err := n.db.Where("user_id = ? AND `key` IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')", userID).Find(&settings).Error; err != nil {
+	if err := n.db.Where(`user_id = ? AND "key" IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')`, userID).Find(&settings).Error; err != nil {
 		slog.Error("failed to load user telegram config", "userId", userID, "error", err)
 	}
 	for _, s := range settings {
