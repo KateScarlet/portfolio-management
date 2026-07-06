@@ -128,7 +128,7 @@ type PortfolioRecord struct {
 	ID          uuid.UUID             `gorm:"type:uuid;primaryKey;comment:记录唯一ID" json:"id"`
 	UserID      uuid.UUID             `gorm:"type:uuid;index;not null;comment:所属用户ID" json:"userId"`
 	PortfolioID uuid.UUID             `gorm:"type:uuid;index;not null;comment:所属组合ID" json:"portfolioId"`
-	Timestamp   int64                 `gorm:"index;not null;comment:快照时间(毫秒时间戳)" json:"timestamp"`
+	Timestamp   time.Time             `gorm:"type:timestamptz;index;not null;comment:快照时间" json:"timestamp"`
 	Assets      AssetMapColumn        `gorm:"type:text;not null;default:'{}';comment:各资产类型市值(JSON)" json:"assets"`
 	Holdings    HoldingSnapshotColumn `gorm:"type:text;not null;default:'[]';comment:持仓快照(JSON数组)" json:"holdings"`
 	Total       decimal.Decimal       `gorm:"type:decimal;default:0;comment:组合总资产" json:"total"`
@@ -186,13 +186,13 @@ type WebAuthnCredential struct {
 	Flags        uint8     `gorm:"default:0" json:"-"`
 	SignCount    uint64    `gorm:"default:0" json:"-"`
 	CreatedAt    time.Time `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
-	LastUsedAt   int64     `json:"lastUsedAt"`
+	LastUsedAt   time.Time `gorm:"timestamptz" json:"lastUsedAt"`
 }
 
 type WebAuthnSession struct {
-	ID        string `gorm:"primaryKey"`
-	Data      string `gorm:"type:text;not null"`
-	ExpiresAt int64  `gorm:"not null"`
+	ID        string    `gorm:"primaryKey"`
+	Data      string    `gorm:"type:text;not null"`
+	ExpiresAt time.Time `gorm:"type:timestamptz;not null"`
 }
 
 // RecalcFromLots recalculates holding fields from its lots.
@@ -291,8 +291,8 @@ type Dividend struct {
 	Currency         string          `gorm:"size:10;not null" json:"currency"`
 	SharesHeld       decimal.Decimal `gorm:"type:decimal;default:0" json:"sharesHeld"`
 	DividendPerShare decimal.Decimal `gorm:"type:decimal;default:0" json:"dividendPerShare"`
-	ExDate           int64           `json:"exDate,omitempty"`
-	PayDate          int64           `json:"payDate,omitempty"`
+	ExDate           time.Time       `gorm:"timestamptz" json:"exDate,omitempty"`
+	PayDate          time.Time       `gorm:"timestamptz" json:"payDate,omitempty"`
 	Reinvest         bool            `gorm:"default:false" json:"reinvest"`
 	ReinvestPrice    decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestPrice"`
 	ReinvestShares   decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestShares"`

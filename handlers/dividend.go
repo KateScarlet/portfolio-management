@@ -19,8 +19,8 @@ type UpdateDividendRequest struct {
 	TaxWithheld      decimal.Decimal `json:"taxWithheld"`
 	Currency         string          `json:"currency"`
 	DividendPerShare decimal.Decimal `json:"dividendPerShare"`
-	ExDate           int64           `json:"exDate"`
-	PayDate          int64           `json:"payDate"`
+	ExDate           time.Time       `json:"exDate"`
+	PayDate          time.Time       `json:"payDate"`
 	Reinvest         bool            `json:"reinvest"`
 	ReinvestPrice    decimal.Decimal `json:"reinvestPrice"`
 	Note             string          `json:"note"`
@@ -32,8 +32,8 @@ type RecordDividendRequest struct {
 	TaxWithheld      decimal.Decimal `json:"taxWithheld"`
 	Currency         string          `json:"currency"`
 	DividendPerShare decimal.Decimal `json:"dividendPerShare"`
-	ExDate           int64           `json:"exDate"`
-	PayDate          int64           `json:"payDate"`
+	ExDate           time.Time       `json:"exDate"`
+	PayDate          time.Time       `json:"payDate"`
 	Reinvest         bool            `json:"reinvest"`
 	ReinvestPrice    decimal.Decimal `json:"reinvestPrice"`
 	Note             string          `json:"note"`

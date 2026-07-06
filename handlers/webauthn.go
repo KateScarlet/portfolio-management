@@ -35,7 +35,7 @@ func saveSession(database *gorm.DB, id string, data any) {
 	session := models.WebAuthnSession{
 		ID:        id,
 		Data:      string(jsonData),
-		ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
+		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}
 	result := database.Where("id = ?", id).Assign(session).FirstOrCreate(&session)
 	slog.Info("session saved", "id", id, "rows_affected", result.RowsAffected, "error", result.Error)
@@ -47,8 +47,8 @@ func loadSession(database *gorm.DB, id string) any {
 		slog.Warn("session not found in db", "id", id, "error", err)
 		return nil
 	}
-	slog.Info("session found in db", "id", id, "expires_at", session.ExpiresAt, "now", time.Now().Unix(), "data_len", len(session.Data))
-	if time.Now().Unix() > session.ExpiresAt {
+	slog.Info("session found in db", "id", id, "expires_at", session.ExpiresAt, "now", time.Now(), "data_len", len(session.Data))
+	if time.Now().After(session.ExpiresAt) {
 		slog.Warn("session expired", "id", id)
 		database.Delete(&session)
 		return nil
@@ -316,7 +316,7 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			PublicKey:    credential.PublicKey,
 			Flags:        credential.Flags.MsgpByte(),
 			SignCount:    uint64(credential.Authenticator.SignCount),
-			LastUsedAt:   time.Now().Unix(),
+			LastUsedAt:   time.Now(),
 		}
 
 		if err := gormDB.Create(&newCred).Error; err != nil {

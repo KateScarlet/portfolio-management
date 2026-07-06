@@ -139,9 +139,8 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	// Migrate created_at columns from bigint (millisecond timestamps) to timestamptz.
-	// Must run before AutoMigrate, which cannot auto-convert bigint→timestamptz.
-	migrateCreatedAtColumns(db)
+	// Migrate bigint timestamp columns to timestamptz before AutoMigrate.
+	migrateTimestampColumns(db)
 
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
@@ -191,16 +190,36 @@ func SaveConfig(cfg *Config) error {
 	return v.WriteConfig()
 }
 
-// migrateCreatedAtColumns converts created_at columns from bigint (millisecond
-// timestamps) to timestamptz. It checks each table's column type before attempting
-// migration so it's safe to run repeatedly.
-func migrateCreatedAtColumns(db *gorm.DB) {
-	tables := []string{"portfolios", "accounts", "fund_transactions", "users", "web_authn_credentials", "dividends"}
-	for _, table := range tables {
+// migrateTimestampColumns converts bigint timestamp columns to timestamptz.
+// Checks column type before altering, safe to run repeatedly.
+func migrateTimestampColumns(db *gorm.DB) {
+	type colMigration struct {
+		table      string
+		column     string
+		inSeconds  bool // true if value is Unix seconds, false if milliseconds
+	}
+	migrations := []colMigration{
+		{"portfolios", "created_at", false},
+		{"accounts", "created_at", false},
+		{"fund_transactions", "created_at", false},
+		{"users", "created_at", false},
+		{"web_authn_credentials", "created_at", false},
+		{"web_authn_credentials", "last_used_at", false},
+		{"web_authn_sessions", "expires_at", true}, // Unix() returns seconds
+		{"dividends", "created_at", false},
+		{"dividends", "ex_date", false},
+		{"dividends", "pay_date", false},
+		{"portfolio_records", "timestamp", false},
+	}
+	for _, m := range migrations {
 		var dataType string
-		db.Raw("SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = 'created_at'", table).Scan(&dataType)
+		db.Raw("SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = ?", m.table, m.column).Scan(&dataType)
 		if dataType == "bigint" || dataType == "int8" {
-			db.Exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN created_at TYPE timestamptz USING to_timestamp(created_at / 1000.0)", table))
+			if m.inSeconds {
+				db.Exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE timestamptz USING to_timestamp(%s)", m.table, m.column, m.column))
+			} else {
+				db.Exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE timestamptz USING to_timestamp(%s / 1000.0)", m.table, m.column, m.column))
+			}
 		}
 	}
 }

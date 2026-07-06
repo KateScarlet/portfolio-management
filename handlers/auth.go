@@ -134,10 +134,10 @@ func Register(db *gorm.DB) app.HandlerFunc {
 		}
 
 		user := models.User{
-			ID:        uuid.New(),
-			Username:  body.Username,
-			Password:  string(hashedPassword),
-			Role:      body.Role,
+			ID:       uuid.New(),
+			Username: body.Username,
+			Password: string(hashedPassword),
+			Role:     body.Role,
 		}
 
 		if err := gorm.G[models.User](db).Create(ctx, &user); err != nil {
@@ -253,10 +253,10 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 	}
 
 	user := models.User{
-		ID:        uuid.New(),
-		Username:  username,
-		Password:  string(hashedPassword),
-		Role:      role,
+		ID:       uuid.New(),
+		Username: username,
+		Password: string(hashedPassword),
+		Role:     role,
 	}
 
 	if err := gorm.G[models.User](db).Create(context.Background(), &user); err != nil {

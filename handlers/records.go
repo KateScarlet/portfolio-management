@@ -150,7 +150,7 @@ func CreateRecord(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			ID:          uuid.New(),
 			UserID:      user.UserID,
 			PortfolioID: portfolioID,
-			Timestamp:   time.Now().UnixMilli(),
+			Timestamp:   time.Now(),
 			Assets:      assets,
 			Holdings:    snapshotHoldings,
 			Total:       total,

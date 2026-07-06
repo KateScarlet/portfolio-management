@@ -314,8 +314,8 @@ export interface Dividend {
   currency: string
   sharesHeld: string
   dividendPerShare: string
-  exDate?: number
-  payDate?: number
+  exDate?: string
+  payDate?: string
   reinvest: boolean
   reinvestPrice: string
   reinvestShares: string
