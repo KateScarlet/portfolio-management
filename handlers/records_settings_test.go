@@ -6,6 +6,7 @@ import (
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
@@ -19,7 +20,7 @@ func setupRecordsTestDB(t *testing.T) *gorm.DB {
 	return setupTestDB(t)
 }
 
-func createTestRecord(t *testing.T, db *gorm.DB, timestamp int64) string {
+func createTestRecord(t *testing.T, db *gorm.DB, timestamp time.Time) string {
 	t.Helper()
 	id := uuid.New()
 	r := models.PortfolioRecord{
@@ -59,8 +60,8 @@ func TestListRecords_Empty(t *testing.T) {
 
 func TestListRecords_ReturnsUserRecords(t *testing.T) {
 	db := setupRecordsTestDB(t)
-	createTestRecord(t, db, 1000)
-	createTestRecord(t, db, 2000)
+	createTestRecord(t, db, time.Unix(1, 0))
+	createTestRecord(t, db, time.Unix(2, 0))
 
 	c := newUserCtx("GET", "/api/records", nil)
 	ListRecords(db)(context.Background(), c)
@@ -73,7 +74,7 @@ func TestListRecords_ReturnsUserRecords(t *testing.T) {
 		t.Fatalf("expected 2 records, got %d", len(records))
 	}
 	// Should be ordered by timestamp DESC
-	if records[0].Timestamp < records[1].Timestamp {
+	if records[0].Timestamp.Before(records[1].Timestamp) {
 		t.Error("expected descending order by timestamp")
 	}
 }
@@ -150,7 +151,7 @@ func TestCreateRecord_NoHoldings(t *testing.T) {
 
 func TestDeleteRecord_Success(t *testing.T) {
 	db := setupRecordsTestDB(t)
-	id := createTestRecord(t, db, 1000)
+	id := createTestRecord(t, db, time.Unix(1, 0))
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
