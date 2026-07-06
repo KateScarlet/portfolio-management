@@ -10,6 +10,7 @@ import (
 	"portfolio-management/models"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -142,6 +143,24 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
 	}
+
+	// 迁移：将 account_id 为 NULL 的持仓转移到默认账户
+	var holdingsWithNull []models.Holding
+	if err := db.Where("account_id IS NULL").Find(&holdingsWithNull).Error; err == nil && len(holdingsWithNull) > 0 {
+		userIDs := make(map[uuid.UUID]bool)
+		for _, h := range holdingsWithNull {
+			userIDs[h.UserID] = true
+		}
+		for userID := range userIDs {
+			var defaultAccount models.Account
+			if err := db.Where("user_id = ? AND is_default = ?", userID, true).First(&defaultAccount).Error; err != nil {
+				continue
+			}
+			db.Model(&models.Holding{}).Where("user_id = ? AND account_id IS NULL", userID).Update("account_id", defaultAccount.ID)
+		}
+	}
+	// 将 account_id 列改为 NOT NULL
+	db.Exec("ALTER TABLE holdings ALTER COLUMN account_id SET NOT NULL")
 
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''")

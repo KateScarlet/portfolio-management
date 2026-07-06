@@ -27,10 +27,7 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func accountIDString(id *uuid.UUID) string {
-	if id == nil {
-		return ""
-	}
+func accountIDString(id uuid.UUID) string {
 	return id.String()
 }
 
@@ -163,7 +160,6 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 							ID:          h.ID,
 							UserID:      h.UserID,
 							PortfolioID: h.PortfolioID,
-							AccountID:   nil,
 							AssetId:     h.AssetId,
 							Symbol:      h.Symbol,
 							Name:        h.Name,
@@ -177,13 +173,10 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 					merged[key] = mh
 				}
 
-				var accountName string
-				if h.AccountID != nil {
-					accountName = accountNameMap[*h.AccountID]
-				}
+				accountName := accountNameMap[h.AccountID]
 				mh.Accounts = append(mh.Accounts, MergedHoldingAccount{
 					HoldingID:   h.ID.String(),
-					AccountID:   accountIDString(h.AccountID),
+					AccountID:   h.AccountID.String(),
 					AccountName: accountName,
 					Shares:      h.Shares,
 					Cost:        h.Cost,
@@ -295,6 +288,14 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		// 如果没有指定账户，使用默认账户
+		if input.AccountID == uuid.Nil {
+			var defaultAccount models.Account
+			if err := db.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&defaultAccount).Error; err == nil {
+				input.AccountID = defaultAccount.ID
+			}
+		}
+
 		isRegisterOnly := input.Shares.IsZero() && input.Cost.IsZero()
 
 		var created bool
@@ -304,17 +305,9 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
-				if input.AccountID != nil {
-					res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id = ? AND symbol != ''", portfolioID, input.Symbol, *input.AccountID).First(&existing)
-				} else {
-					res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id IS NULL AND symbol != ''", portfolioID, input.Symbol).First(&existing)
-				}
+				res = tx.Where("portfolio_id = ? AND symbol = ? AND account_id = ? AND symbol != ''", portfolioID, input.Symbol, input.AccountID).First(&existing)
 			} else {
-				if input.AccountID != nil {
-					res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId, *input.AccountID).First(&existing)
-				} else {
-					res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id IS NULL AND symbol = ''", portfolioID, input.Name, input.AssetId).First(&existing)
-				}
+				res = tx.Where("portfolio_id = ? AND name = ? AND asset_id = ? AND account_id = ? AND symbol = ''", portfolioID, input.Name, input.AssetId, input.AccountID).First(&existing)
 			}
 
 			if res.Error == nil {

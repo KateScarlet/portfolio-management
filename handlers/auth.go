@@ -61,6 +61,8 @@ func Login(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
+		_ = ensureDefaultAccount(db, user.ID)
+
 		setAuthCookie(c, "auth_token", token, cookieMaxAge, cfg)
 		c.JSON(consts.StatusOK, map[string]any{
 			"user": map[string]any{
@@ -147,6 +149,11 @@ func Register(db *gorm.DB) app.HandlerFunc {
 
 		if err := ensureDefaultPortfolio(db, user.ID); err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认组合失败"})
+			return
+		}
+
+		if err := ensureDefaultAccount(db, user.ID); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认账户失败"})
 			return
 		}
 
@@ -263,7 +270,32 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		return err
 	}
 
-	return ensureDefaultPortfolio(db, user.ID)
+	if err := ensureDefaultPortfolio(db, user.ID); err != nil {
+		return err
+	}
+	return ensureDefaultAccount(db, user.ID)
+}
+
+func ensureDefaultAccount(db *gorm.DB, userID uuid.UUID) error {
+	var count int64
+	db.Model(&models.Account{}).Where("user_id = ?", userID).Count(&count)
+	if count > 0 {
+		return nil
+	}
+	account := models.Account{
+		ID:        uuid.New(),
+		UserID:    userID,
+		Name:      "默认账户",
+		IsDefault: true,
+	}
+	ctx := context.Background()
+	if err := gorm.G[models.Account](db).Create(ctx, &account); err != nil {
+		return err
+	}
+	if _, err := gorm.G[models.Holding](db).Where("user_id = ? AND account_id IS NULL", userID).Update(ctx, "account_id", account.ID); err != nil {
+		return err
+	}
+	return nil
 }
 
 func ensureDefaultPortfolio(db *gorm.DB, userID uuid.UUID) error {

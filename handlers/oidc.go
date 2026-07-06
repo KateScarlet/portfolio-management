@@ -152,6 +152,8 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败，用户名 '" + username + "' 可能已被占用: " + err.Error()})
 				return
 			}
+			_ = ensureDefaultPortfolio(gormDB, user.ID)
+			_ = ensureDefaultAccount(gormDB, user.ID)
 		case err != nil:
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询用户失败"})
 			return

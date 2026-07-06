@@ -53,6 +53,7 @@ export interface Account {
   name: string
   description?: string
   broker?: string
+  isDefault: boolean
   createdAt: string
 }
 
@@ -126,7 +127,7 @@ export interface Holding {
   date?: string // Original purchase date for the lot being added
   fee?: string // 手续费（仅用于创建时传递）
   lots?: HoldingLot[]
-  accountId?: string // 所属账户ID
+  accountId: string // 所属账户ID
 }
 
 export interface HoldingSnapshot {

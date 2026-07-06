@@ -335,7 +335,7 @@ export default function HoldingsManager({
               )}
               {toDecimal(lot.fee).isPositive() && (
                 <span className="w-20 text-[10px] text-[#ADB5BD] text-right">
-                  费: {formatCurrencyByCode(lot.fee || 0, h.currency || "CNY")}
+                  手续费: {formatCurrencyByCode(lot.fee || 0, h.currency || "CNY")}
                 </span>
               )}
               <div className="flex gap-2 shrink-0">
@@ -394,7 +394,7 @@ export default function HoldingsManager({
       </div>
 
       {isAdding && (
-        <AddHoldingForm onAddHolding={onAddHolding} onClose={() => setIsAdding(false)} />
+        <AddHoldingForm onAddHolding={onAddHolding} onClose={() => setIsAdding(false)} accounts={accounts} />
       )}
 
       <div className="grow overflow-x-auto">
@@ -623,7 +623,7 @@ export default function HoldingsManager({
                         return (
                           <tr className="bg-[#F8F9FA]">
                             <td colSpan={6} className="px-6 py-4">
-                              <div className="pl-12 border-l-2 border-[#DEE2E6] ml-4 space-y-3">
+                              <div className="pl-6 border-l-2 border-[#DEE2E6] ml-4 space-y-3">
                                 {groups.map((group, gi) => (
                                   <div key={gi} className="space-y-1">
                                     {hasMulti && (

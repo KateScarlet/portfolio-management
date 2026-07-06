@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -20,7 +21,7 @@ func ListAccounts(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		accounts, err := gorm.G[models.Account](db).Where("user_id = ?", user.UserID).Order("created_at ASC").Find(ctx)
+		accounts, err := gorm.G[models.Account](db).Where("user_id = ?", user.UserID).Order("is_default DESC, created_at ASC").Find(ctx)
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
@@ -134,18 +135,25 @@ func DeleteAccount(db *gorm.DB) app.HandlerFunc {
 
 		id := c.Param("id")
 
-		_, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		account, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "账户不存在"})
 			return
 		}
 
+		if account.IsDefault {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能删除默认账户"})
+			return
+		}
+
 		err = db.Transaction(func(tx *gorm.DB) error {
-			// Clear account_id on holdings belonging to this account
-			if _, err := gorm.G[map[string]any](tx).Table("holdings").Where("user_id = ? AND account_id = ?", user.UserID, id).Updates(ctx, map[string]any{"account_id": nil}); err != nil {
+			defaultAccount, err := gorm.G[models.Account](tx).Where("user_id = ? AND is_default = ?", user.UserID, true).First(ctx)
+			if err != nil {
+				return fmt.Errorf("未找到默认账户")
+			}
+			if _, err := gorm.G[map[string]any](tx).Table("holdings").Where("user_id = ? AND account_id = ?", user.UserID, id).Updates(ctx, map[string]any{"account_id": defaultAccount.ID}); err != nil {
 				return err
 			}
-			// Delete the account
 			if _, err := gorm.G[models.Account](tx).Where("id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
@@ -210,7 +218,7 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 		if filterAccountID != "" {
 			filtered := make([]models.Holding, 0)
 			for i := range holdings {
-				if holdings[i].AccountID != nil && holdings[i].AccountID.String() == filterAccountID {
+				if holdings[i].AccountID.String() == filterAccountID {
 					filtered = append(filtered, holdings[i])
 				}
 			}
@@ -228,10 +236,7 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 		// Enrich with account names
 		result := make([]HoldingWithAccount, len(holdings))
 		for i := range holdings {
-			var accountName string
-			if holdings[i].AccountID != nil {
-				accountName = accountNameMap[*holdings[i].AccountID]
-			}
+			accountName := accountNameMap[holdings[i].AccountID]
 			result[i] = HoldingWithAccount{
 				Holding:     holdings[i],
 				AccountName: accountName,

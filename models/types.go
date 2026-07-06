@@ -15,7 +15,7 @@ type HoldingLot struct {
 	HoldingID  uuid.UUID       `gorm:"type:uuid;index;not null;comment:关联持仓ID" json:"holdingId"`
 	Type       string          `gorm:"size:10;default:'';comment:交易类型(buy/sell)" json:"type,omitempty"`
 	Date       time.Time       `gorm:"comment:交易日期" json:"date"`
-	Shares     decimal.Decimal `gorm:"type:decimal;default:0;comment:交易股数(买入为正,卖出为负)" json:"shares"`
+	Shares     decimal.Decimal `gorm:"type:decimal;default:0;comment:交易股数" json:"shares"`
 	CostPrice  decimal.Decimal `gorm:"type:decimal;default:0;comment:成本单价" json:"costPrice"`
 	Cost       decimal.Decimal `gorm:"type:decimal;default:0;comment:交易成本(买入为成本增加,卖出为成本减少)" json:"cost"`
 	ValueAdded decimal.Decimal `gorm:"type:decimal;default:0;comment:市值变动(买入为购买时市值,卖出为卖出时市值)" json:"valueAdded"`
@@ -63,6 +63,7 @@ type Account struct {
 	Name        string    `gorm:"size:100;not null;comment:账户名称" json:"name"`
 	Description string    `gorm:"size:500;default:'';comment:账户描述" json:"description,omitempty"`
 	Broker      string    `gorm:"size:100;default:'';comment:券商名称" json:"broker,omitempty"`
+	IsDefault   bool      `gorm:"default:false;comment:是否为默认账户" json:"isDefault"`
 	CreatedAt   time.Time `gorm:"autoCreateTime;timestamptz;comment:创建时间" json:"createdAt"`
 }
 
@@ -70,7 +71,7 @@ type Holding struct {
 	ID             uuid.UUID       `gorm:"type:uuid;primaryKey;comment:持仓唯一ID" json:"id"`
 	UserID         uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属用户ID" json:"userId"`
 	PortfolioID    uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属组合ID" json:"portfolioId"`
-	AccountID      *uuid.UUID      `gorm:"type:uuid;index;comment:所属账户ID(可为空)" json:"accountId,omitempty"`
+	AccountID      uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属账户ID" json:"accountId"`
 	AssetId        string          `gorm:"size:20;not null;comment:资产类型(stock/bond/fund等)" json:"assetId"`
 	Symbol         string          `gorm:"size:20;default:'';comment:资产代码(如AAPL)" json:"symbol"`
 	Name           string          `gorm:"size:200;default:'';comment:资产名称" json:"name,omitempty"`

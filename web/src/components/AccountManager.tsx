@@ -163,6 +163,11 @@ export default function AccountManager({ accounts, onClose, onRefresh }: Props) 
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-sm font-medium">{a.name}</span>
+                    {a.isDefault && (
+                      <span className="ml-2 text-[10px] text-[#6C757D] bg-[#F8F9FA] px-1.5 py-0.5 rounded">
+                        默认
+                      </span>
+                    )}
                     {a.broker && (
                       <span className="ml-2 text-[10px] text-[#6C757D] bg-[#F8F9FA] px-1.5 py-0.5 rounded">
                         {a.broker}
@@ -184,12 +189,14 @@ export default function AccountManager({ accounts, onClose, onRefresh }: Props) 
                     >
                       编辑
                     </button>
-                    <button
-                      onClick={() => setDeleteTarget({ id: a.id, name: a.name })}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      删除
-                    </button>
+                    {!a.isDefault && (
+                      <button
+                        onClick={() => setDeleteTarget({ id: a.id, name: a.name })}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        删除
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -204,7 +211,7 @@ export default function AccountManager({ accounts, onClose, onRefresh }: Props) 
       {deleteTarget && (
         <ConfirmDialog
           title="删除账户"
-          message={`确定删除账户"${deleteTarget.name}"？该账户下的持仓将被解除归属，但持仓本身不会被删除。`}
+          message={`确定删除账户"${deleteTarget.name}"？该账户下的持仓将转移到默认账户。`}
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />

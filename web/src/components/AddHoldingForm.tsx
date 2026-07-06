@@ -13,9 +13,11 @@ interface AddHoldingFormProps {
   onAddHolding: (holding: Omit<import("../types").Holding, "id">) => Promise<void>
   onClose: () => void
   accountId?: string
+  accounts?: import("../types").Account[]
 }
 
-export default function AddHoldingForm({ onAddHolding, onClose, accountId }: AddHoldingFormProps) {
+export default function AddHoldingForm({ onAddHolding, onClose, accountId, accounts }: AddHoldingFormProps) {
+  const defaultAccountId = accountId || accounts?.find((a) => a.isDefault)?.id || ""
   const [assetId, setAssetId] = useState<AssetId>("stocks")
   const [market, setMarket] = useState<
     "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
@@ -41,7 +43,7 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId }: Add
           shares: "0",
           price: "0",
           value: "0",
-          accountId,
+          accountId: defaultAccountId,
         })
       } catch (e) {
         showToast(e instanceof Error ? e.message : "录入失败", "error")
@@ -74,7 +76,7 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId }: Add
             shares: "0",
             price: String(data.price),
             value: "0",
-            accountId,
+          accountId: defaultAccountId,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
