@@ -276,7 +276,7 @@ func TestDeleteUser_CleansUpRelatedData(t *testing.T) {
 	uid := createTestUser(t, db, "deleteme", "user")
 
 	portfolioID := uuid.New()
-	db.Create(&models.Portfolio{ID: portfolioID, UserID: uid, Name: "Test", IsDefault: true, CreatedAt: 1000})
+	db.Create(&models.Portfolio{ID: portfolioID, UserID: uid, Name: "Test", IsDefault: true})
 	db.Create(&models.Holding{ID: uuid.New(), UserID: uid, PortfolioID: portfolioID, AssetId: "stocks", Symbol: "AAPL"})
 	db.Create(&models.PortfolioRecord{ID: uuid.New(), UserID: uid, PortfolioID: portfolioID, Timestamp: 1000, Assets: models.AssetMapColumn{"stocks": decimal.NewFromInt(100)}, Total: decimal.NewFromInt(100)})
 	db.Create(&models.Setting{Key: "syncInterval", Value: "5", UserID: uid, PortfolioID: portfolioID})

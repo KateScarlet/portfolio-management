@@ -5,7 +5,6 @@ import (
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -59,7 +58,6 @@ func CreateAccount(db *gorm.DB) app.HandlerFunc {
 			Name:        body.Name,
 			Description: body.Description,
 			Broker:      body.Broker,
-			CreatedAt:   time.Now().UnixMilli(),
 		}
 
 		if err := gorm.G[models.Account](db).Create(ctx, &account); err != nil {

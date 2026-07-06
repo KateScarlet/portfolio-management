@@ -38,7 +38,6 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		UserID:    testUserID,
 		Name:      "默认组合",
 		IsDefault: true,
-		CreatedAt: 1000,
 	})
 	return db
 }

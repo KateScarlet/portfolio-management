@@ -316,7 +316,6 @@ func WebAuthnRegisterFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			PublicKey:    credential.PublicKey,
 			Flags:        credential.Flags.MsgpByte(),
 			SignCount:    uint64(credential.Authenticator.SignCount),
-			CreatedAt:    time.Now().Unix(),
 			LastUsedAt:   time.Now().Unix(),
 		}
 

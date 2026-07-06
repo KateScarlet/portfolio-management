@@ -7,7 +7,6 @@ import (
 	"errors"
 	"portfolio-management/db"
 	"portfolio-management/models"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -148,7 +147,6 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				Role:        "user",
 				SSOProvider: "oidc",
 				SSOId:       sub,
-				CreatedAt:   time.Now().UnixMilli(),
 			}
 			if err := gormDB.Create(&user).Error; err != nil {
 				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败，用户名 '" + username + "' 可能已被占用: " + err.Error()})

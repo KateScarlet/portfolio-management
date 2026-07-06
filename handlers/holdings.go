@@ -441,7 +441,6 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 						Amount:      addedCost,
 						Currency:    holdingCurrency,
 						HoldingID:   &result.ID,
-						CreatedAt:   time.Now().UnixMilli(),
 					}).Error; err != nil {
 						return err
 					}
@@ -709,7 +708,6 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 					Amount:      refundAmount,
 					Currency:    currency,
 					HoldingID:   &holding.ID,
-					CreatedAt:   time.Now().UnixMilli(),
 				}).Error; err != nil {
 					return err
 				}

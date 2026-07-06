@@ -139,6 +139,10 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
+	// Migrate created_at columns from bigint (millisecond timestamps) to timestamptz.
+	// Must run before AutoMigrate, which cannot auto-convert bigint→timestamptz.
+	migrateCreatedAtColumns(db)
+
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
 	}
@@ -185,4 +189,18 @@ func SaveConfig(cfg *Config) error {
 	v.SetConfigFile(ConfigFile())
 	v.SetConfigType("yaml")
 	return v.WriteConfig()
+}
+
+// migrateCreatedAtColumns converts created_at columns from bigint (millisecond
+// timestamps) to timestamptz. It checks each table's column type before attempting
+// migration so it's safe to run repeatedly.
+func migrateCreatedAtColumns(db *gorm.DB) {
+	tables := []string{"portfolios", "accounts", "fund_transactions", "users", "web_authn_credentials", "dividends"}
+	for _, table := range tables {
+		var dataType string
+		db.Raw("SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = 'created_at'", table).Scan(&dataType)
+		if dataType == "bigint" || dataType == "int8" {
+			db.Exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN created_at TYPE timestamptz USING to_timestamp(created_at / 1000.0)", table))
+		}
+	}
 }

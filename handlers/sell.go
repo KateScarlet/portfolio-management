@@ -208,7 +208,6 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					Amount:      realizedValue,
 					Currency:    currency,
 					HoldingID:   &holding.ID,
-					CreatedAt:   time.Now().UnixMilli(),
 				}).Error; err != nil {
 					return err
 				}

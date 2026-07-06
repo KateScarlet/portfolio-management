@@ -108,7 +108,6 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 				Reinvest:         req.Reinvest,
 				ReinvestPrice:    req.ReinvestPrice,
 				Note:             req.Note,
-				CreatedAt:        time.Now().UnixMilli(),
 			}
 
 			if err := tx.Create(&dividend).Error; err != nil {
@@ -162,7 +161,6 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 					Currency:    currency,
 					HoldingID:   &req.HoldingID,
 					Note:        req.Note,
-					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err
@@ -186,7 +184,6 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 					Currency:    currency,
 					HoldingID:   &req.HoldingID,
 					Note:        req.Note,
-					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err
@@ -464,7 +461,6 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 					Currency:    currency,
 					HoldingID:   &dividend.HoldingID,
 					Note:        req.Note,
-					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err
@@ -484,7 +480,6 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 					Currency:    currency,
 					HoldingID:   &dividend.HoldingID,
 					Note:        req.Note,
-					CreatedAt:   time.Now().UnixMilli(),
 				}
 				if err := tx.Create(&fundTx).Error; err != nil {
 					return err

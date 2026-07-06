@@ -7,7 +7,6 @@ import (
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
 
 	"log/slog"
 
@@ -153,7 +152,6 @@ func TransferIn(db *gorm.DB) app.HandlerFunc {
 				Amount:      body.Amount,
 				Currency:    body.Currency,
 				Note:        body.Note,
-				CreatedAt:   time.Now().UnixMilli(),
 			}).Error
 		})
 		if err != nil {
@@ -224,7 +222,6 @@ func TransferOut(db *gorm.DB) app.HandlerFunc {
 				Amount:      body.Amount,
 				Currency:    body.Currency,
 				Note:        body.Note,
-				CreatedAt:   time.Now().UnixMilli(),
 			}).Error
 		})
 		if err != nil {
@@ -316,7 +313,6 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			now := time.Now().UnixMilli()
 			if err := tx.Create(&models.FundTransaction{
 				ID:                uuid.New(),
 				UserID:            user.UserID,
@@ -326,7 +322,6 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 				Currency:          body.Currency,
 				TargetPortfolioID: &targetPortfolioID,
 				Note:              body.Note,
-				CreatedAt:         now,
 			}).Error; err != nil {
 				return err
 			}
@@ -339,7 +334,6 @@ func TransferBetween(db *gorm.DB) app.HandlerFunc {
 				Currency:          body.Currency,
 				TargetPortfolioID: &portfolioID,
 				Note:              "从其他组合划转转入",
-				CreatedAt:         now,
 			}).Error
 		})
 		if err != nil {
@@ -435,7 +429,6 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 				TargetAmount:   body.ToAmount,
 				TargetCurrency: body.ToCurrency,
 				ExchangeRate:   body.ExchangeRate,
-				CreatedAt:      time.Now().UnixMilli(),
 			}).Error
 		})
 		if err != nil {

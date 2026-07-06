@@ -138,7 +138,6 @@ func Register(db *gorm.DB) app.HandlerFunc {
 			Username:  body.Username,
 			Password:  string(hashedPassword),
 			Role:      body.Role,
-			CreatedAt: time.Now().UnixMilli(),
 		}
 
 		if err := gorm.G[models.User](db).Create(ctx, &user); err != nil {
@@ -258,7 +257,6 @@ func CreateUserForSetup(db *gorm.DB, username, password, role string) error {
 		Username:  username,
 		Password:  string(hashedPassword),
 		Role:      role,
-		CreatedAt: time.Now().UnixMilli(),
 	}
 
 	if err := gorm.G[models.User](db).Create(context.Background(), &user); err != nil {
@@ -279,7 +277,6 @@ func ensureDefaultPortfolio(db *gorm.DB, userID uuid.UUID) error {
 		UserID:    userID,
 		Name:      "默认组合",
 		IsDefault: true,
-		CreatedAt: time.Now().UnixMilli(),
 	}
 	ctx := context.Background()
 	if err := gorm.G[models.Portfolio](db).Create(ctx, &portfolio); err != nil {

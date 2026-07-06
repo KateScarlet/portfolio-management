@@ -54,7 +54,7 @@ type Portfolio struct {
 	Name        string    `gorm:"size:100;not null;comment:组合名称" json:"name"`
 	Description string    `gorm:"size:500;default:'';comment:组合描述" json:"description,omitempty"`
 	IsDefault   bool      `gorm:"default:false;comment:是否为默认组合" json:"isDefault"`
-	CreatedAt   int64     `gorm:"comment:创建时间(毫秒时间戳)" json:"createdAt"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;timestamptz;comment:创建时间" json:"createdAt"`
 }
 
 type Account struct {
@@ -63,7 +63,7 @@ type Account struct {
 	Name        string    `gorm:"size:100;not null;comment:账户名称" json:"name"`
 	Description string    `gorm:"size:500;default:'';comment:账户描述" json:"description,omitempty"`
 	Broker      string    `gorm:"size:100;default:'';comment:券商名称" json:"broker,omitempty"`
-	CreatedAt   int64     `gorm:"comment:创建时间(毫秒时间戳)" json:"createdAt"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;timestamptz;comment:创建时间" json:"createdAt"`
 }
 
 type Holding struct {
@@ -163,7 +163,7 @@ type FundTransaction struct {
 	ExchangeRate      decimal.Decimal `gorm:"type:decimal;default:0;comment:汇率" json:"exchangeRate"`
 	HoldingID         *uuid.UUID      `gorm:"type:uuid;comment:关联持仓ID(仅分红类型)" json:"holdingId,omitempty"`
 	Note              string          `gorm:"size:500;default:'';comment:备注" json:"note,omitempty"`
-	CreatedAt         int64           `gorm:"comment:创建时间(毫秒时间戳)" json:"createdAt"`
+	CreatedAt         time.Time       `gorm:"autoCreateTime;timestamptz;comment:创建时间" json:"createdAt"`
 }
 
 type User struct {
@@ -173,7 +173,7 @@ type User struct {
 	Role        string    `gorm:"size:20;default:'user'" json:"role"`
 	SSOProvider string    `gorm:"size:20;default:''" json:"ssoProvider,omitempty"`
 	SSOId       string    `gorm:"size:200;default:''" json:"-"`
-	CreatedAt   int64     `json:"createdAt"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
 }
 
 // WebAuthnCredential stores a registered WebAuthn (passkey) credential for a user.
@@ -185,7 +185,7 @@ type WebAuthnCredential struct {
 	PublicKey    []byte    `gorm:"type:bytes;not null" json:"-"`
 	Flags        uint8     `gorm:"default:0" json:"-"`
 	SignCount    uint64    `gorm:"default:0" json:"-"`
-	CreatedAt    int64     `json:"createdAt"`
+	CreatedAt    time.Time `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
 	LastUsedAt   int64     `json:"lastUsedAt"`
 }
 
@@ -299,5 +299,5 @@ type Dividend struct {
 	HoldingLotID     *uuid.UUID      `gorm:"type:uuid;comment:关联持仓批次ID(仅再投资)" json:"holdingLotId,omitempty"`
 	FundTxID         *uuid.UUID      `gorm:"type:uuid;comment:关联资金交易ID" json:"fundTxId,omitempty"`
 	Note             string          `gorm:"size:500;default:''" json:"note,omitempty"`
-	CreatedAt        int64           `json:"createdAt"`
+	CreatedAt        time.Time       `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
 }

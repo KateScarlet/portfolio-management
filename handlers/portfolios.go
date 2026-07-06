@@ -4,7 +4,6 @@ import (
 	"context"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -52,7 +51,6 @@ func CreatePortfolio(db *gorm.DB) app.HandlerFunc {
 			Name:        body.Name,
 			Description: body.Description,
 			IsDefault:   false,
-			CreatedAt:   time.Now().UnixMilli(),
 		}
 
 		if err := gorm.G[models.Portfolio](db).Create(ctx, &portfolio); err != nil {

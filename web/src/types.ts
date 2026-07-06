@@ -29,7 +29,7 @@ export interface FundTransaction {
   exchangeRate?: string
   holdingId?: string
   note?: string
-  createdAt: number
+  createdAt: string
 }
 
 export interface UserInfo {
@@ -44,7 +44,7 @@ export interface Portfolio {
   name: string
   description?: string
   isDefault: boolean
-  createdAt: number
+  createdAt: string
 }
 
 export interface Account {
@@ -53,7 +53,7 @@ export interface Account {
   name: string
   description?: string
   broker?: string
-  createdAt: number
+  createdAt: string
 }
 
 export interface HoldingWithAccount extends Holding {
@@ -322,5 +322,5 @@ export interface Dividend {
   holdingLotId?: string
   fundTxId?: string
   note?: string
-  createdAt: number
+  createdAt: string
 }

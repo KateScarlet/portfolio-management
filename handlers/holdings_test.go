@@ -91,7 +91,7 @@ func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 
 	otherPortfolioID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
 	otherUserID := uuid.MustParse("00000000-0000-0000-0000-000000000099")
-	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true, CreatedAt: 1000})
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true})
 
 	c := app.NewContext(1)
 	c.Request.SetRequestURI("/api/portfolios/" + otherPortfolioID.String() + "/holdings")
@@ -547,7 +547,7 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 
 	otherPortfolioID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
 	otherUserID := uuid.MustParse("00000000-0000-0000-0000-000000000099")
-	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true, CreatedAt: 1000})
+	db.Create(&models.Portfolio{ID: otherPortfolioID, UserID: otherUserID, Name: "Other", IsDefault: true})
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: otherPortfolioID.String()}, {Key: "id", Value: id}}
