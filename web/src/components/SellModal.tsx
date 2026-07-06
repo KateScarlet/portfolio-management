@@ -34,9 +34,6 @@ export default function SellModal({
   const [accountId, setAccountId] = useState(
     mergedAccounts.length === 1 ? mergedAccounts[0].accountId : holding.accountId || ""
   )
-  const [sellShares, setSellShares] = useState(
-    holding.shares && toDecimal(holding.shares).isPositive() ? holding.shares.toString() : ""
-  )
   const [sellPrice, setSellPrice] = useState(
     holding.shares && toDecimal(holding.shares).isPositive()
       ? (holding.price || "0").toString()
@@ -47,19 +44,38 @@ export default function SellModal({
 
   const { showToast } = useToast()
 
+  // 获取当前选中账户的持仓信息
+  const selectedAccount = mergedAccounts.find((a) => a.accountId === accountId)
+  const maxShares = selectedAccount?.shares || holding.shares || "0"
+  const [sellShares, setSellShares] = useState(
+    maxShares && toDecimal(maxShares).isPositive() ? maxShares.toString() : ""
+  )
+
+  // 当账户切换时，重置卖出份额
+  const handleAccountChange = (newAccountId: string) => {
+    setAccountId(newAccountId)
+    const newAccount = mergedAccounts.find((a) => a.accountId === newAccountId)
+    const newMaxShares = newAccount?.shares || holding.shares || "0"
+    if (toDecimal(newMaxShares).isPositive()) {
+      setSellShares(newMaxShares.toString())
+    } else {
+      setSellShares("")
+    }
+  }
+
   const confirmSell = async () => {
     const feeStr = sellFee || "0"
     const dateMs = new Date(sellDate).toISOString()
 
-    if (holding.shares && toDecimal(holding.shares).isPositive() && holding.price) {
+    if (toDecimal(maxShares).isPositive() && holding.price) {
       const sShares = parseDecimalInput(sellShares)
       const sPrice = parseDecimalInput(sellPrice)
       if (!sShares?.isPositive()) {
         showToast("请输入有效的卖出份额", "error")
         return
       }
-      if (sShares.greaterThan(holding.shares)) {
-        showToast(`卖出份额不能超过持有量 ${holding.shares}`, "error")
+      if (sShares.greaterThan(maxShares)) {
+        showToast(`卖出份额不能超过持有量 ${maxShares}`, "error")
         return
       }
       if (!sPrice || sPrice.isNegative()) {
@@ -135,11 +151,30 @@ export default function SellModal({
         </div>
 
         <div className="space-y-4">
-          {holding.shares && toDecimal(holding.shares).isPositive() ? (
+          {mergedAccounts.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                账户
+              </label>
+              <select
+                value={accountId}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+              >
+                {mergedAccounts.map((a) => (
+                  <option key={a.accountId} value={a.accountId}>
+                    {a.accountName} ({a.shares}股)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {toDecimal(maxShares).isPositive() ? (
             <>
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                  卖出份额 (最多: {holding.shares})
+                  卖出份额 (最多: {maxShares})
                 </label>
                 <input
                   type="number"
@@ -200,25 +235,6 @@ export default function SellModal({
             placeholder="0"
           />
         </div>
-
-        {mergedAccounts.length > 1 && (
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-              账户
-            </label>
-            <select
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
-            >
-              {mergedAccounts.map((a) => (
-                <option key={a.accountId} value={a.accountId}>
-                  {a.accountName || "未分配"} ({a.shares}股)
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">
           <button

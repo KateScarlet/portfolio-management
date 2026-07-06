@@ -26,20 +26,19 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId, accou
   const [name, setName] = useState("")
   const [isManual, setIsManual] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
+  const [currency, setCurrency] = useState("CNY")
 
   const { showToast } = useToast()
 
   const handleAdd = async () => {
     if (isManual) {
-      const targetCurrency =
-        market === "US" || market === "CRYPTO" ? "USD" : market === "HK" ? "HKD" : "CNY"
       try {
         await onAddHolding({
           assetId,
           symbol: "",
           name: name.trim() || "手工资产",
           market,
-          currency: targetCurrency,
+          currency,
           shares: "0",
           price: "0",
           value: "0",
@@ -257,6 +256,26 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId, accou
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
             />
+          </div>
+        )}
+
+        {isManual && (
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+              币种
+            </label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+            >
+              <option value="CNY">CNY (人民币)</option>
+              <option value="USD">USD (美元)</option>
+              <option value="HKD">HKD (港币)</option>
+              <option value="EUR">EUR (欧元)</option>
+              <option value="GBP">GBP (英镑)</option>
+              <option value="JPY">JPY (日元)</option>
+            </select>
           </div>
         )}
 

@@ -141,6 +141,26 @@ export default function BuyModal({
         </div>
 
         <div className="space-y-4">
+          {accounts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+                账户
+              </label>
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                    {a.broker ? ` (${a.broker})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {isSymbolBased ? (
             <>
               <div className="flex flex-col gap-2">
@@ -244,26 +264,6 @@ export default function BuyModal({
               className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A] font-mono"
             />
           </div>
-
-          {accounts.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
-                账户
-              </label>
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.broker ? ` (${a.broker})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
 
         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">

@@ -535,8 +535,8 @@ export async function recordDividend(
     taxWithheld?: string
     currency?: string
     dividendPerShare?: string
-    exDate?: number
-    payDate?: number
+    exDate?: string
+    payDate?: string
     reinvest: boolean
     reinvestPrice?: string
     note?: string
@@ -567,8 +567,8 @@ export async function updateDividend(
     taxWithheld?: string
     currency?: string
     dividendPerShare?: string
-    exDate?: number
-    payDate?: number
+    exDate?: string
+    payDate?: string
     reinvest: boolean
     reinvestPrice?: string
     note?: string
