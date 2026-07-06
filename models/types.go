@@ -267,6 +267,17 @@ func BuyFees(lots []HoldingLot) decimal.Decimal {
 	return total
 }
 
+// SellFees returns the sum of sell lot fees only (excludes buy lot fees).
+func SellFees(lots []HoldingLot) decimal.Decimal {
+	total := decimal.Zero
+	for i := range lots {
+		if lots[i].Type == "sell" {
+			total = total.Add(lots[i].Fee)
+		}
+	}
+	return total
+}
+
 type Dividend struct {
 	ID               uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID           uuid.UUID       `gorm:"type:uuid;index;not null" json:"userId"`
