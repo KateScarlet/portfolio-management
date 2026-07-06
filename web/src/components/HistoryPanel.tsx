@@ -1,7 +1,13 @@
 import React, { useState } from "react"
 import { format } from "date-fns"
 import { PortfolioRecord, ColorScheme } from "../types"
-import { formatCurrencyByCode, formatPrice, formatPercent, getProfitColor, toDecimal } from "../utils"
+import {
+  formatCurrencyByCode,
+  formatPrice,
+  formatPercent,
+  getProfitColor,
+  toDecimal,
+} from "../utils"
 import ConfirmDialog from "./ConfirmDialog"
 
 interface HistoryPanelProps {

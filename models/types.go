@@ -212,15 +212,15 @@ func RecalcFromLots(h *Holding, lots []HoldingLot) {
 	var totalBuyCost, totalSellCost decimal.Decimal
 	var totalBuyValue, totalSellValue decimal.Decimal
 
-	for _, lot := range lots {
-		if lot.Type == "sell" {
-			totalSellShares = totalSellShares.Add(lot.Shares)
-			totalSellCost = totalSellCost.Add(lot.Cost)
-			totalSellValue = totalSellValue.Add(lot.ValueAdded)
+	for i := range lots {
+		if lots[i].Type == "sell" {
+			totalSellShares = totalSellShares.Add(lots[i].Shares)
+			totalSellCost = totalSellCost.Add(lots[i].Cost)
+			totalSellValue = totalSellValue.Add(lots[i].ValueAdded)
 		} else {
-			totalBuyShares = totalBuyShares.Add(lot.Shares)
-			totalBuyCost = totalBuyCost.Add(lot.Cost)
-			totalBuyValue = totalBuyValue.Add(lot.ValueAdded)
+			totalBuyShares = totalBuyShares.Add(lots[i].Shares)
+			totalBuyCost = totalBuyCost.Add(lots[i].Cost)
+			totalBuyValue = totalBuyValue.Add(lots[i].ValueAdded)
 		}
 	}
 
@@ -248,8 +248,8 @@ func RecalcFromLots(h *Holding, lots []HoldingLot) {
 // TotalFees returns the sum of all lot fees for this holding.
 func TotalFees(lots []HoldingLot) decimal.Decimal {
 	total := decimal.Zero
-	for _, lot := range lots {
-		total = total.Add(lot.Fee)
+	for i := range lots {
+		total = total.Add(lots[i].Fee)
 	}
 	return total
 }
@@ -259,9 +259,9 @@ func TotalFees(lots []HoldingLot) decimal.Decimal {
 // in principal would double-count the cost.
 func BuyFees(lots []HoldingLot) decimal.Decimal {
 	total := decimal.Zero
-	for _, lot := range lots {
-		if lot.Type != "sell" {
-			total = total.Add(lot.Fee)
+	for i := range lots {
+		if lots[i].Type != "sell" {
+			total = total.Add(lots[i].Fee)
 		}
 	}
 	return total

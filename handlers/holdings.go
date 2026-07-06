@@ -92,8 +92,13 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
+		portfolioIDStr := c.Param("pid")
+		portfolioID, err := uuid.Parse(portfolioIDStr)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -112,8 +117,8 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 
 		// Load lots for all holdings
 		holdingIDs := make([]uuid.UUID, len(holdings))
-		for i, h := range holdings {
-			holdingIDs[i] = h.ID
+		for i := range holdings {
+			holdingIDs[i] = holdings[i].ID
 		}
 		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
 		if err != nil {
@@ -148,7 +153,8 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 			merged := make(map[mergeKey]*MergedHolding)
 
-			for _, h := range holdings {
+			for i := range holdings {
+				h := &holdings[i]
 				key := mergeKey{Symbol: h.Symbol, Name: h.Name, AssetId: h.AssetId}
 				mh, exists := merged[key]
 				if !exists {
@@ -217,8 +223,8 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 
 		// Non-merge mode: attach lots to each holding
 		resp := make([]HoldingResponse, len(holdings))
-		for i, h := range holdings {
-			resp[i] = HoldingResponse{Holding: h, Lots: lotsMap[h.ID]}
+		for i := range holdings {
+			resp[i] = HoldingResponse{Holding: holdings[i], Lots: lotsMap[holdings[i].ID]}
 		}
 		c.JSON(consts.StatusOK, resp)
 	}
@@ -236,8 +242,13 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
+		portfolioIDStr := c.Param("pid")
+		portfolioID, err := uuid.Parse(portfolioIDStr)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -349,7 +360,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 
 				input.ID = uuid.New()
 				input.UserID = user.UserID
-				input.PortfolioID = uuid.MustParse(portfolioID)
+				input.PortfolioID = portfolioID
 				created = true
 				result = input.Holding
 				if err := tx.Create(&input.Holding).Error; err != nil {
@@ -383,14 +394,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			if !isRegisterOnly {
-				var lotFee decimal.Decimal
-				if created {
-					lotFee = input.Fee
-				} else {
-					// fee from the new lot just appended
-					lotFee = input.Fee
-				}
-				addedCost := input.Cost.Add(lotFee)
+				addedCost := input.Cost.Add(input.Fee)
 				if addedCost.IsPositive() {
 					holdingCurrency := input.Currency
 					if holdingCurrency == "" {
@@ -420,7 +424,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 							if err := tx.Create(&models.AvailableFund{
 								ID:          uuid.New(),
 								UserID:      user.UserID,
-								PortfolioID: uuid.MustParse(portfolioID),
+								PortfolioID: portfolioID,
 								Currency:    holdingCurrency,
 								Amount:      newAmount,
 							}).Error; err != nil {
@@ -432,7 +436,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 					if err := tx.Create(&models.FundTransaction{
 						ID:          uuid.New(),
 						UserID:      user.UserID,
-						PortfolioID: uuid.MustParse(portfolioID),
+						PortfolioID: portfolioID,
 						Type:        "buy",
 						Amount:      addedCost,
 						Currency:    holdingCurrency,
@@ -471,8 +475,13 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
+		portfolioIDStr := c.Param("pid")
+		portfolioID, err := uuid.Parse(portfolioIDStr)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -633,7 +642,11 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		lots, _ := models.LoadLots(db, holding.ID)
+		lots, err := models.LoadLots(db, holding.ID)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: lots})
 	}
 }
@@ -646,8 +659,13 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		portfolioID := c.Param("pid")
-		owns, err := userOwnsPortfolio(db, user.UserID, uuid.MustParse(portfolioID))
+		portfolioIDStr := c.Param("pid")
+		portfolioID, err := uuid.Parse(portfolioIDStr)
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
 		if err != nil {
 			slog.Error("failed to check portfolio ownership", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
@@ -680,13 +698,13 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				if currency == "" {
 					currency = "CNY"
 				}
-				if err := addAvailableFund(tx, user.UserID, uuid.MustParse(portfolioID), currency, refundAmount); err != nil {
+				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, refundAmount); err != nil {
 					return err
 				}
 				if err := tx.Create(&models.FundTransaction{
 					ID:          uuid.New(),
 					UserID:      user.UserID,
-					PortfolioID: uuid.MustParse(portfolioID),
+					PortfolioID: portfolioID,
 					Type:        "delete",
 					Amount:      refundAmount,
 					Currency:    currency,

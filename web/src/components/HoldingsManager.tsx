@@ -9,7 +9,13 @@ import {
   ColorScheme,
 } from "../types"
 import AssetIcon from "./AssetIcon"
-import { formatCurrencyByCode, formatPrice, formatPercent, getProfitColor, toDecimal } from "../utils"
+import {
+  formatCurrencyByCode,
+  formatPrice,
+  formatPercent,
+  getProfitColor,
+  toDecimal,
+} from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
@@ -154,13 +160,20 @@ export default function HoldingsManager({
   }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
   // Pre-compute lot groups for each holding (for merged view)
-  const lotGroupsByHolding = new Map<string, { name: string; lots: HoldingLot[]; holdingId: string }[]>()
+  const lotGroupsByHolding = new Map<
+    string,
+    { name: string; lots: HoldingLot[]; holdingId: string }[]
+  >()
   for (const h of holdings) {
     const accs = ("accounts" in h ? (h as MergedHolding).accounts : null) || []
     if (accs.length > 1) {
       lotGroupsByHolding.set(
         h.id,
-        accs.map((acc) => ({ name: acc.accountName || "未分配", lots: acc.lots || [], holdingId: acc.holdingId }))
+        accs.map((acc) => ({
+          name: acc.accountName || "未分配",
+          lots: acc.lots || [],
+          holdingId: acc.holdingId,
+        }))
       )
     } else {
       lotGroupsByHolding.set(h.id, [{ name: "", lots: h.lots || [], holdingId: h.id }])
@@ -182,7 +195,9 @@ export default function HoldingsManager({
                 type="date"
                 value={lot.date ? lot.date.split("T")[0] : ""}
                 onChange={(e) => {
-                  saveEditLot(holdingId, h, lot.id, { date: e.target.value ? new Date(e.target.value).toISOString() : lot.date })
+                  saveEditLot(holdingId, h, lot.id, {
+                    date: e.target.value ? new Date(e.target.value).toISOString() : lot.date,
+                  })
                 }}
                 className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
               />

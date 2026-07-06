@@ -9,7 +9,13 @@ import {
   Portfolio,
   ColorScheme,
 } from "../types"
-import { formatCurrencyByCode, formatPrice, formatPercent, getProfitColor, toDecimal } from "../utils"
+import {
+  formatCurrencyByCode,
+  formatPrice,
+  formatPercent,
+  getProfitColor,
+  toDecimal,
+} from "../utils"
 import * as api from "../api"
 import AddHoldingForm from "./AddHoldingForm"
 import BuyModal from "./BuyModal"
@@ -263,9 +269,7 @@ export default function AccountView({
                         </td>
                         <td className="py-1.5 text-right font-mono">{lot.shares}</td>
                         <td className="py-1.5 text-right font-mono">
-                          {lot.costPrice
-                            ? formatPrice(lot.costPrice, h.currency || "CNY")
-                            : "-"}
+                          {lot.costPrice ? formatPrice(lot.costPrice, h.currency || "CNY") : "-"}
                         </td>
                         <td className="py-1.5 text-right font-mono">
                           {lot.cost ? formatCurrencyByCode(lot.cost, h.currency || "CNY") : "-"}

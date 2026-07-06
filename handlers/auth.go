@@ -195,6 +195,12 @@ func DeleteUser(db *gorm.DB) app.HandlerFunc {
 		}
 
 		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("holding_id IN (SELECT id FROM holdings WHERE user_id = ?)", id).Delete(&models.HoldingLot{}).Error; err != nil {
+				return err
+			}
+			if _, err := gorm.G[models.Dividend](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
+				return err
+			}
 			if _, err := gorm.G[models.Holding](tx).Where("user_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}

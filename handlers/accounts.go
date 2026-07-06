@@ -198,8 +198,8 @@ func ListAllAccountHoldings(db *gorm.DB, router *marketsource.Router) app.Handle
 
 		// Load lots for all holdings
 		holdingIDs := make([]uuid.UUID, len(holdings))
-		for i, h := range holdings {
-			holdingIDs[i] = h.ID
+		for i := range holdings {
+			holdingIDs[i] = holdings[i].ID
 		}
 		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
 		if err != nil {
@@ -271,8 +271,8 @@ func ListAccountHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 
 		// Load lots for all holdings
 		holdingIDs := make([]uuid.UUID, len(holdings))
-		for i, h := range holdings {
-			holdingIDs[i] = h.ID
+		for i := range holdings {
+			holdingIDs[i] = holdings[i].ID
 		}
 		lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
 		if err != nil {
@@ -293,8 +293,8 @@ func ListAccountHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			Lots []models.HoldingLot `json:"lots"`
 		}
 		result := make([]HoldingWithLots, len(holdings))
-		for i, h := range holdings {
-			result[i] = HoldingWithLots{Holding: h, Lots: lotsMap[h.ID]}
+		for i := range holdings {
+			result[i] = HoldingWithLots{Holding: holdings[i], Lots: lotsMap[holdings[i].ID]}
 		}
 
 		c.JSON(consts.StatusOK, result)

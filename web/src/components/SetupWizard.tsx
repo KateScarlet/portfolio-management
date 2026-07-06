@@ -59,9 +59,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                 <label className="block text-sm font-medium text-[#1A1A1A] mb-2">数据库类型</label>
                 <p className="text-xs text-[#6C757D] mb-3">选择用于存储数据的数据库类型。</p>
                 <div className="flex gap-3">
-                  <button
-                    className="flex-1 px-4 py-3 rounded-lg border text-sm transition-colors bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-default"
-                  >
+                  <button className="flex-1 px-4 py-3 rounded-lg border text-sm transition-colors bg-[#1A1A1A] text-white border-[#1A1A1A] cursor-default">
                     <div className="font-medium">PostgreSQL</div>
                     <div className="text-xs mt-1 opacity-75">推荐，适合生产环境</div>
                   </button>
@@ -82,9 +80,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           {step === 1 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
-                  数据库连接
-                </label>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-2">数据库连接</label>
                 <p className="text-xs text-[#6C757D] mb-3">配置 PostgreSQL 数据库连接。</p>
                 <div>
                   <label className="block text-xs font-medium text-[#6C757D] mb-1">

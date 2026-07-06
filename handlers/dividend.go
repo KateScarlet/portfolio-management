@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"time"
@@ -200,7 +201,7 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			if httpErr, ok := err.(*httpError); ok {
+			if httpErr, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -324,7 +325,7 @@ func DeleteDividend(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			if httpErr, ok := err.(*httpError); ok {
+			if httpErr, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -510,7 +511,7 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			if httpErr, ok := err.(*httpError); ok {
+			if httpErr, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

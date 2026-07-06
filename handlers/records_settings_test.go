@@ -263,7 +263,9 @@ func TestGetAvailableFunds_WithValue(t *testing.T) {
 	GetAvailableFunds(db)(context.Background(), c)
 
 	var result []map[string]any
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 	if len(result) != 1 {
 		t.Fatalf("expected 1 fund entry, got %d", len(result))
 	}
@@ -287,7 +289,9 @@ func TestGetAvailableFunds_MultipleCurrencies(t *testing.T) {
 	GetAvailableFunds(db)(context.Background(), c)
 
 	var result []map[string]any
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 	if len(result) != 2 {
 		t.Fatalf("expected 2 fund entries, got %d", len(result))
 	}
@@ -308,7 +312,9 @@ func TestGetAvailableFunds_HidesZeroAmount(t *testing.T) {
 	GetAvailableFunds(db)(context.Background(), c)
 
 	var result []map[string]any
-	json.Unmarshal(c.Response.Body(), &result)
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 	if len(result) != 1 {
 		t.Fatalf("expected 1 fund entry (zero hidden), got %d", len(result))
 	}

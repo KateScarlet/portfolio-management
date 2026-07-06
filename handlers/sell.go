@@ -227,7 +227,11 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		// Reload lots for response
-		lots, _ := models.LoadLots(db, holding.ID)
+		lots, err := models.LoadLots(db, holding.ID)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 		c.JSON(consts.StatusOK, map[string]any{
 			"soldHolding":    HoldingResponse{Holding: holding, Lots: lots},
 			"availableFunds": newFundsAmount.StringFixed(2),

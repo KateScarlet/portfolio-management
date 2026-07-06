@@ -24,8 +24,8 @@ func LoadLotsByHoldingIDs(db *gorm.DB, holdingIDs []uuid.UUID) (map[uuid.UUID][]
 		return nil, err
 	}
 	result := make(map[uuid.UUID][]HoldingLot, len(holdingIDs))
-	for _, lot := range allLots {
-		result[lot.HoldingID] = append(result[lot.HoldingID], lot)
+	for i := range allLots {
+		result[allLots[i].HoldingID] = append(result[allLots[i].HoldingID], allLots[i])
 	}
 	return result, nil
 }
