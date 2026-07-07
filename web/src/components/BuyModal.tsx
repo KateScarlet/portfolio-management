@@ -10,6 +10,7 @@ interface BuyModalProps {
   onConfirm: (updatedHolding: Holding) => void
   onClose: () => void
   accounts?: Account[]
+  accountId?: string
 }
 
 export default function BuyModal({
@@ -18,6 +19,7 @@ export default function BuyModal({
   onConfirm,
   onClose,
   accounts = [],
+  accountId: selectedAccountId,
 }: BuyModalProps) {
   const isSymbolBased = !!holding.symbol
 
@@ -27,7 +29,7 @@ export default function BuyModal({
   const [buyFee, setBuyFee] = useState("")
   const [buyDate, setBuyDate] = useState(new Date().toISOString().split("T")[0])
   const [accountId, setAccountId] = useState(
-    holding.accountId || accounts.find((a) => a.isDefault)?.id || ""
+    selectedAccountId || holding.accountId || accounts.find((a) => a.isDefault)?.id || ""
   )
 
   const [manualPrice, setManualPrice] = useState("")
@@ -141,7 +143,7 @@ export default function BuyModal({
         </div>
 
         <div className="space-y-4">
-          {accounts.length > 0 && (
+          {!selectedAccountId && accounts.length > 0 && (
             <div className="flex flex-col gap-2">
               <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
                 账户

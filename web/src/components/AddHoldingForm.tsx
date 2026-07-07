@@ -12,12 +12,14 @@ import { useToast } from "./toast-context"
 interface AddHoldingFormProps {
   onAddHolding: (holding: Omit<import("../types").Holding, "id">) => Promise<void>
   onClose: () => void
+  accounts: import("../types").Account[]
   accountId?: string
-  accounts?: import("../types").Account[]
 }
 
-export default function AddHoldingForm({ onAddHolding, onClose, accountId, accounts }: AddHoldingFormProps) {
-  const defaultAccountId = accountId || accounts?.find((a) => a.isDefault)?.id || ""
+export default function AddHoldingForm({ onAddHolding, onClose, accounts, accountId }: AddHoldingFormProps) {
+  const [selectedAccountId, setSelectedAccountId] = useState(
+    accountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id || ""
+  )
   const [assetId, setAssetId] = useState<AssetId>("stocks")
   const [market, setMarket] = useState<
     "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
@@ -42,7 +44,7 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId, accou
           shares: "0",
           price: "0",
           value: "0",
-          accountId: defaultAccountId,
+          accountId: selectedAccountId,
         })
       } catch (e) {
         showToast(e instanceof Error ? e.message : "录入失败", "error")
@@ -75,7 +77,7 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId, accou
             shares: "0",
             price: String(data.price),
             value: "0",
-          accountId: defaultAccountId,
+          accountId: selectedAccountId,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
@@ -118,6 +120,24 @@ export default function AddHoldingForm({ onAddHolding, onClose, accountId, accou
         </label>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+        {!accountId && (
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
+              账户
+            </label>
+            <select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-full px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}{a.broker ? ` (${a.broker})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <label className="text-[10px] uppercase tracking-widest text-[#ADB5BD] font-bold">
             分类

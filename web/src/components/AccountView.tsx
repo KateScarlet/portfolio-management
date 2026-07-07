@@ -344,6 +344,7 @@ export default function AccountView({
           <AddHoldingForm
             onAddHolding={handleAddHolding}
             onClose={() => setIsAdding(false)}
+            accounts={accounts}
             accountId={selectedAccount?.id}
           />
         )}
@@ -413,6 +414,7 @@ export default function AccountView({
           onConfirm={handleBuyConfirm}
           onClose={() => setBuyingHolding(null)}
           accounts={accounts}
+          accountId={selectedAccount?.id}
         />
       )}
       {sellingHolding && currentPortfolio && sellingHolding.portfolioId && (
