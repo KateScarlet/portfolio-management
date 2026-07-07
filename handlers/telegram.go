@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"portfolio-management/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -51,29 +52,134 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 
 		case "price":
-			msg := `⚠️ <b>价格波动提醒</b>
+			user := middleware.GetUser(c)
+			if user == nil {
+				c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+				return
+			}
 
-📈 <b>沪深300ETF</b> (510300)
-当前价: ¥4.56 | 涨跌: +6.2%
+			var holdings []models.Holding
+			if err := db.Where("user_id = ?", user.UserID).Limit(5).Find(&holdings).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
+				return
+			}
 
-📉 <b>国债ETF</b> (511010)
-当前价: ¥102.30 | 涨跌: -5.5%
+			if len(holdings) == 0 {
+				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": "无持仓数据"})
+				return
+			}
 
-<i>— 这是一条测试消息</i>`
-			if err := client.SendMessage(msg); err != nil {
+			lines := []string{"⚠️ <b>价格波动提醒</b>", ""}
+			for _, h := range holdings {
+				lines = append(lines, fmt.Sprintf("<b>%s</b> (%s)\n当前价: %s %s",
+					h.Name, h.Symbol, h.Currency, h.Price.StringFixed(2)))
+			}
+			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
+
+			if err := client.SendMessage(strings.Join(lines, "\n\n")); err != nil {
 				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
 				return
 			}
 
 		case "drift":
-			msg := `⚠️ <b>配比偏离提醒</b>
+			user := middleware.GetUser(c)
+			if user == nil {
+				c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+				return
+			}
 
-当前资产配置 vs 目标 25%:
-<b>股票</b>: 35.2% (偏离 +10.2%)
-<b>债券</b>: 14.8% (偏离 -10.2%)
+			var portfolio models.Portfolio
+			if err := db.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&portfolio).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "未找到默认组合"})
+				return
+			}
 
-<i>— 这是一条测试消息</i>`
-			if err := client.SendMessage(msg); err != nil {
+			var holdings []models.Holding
+			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&holdings).Error; err != nil {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
+				return
+			}
+
+			for i := range holdings {
+				h := &holdings[i]
+				if h.Currency != "" && h.Currency != "CNY" {
+					pair := h.Currency + "CNY"
+					rate, err := router.ExchangeRate(user.UserID, pair)
+					if err == nil {
+						h.Value = h.Value.Mul(rate)
+					}
+				}
+			}
+
+			assets := map[string]decimal.Decimal{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
+			total := decimal.Zero
+			for i := range holdings {
+				h := &holdings[i]
+				assets[h.AssetId] = assets[h.AssetId].Add(h.Value)
+				total = total.Add(h.Value)
+			}
+
+			var funds []models.AvailableFund
+			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolio.ID).Find(&funds).Error; err != nil {
+				slog.Error("failed to load available funds for drift test", "error", err)
+			}
+			for _, f := range funds {
+				amt := f.Amount
+				if f.Currency != "" && f.Currency != "CNY" {
+					pair := f.Currency + "CNY"
+					rate, err := router.ExchangeRate(user.UserID, pair)
+					if err == nil {
+						amt = amt.Mul(rate)
+					}
+				}
+				total = total.Add(amt)
+			}
+
+			if total.IsZero() {
+				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": "组合无资产数据"})
+				return
+			}
+
+			settings := make(map[string]string)
+			var settingList []models.Setting
+			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&settingList).Error; err == nil {
+				for _, s := range settingList {
+					settings[s.Key] = s.Value
+				}
+			}
+
+			targetPcts := map[string]decimal.Decimal{
+				"stocks": decimal.NewFromInt(25), "bonds": decimal.NewFromInt(25),
+				"cash": decimal.NewFromInt(25), "commodities": decimal.NewFromInt(25),
+			}
+			for id := range targetPcts {
+				if v := settings["target"+strings.ToUpper(id[:1])+id[1:]]; v != "" {
+					if pct, err := decimal.NewFromString(v); err == nil {
+						targetPcts[id] = pct
+					}
+				}
+			}
+			targetTotal := decimal.Zero
+			for _, v := range targetPcts {
+				targetTotal = targetTotal.Add(v)
+			}
+			if targetTotal.GreaterThan(decimal.Zero) && !targetTotal.Equal(decimal.NewFromInt(100)) {
+				for id := range targetPcts {
+					targetPcts[id] = targetPcts[id].Div(targetTotal).Mul(decimal.NewFromInt(100))
+				}
+			}
+
+			assetNames := map[string]string{"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品"}
+			lines := []string{"⚠️ <b>配比偏离提醒</b>", "", "当前资产配置:"}
+			for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
+				pct := assets[id].Div(total).Mul(decimal.NewFromInt(100))
+				diff := pct.Sub(targetPcts[id])
+				lines = append(lines, fmt.Sprintf("<b>%s</b>: %s%% (目标 %s%%, 偏离 %s%%)",
+					assetNames[id], pct.StringFixed(1), targetPcts[id].StringFixed(0), diff.StringFixed(1)))
+			}
+			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
+
+			if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {
 				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": err.Error()})
 				return
 			}

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { CandlestickChart, ScrollText, Banknote, Gem } from "lucide-react"
+import { CandlestickChart, ScrollText, Banknote, Cuboid } from "lucide-react"
 
 export type AssetId = "stocks" | "bonds" | "cash" | "commodities"
 
@@ -247,7 +247,7 @@ export const ASSET_DEFINITIONS: Record<AssetId, AssetInfo> = {
     description: "提供通货膨胀保护（如黄金, 能源, 农产品等）",
     color: "#D4AF37",
     targetPct: 25,
-    icon: Gem,
+    icon: Cuboid,
   },
 }
 

@@ -312,6 +312,22 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID uuid.UUID, tgClient *tele
 		total = total.Add(h.Value)
 	}
 
+	var funds []models.AvailableFund
+	if err := n.db.Where("user_id = ? AND portfolio_id = ?", userID, portfolioID).Find(&funds).Error; err != nil {
+		slog.Error("failed to load available funds for drift alert", "userId", userID, "portfolioId", portfolioID, "error", err)
+	}
+	for _, f := range funds {
+		amt := f.Amount
+		if f.Currency != "" && f.Currency != "CNY" {
+			pair := f.Currency + "CNY"
+			rate, err := n.router.ExchangeRate(userID, pair)
+			if err == nil {
+				amt = amt.Mul(rate)
+			}
+		}
+		total = total.Add(amt)
+	}
+
 	if total.IsZero() {
 		return
 	}
