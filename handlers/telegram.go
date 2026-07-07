@@ -203,6 +203,23 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				assets[h.AssetId] = assets[h.AssetId].Add(h.Value)
 				total = total.Add(h.Value)
 			}
+
+			var funds []models.AvailableFund
+			if err := db.Where("user_id = ?", user.UserID).Find(&funds).Error; err != nil {
+				slog.Error("failed to load available funds for summary test", "error", err)
+			}
+			for _, f := range funds {
+				amt := f.Amount
+				if f.Currency != "" && f.Currency != "CNY" {
+					pair := f.Currency + "CNY"
+					rate, err := router.ExchangeRate(user.UserID, pair)
+					if err == nil {
+						amt = amt.Mul(rate)
+					}
+				}
+				total = total.Add(amt)
+			}
+
 			principal, err := CalcPrincipalByUser(db, user.UserID, "CNY", router)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "计算累计投入失败: " + err.Error()})

@@ -487,6 +487,22 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, tgClient *telegra
 		total = total.Add(h.Value)
 	}
 
+	var funds []models.AvailableFund
+	if err := n.db.Where("user_id = ? AND portfolio_id = ?", userID, portfolioID).Find(&funds).Error; err != nil {
+		slog.Error("failed to load available funds for summary", "userId", userID, "portfolioId", portfolioID, "error", err)
+	}
+	for _, f := range funds {
+		amt := f.Amount
+		if f.Currency != "" && f.Currency != "CNY" {
+			pair := f.Currency + "CNY"
+			rate, err := n.router.ExchangeRate(userID, pair)
+			if err == nil {
+				amt = amt.Mul(rate)
+			}
+		}
+		total = total.Add(amt)
+	}
+
 	var txs []models.FundTransaction
 	if err := n.db.Where("portfolio_id = ? AND type IN ?", portfolioID, []string{"transfer_in", "transfer_out"}).Find(&txs).Error; err != nil {
 		slog.Error("failed to load fund transactions for summary", "portfolioId", portfolioID, "error", err)
