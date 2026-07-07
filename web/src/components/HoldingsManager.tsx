@@ -110,23 +110,31 @@ export default function HoldingsManager({
   }, [onSyncComplete, setHoldings, portfolioId])
 
   const saveEditLot = useCallback(
-    (targetHoldingId: string, h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
-      if (!h.lots) return
-      const updatedLots = h.lots.map((l) => (l.id === lotId ? { ...l, ...updatedFields } : l))
-      onUpdateHolding(targetHoldingId, { lots: updatedLots })
+    async (targetHoldingId: string, h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
+      try {
+        await api.updateLot(portfolioId, targetHoldingId, lotId, updatedFields)
+        const freshHoldings = await api.fetchHoldings(portfolioId)
+        setHoldings(freshHoldings)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "更新交易记录失败", "error")
+      }
       setEditingLotId(null)
     },
-    [onUpdateHolding]
+    [portfolioId, setHoldings, showToast]
   )
 
   const deleteEditLot = useCallback(
-    (targetHoldingId: string, h: Holding, lotId: string) => {
-      if (!h.lots) return
-      const updatedLots = h.lots.filter((l) => l.id !== lotId)
-      onUpdateHolding(targetHoldingId, { lots: updatedLots })
+    async (targetHoldingId: string, h: Holding, lotId: string) => {
+      try {
+        await api.deleteLot(portfolioId, targetHoldingId, lotId)
+        const freshHoldings = await api.fetchHoldings(portfolioId)
+        setHoldings(freshHoldings)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "删除交易记录失败", "error")
+      }
       setEditingLotId(null)
     },
-    [onUpdateHolding]
+    [portfolioId, setHoldings, showToast]
   )
 
   const handleSellConfirm = useCallback(async () => {

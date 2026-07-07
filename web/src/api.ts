@@ -67,6 +67,24 @@ export async function deleteHolding(pid: string, id: string): Promise<void> {
   })
 }
 
+export async function deleteLot(pid: string, hid: string, lid: string): Promise<Holding> {
+  return request<Holding>(`/api/portfolios/${pid}/holdings/${hid}/lots/${lid}`, {
+    method: "DELETE",
+  })
+}
+
+export async function updateLot(
+  pid: string,
+  hid: string,
+  lid: string,
+  data: Partial<import("./types").HoldingLot>
+): Promise<Holding> {
+  return request<Holding>(`/api/portfolios/${pid}/holdings/${hid}/lots/${lid}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
 export async function sellHolding(
   pid: string,
   id: string,

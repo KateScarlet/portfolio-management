@@ -729,6 +729,316 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 	}
 }
 
+func UpdateLot(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
+		holdingID, err := uuid.Parse(c.Param("hid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的持仓ID"})
+			return
+		}
+		lotID, err := uuid.Parse(c.Param("lid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的记录ID"})
+			return
+		}
+
+		var existingLot models.HoldingLot
+		if err := db.Where("id = ? AND holding_id = ?", lotID, holdingID).First(&existingLot).Error; err != nil {
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "交易记录不存在"})
+			return
+		}
+
+		var input struct {
+			Date       *time.Time       `json:"date"`
+			Shares     *decimal.Decimal `json:"shares"`
+			CostPrice  *decimal.Decimal `json:"costPrice"`
+			Cost       *decimal.Decimal `json:"cost"`
+			ValueAdded *decimal.Decimal `json:"valueAdded"`
+			Fee        *decimal.Decimal `json:"fee"`
+		}
+		if err := c.BindJSON(&input); err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if input.Shares != nil && input.Shares.IsNegative() {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录股数不能为负数"})
+			return
+		}
+		if input.Cost != nil && input.Cost.IsNegative() {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录成本不能为负数"})
+			return
+		}
+		if input.Fee != nil && input.Fee.IsNegative() {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录手续费不能为负数"})
+			return
+		}
+
+		updates := make(map[string]any)
+		if input.Date != nil {
+			updates["date"] = *input.Date
+		}
+		if input.Shares != nil {
+			updates["shares"] = *input.Shares
+		}
+		if input.CostPrice != nil {
+			updates["cost_price"] = *input.CostPrice
+		}
+		if input.Cost != nil {
+			updates["cost"] = *input.Cost
+		}
+		if input.ValueAdded != nil {
+			updates["value_added"] = *input.ValueAdded
+		}
+		if input.Fee != nil {
+			updates["fee"] = *input.Fee
+		}
+
+		if len(updates) == 0 {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
+			return
+		}
+
+		err = db.Transaction(func(tx *gorm.DB) error {
+			// 先记录旧值，计算资金差额
+			var holding models.Holding
+			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
+				return err
+			}
+			currency := holding.Currency
+			if currency == "" {
+				currency = "CNY"
+			}
+
+			var fundDelta decimal.Decimal
+			if existingLot.Type == "sell" {
+				oldRealized := existingLot.ValueAdded.Sub(existingLot.Fee)
+				newRealized := oldRealized
+				if input.ValueAdded != nil {
+					newRealized = input.ValueAdded.Sub(existingLot.Fee)
+				}
+				if input.Fee != nil {
+					if input.ValueAdded != nil {
+						newRealized = input.ValueAdded.Sub(*input.Fee)
+					} else {
+						newRealized = existingLot.ValueAdded.Sub(*input.Fee)
+					}
+				}
+				fundDelta = newRealized.Sub(oldRealized)
+			} else {
+				oldCost := existingLot.Cost.Add(existingLot.Fee)
+				newCost := oldCost
+				if input.Cost != nil {
+					newCost = input.Cost.Add(existingLot.Fee)
+				}
+				if input.Fee != nil {
+					if input.Cost != nil {
+						newCost = input.Cost.Add(*input.Fee)
+					} else {
+						newCost = existingLot.Cost.Add(*input.Fee)
+					}
+				}
+				fundDelta = oldCost.Sub(newCost) // 正数=退款, 负数=补扣
+			}
+
+			// 应用资金差额
+			if fundDelta.IsPositive() {
+				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, fundDelta); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID:          uuid.New(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Type:        "delete",
+					Amount:      fundDelta,
+					Currency:    currency,
+					HoldingID:   &holdingID,
+				}).Error; err != nil {
+					return err
+				}
+			} else if fundDelta.IsNegative() {
+				abs := fundDelta.Abs()
+				if err := deductAvailableFund(tx, user.UserID, portfolioID, currency, abs); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID:          uuid.New(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Type:        "delete",
+					Amount:      abs,
+					Currency:    currency,
+					HoldingID:   &holdingID,
+				}).Error; err != nil {
+					return err
+				}
+			}
+
+			if err := tx.Model(&models.HoldingLot{}).Where("id = ?", lotID).Updates(updates).Error; err != nil {
+				return err
+			}
+			remainingLots, err := models.LoadLots(tx, holdingID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, remainingLots)
+			return tx.Save(&holding).Error
+		})
+		if err != nil {
+			if he, ok := errors.AsType[*httpError](err); ok {
+				c.JSON(he.status, map[string]string{"error": he.msg})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
+			return
+		}
+
+		remainingLots, _ := models.LoadLots(db, holdingID)
+		var holding models.Holding
+		db.First(&holding, "id = ?", holdingID)
+		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: remainingLots})
+	}
+}
+
+func DeleteLot(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user := middleware.GetUser(c)
+		if user == nil {
+			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+			return
+		}
+
+		portfolioID, err := uuid.Parse(c.Param("pid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+			return
+		}
+		owns, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+		if err != nil {
+			slog.Error("failed to check portfolio ownership", "error", err)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "数据库错误"})
+			return
+		}
+		if !owns {
+			c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问此组合"})
+			return
+		}
+
+		holdingID, err := uuid.Parse(c.Param("hid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的持仓ID"})
+			return
+		}
+		lotID, err := uuid.Parse(c.Param("lid"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的记录ID"})
+			return
+		}
+
+		var lot models.HoldingLot
+		if err := db.Where("id = ? AND holding_id = ?", lotID, holdingID).First(&lot).Error; err != nil {
+			c.JSON(consts.StatusNotFound, map[string]string{"error": "交易记录不存在"})
+			return
+		}
+
+		err = db.Transaction(func(tx *gorm.DB) error {
+			var holding models.Holding
+			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
+				return err
+			}
+
+			// 回退资金: 买入退回 cost+fee, 卖出扣回 valueAdded-fee
+			currency := holding.Currency
+			if currency == "" {
+				currency = "CNY"
+			}
+			var fundDelta decimal.Decimal
+			if lot.Type == "sell" {
+				fundDelta = lot.ValueAdded.Sub(lot.Fee).Neg()
+			} else {
+				fundDelta = lot.Cost.Add(lot.Fee)
+			}
+			if fundDelta.IsPositive() {
+				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, fundDelta); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID:          uuid.New(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Type:        "delete",
+					Amount:      fundDelta,
+					Currency:    currency,
+					HoldingID:   &holdingID,
+				}).Error; err != nil {
+					return err
+				}
+			} else if fundDelta.IsNegative() {
+				if err := deductAvailableFund(tx, user.UserID, portfolioID, currency, fundDelta.Abs()); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID:          uuid.New(),
+					UserID:      user.UserID,
+					PortfolioID: portfolioID,
+					Type:        "delete",
+					Amount:      fundDelta.Abs(),
+					Currency:    currency,
+					HoldingID:   &holdingID,
+				}).Error; err != nil {
+					return err
+				}
+			}
+
+			if err := models.DeleteLotByID(tx, lotID); err != nil {
+				return err
+			}
+			remainingLots, err := models.LoadLots(tx, holdingID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, remainingLots)
+			return tx.Save(&holding).Error
+		})
+		if err != nil {
+			if he, ok := errors.AsType[*httpError](err); ok {
+				c.JSON(he.status, map[string]string{"error": he.msg})
+			} else {
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+			}
+			return
+		}
+
+		remainingLots, _ := models.LoadLots(db, holdingID)
+		var holding models.Holding
+		db.First(&holding, "id = ?", holdingID)
+		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: remainingLots})
+	}
+}
+
 func userOwnsPortfolio(db *gorm.DB, userID, portfolioID uuid.UUID) (bool, error) {
 	var count int64
 	if err := db.Model(&models.Portfolio{}).Where("id = ? AND user_id = ?", portfolioID, userID).Count(&count).Error; err != nil {

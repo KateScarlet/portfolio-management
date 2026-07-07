@@ -135,6 +135,8 @@ func main() {
 	pf.PATCH("/holdings/:id", handlers.UpdateHolding(database))
 	pf.DELETE("/holdings/:id", handlers.DeleteHolding(database))
 	pf.POST("/holdings/:id/sell", handlers.SellHolding(database))
+	pf.PATCH("/holdings/:hid/lots/:lid", handlers.UpdateLot(database))
+	pf.DELETE("/holdings/:hid/lots/:lid", handlers.DeleteLot(database))
 
 	pf.GET("/records", handlers.ListRecords(database))
 	pf.POST("/records", handlers.CreateRecord(database, router))
