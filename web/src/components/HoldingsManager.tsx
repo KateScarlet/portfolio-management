@@ -133,8 +133,9 @@ export default function HoldingsManager({
         showToast(e instanceof Error ? e.message : "删除交易记录失败", "error")
       }
       setEditingLotId(null)
+      onRefreshAvailableFunds()
     },
-    [portfolioId, setHoldings, showToast]
+    [portfolioId, setHoldings, onRefreshAvailableFunds, showToast]
   )
 
   const handleSellConfirm = useCallback(async () => {

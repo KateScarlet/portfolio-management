@@ -145,12 +145,17 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			if input.Date != nil && !input.Date.IsZero() {
 				sellDate = *input.Date
 			}
+			var sellPrice decimal.Decimal
+			if input.Shares.IsPositive() {
+				sellPrice = input.Price
+			}
+
 			sellLot := models.HoldingLot{
 				ID:        uuid.New(),
 				HoldingID: holding.ID,
 				Type:      "sell",
 				Date:      sellDate,
-				CostPrice: holding.CostPrice,
+				CostPrice: sellPrice,
 				Cost:      costReduction,
 				Fee:       input.Fee,
 			}

@@ -685,7 +685,13 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			refundAmount := holding.Cost.Add(models.BuyFees(lots)).Add(models.SellFees(lots))
+			var realizedValue decimal.Decimal
+			for _, lot := range lots {
+				if lot.Type == "sell" {
+					realizedValue = realizedValue.Add(lot.ValueAdded).Sub(lot.Fee)
+				}
+			}
+			refundAmount := holding.Cost.Add(models.BuyFees(lots)).Sub(realizedValue)
 			if refundAmount.IsPositive() {
 				currency := holding.Currency
 				if currency == "" {

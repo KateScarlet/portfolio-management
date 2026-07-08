@@ -206,6 +206,10 @@ type WebAuthnSession struct {
 //   - Total investment (principal) = Cost + BuyFees()
 func RecalcFromLots(h *Holding, lots []HoldingLot) {
 	if len(lots) == 0 {
+		h.Shares = decimal.Zero
+		h.Value = decimal.Zero
+		h.Cost = decimal.Zero
+		h.CostPrice = decimal.Zero
 		return
 	}
 
