@@ -550,11 +550,12 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 						holding.Price = priceBefore
 						holding.Value = holding.Shares.Mul(holding.Price)
 					}
-					if err := db.Save(&holding).Error; err != nil {
-						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-						return
-					}
-					if err := models.ReplaceLots(db, holding.ID, lots); err != nil {
+					if err := db.Transaction(func(tx *gorm.DB) error {
+						if err := tx.Save(&holding).Error; err != nil {
+							return err
+						}
+						return models.ReplaceLots(tx, holding.ID, lots)
+					}); err != nil {
 						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 						return
 					}

@@ -142,6 +142,12 @@ func DeletePortfolio(db *gorm.DB) app.HandlerFunc {
 		}
 
 		err = db.Transaction(func(tx *gorm.DB) error {
+			if _, err := gorm.G[models.HoldingLot](tx).Where("holding_id IN (SELECT id FROM holdings WHERE portfolio_id = ?)", id).Delete(ctx); err != nil {
+				return err
+			}
+			if _, err := gorm.G[models.Dividend](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
+				return err
+			}
 			if _, err := gorm.G[models.Holding](tx).Where("portfolio_id = ?", id).Delete(ctx); err != nil {
 				return err
 			}
