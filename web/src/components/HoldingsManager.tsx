@@ -67,6 +67,7 @@ export default function HoldingsManager({
   const [editingLotFee, setEditingLotFee] = useState("")
   const [editingLotShares, setEditingLotShares] = useState("")
   const [editingLotCostPrice, setEditingLotCostPrice] = useState("")
+  const [editingLotDate, setEditingLotDate] = useState("")
   const [sellingHolding, setSellingHolding] = useState<Holding | null>(null)
   const [buyingHolding, setBuyingHolding] = useState<Holding | null>(null)
   const [deletingHolding, setDeletingHolding] = useState<Holding | null>(null)
@@ -119,6 +120,7 @@ export default function HoldingsManager({
         showToast(e instanceof Error ? e.message : "更新交易记录失败", "error")
       }
       setEditingLotId(null)
+      setEditingLotDate("")
     },
     [portfolioId, setHoldings, showToast]
   )
@@ -133,6 +135,7 @@ export default function HoldingsManager({
         showToast(e instanceof Error ? e.message : "删除交易记录失败", "error")
       }
       setEditingLotId(null)
+      setEditingLotDate("")
       onRefreshAvailableFunds()
     },
     [portfolioId, setHoldings, onRefreshAvailableFunds, showToast]
@@ -202,12 +205,8 @@ export default function HoldingsManager({
               <span className="text-[9px] text-[#ADB5BD] uppercase">日期</span>
               <input
                 type="date"
-                value={lot.date ? lot.date.split("T")[0] : ""}
-                onChange={(e) => {
-                  saveEditLot(holdingId, h, lot.id, {
-                    date: e.target.value ? new Date(e.target.value).toISOString() : lot.date,
-                  })
-                }}
+                value={editingLotDate}
+                onChange={(e) => setEditingLotDate(e.target.value)}
                 className="px-2 py-1 border border-[#E9ECEF] rounded text-xs focus:outline-none focus:border-[#1A1A1A]"
               />
             </div>
@@ -290,6 +289,7 @@ export default function HoldingsManager({
               <button
                 onClick={() =>
                   saveEditLot(holdingId, h, lot.id, {
+                    date: editingLotDate ? new Date(editingLotDate).toISOString() : lot.date,
                     costPrice: h.symbol ? editingLotCostPrice : undefined,
                     shares: editingLotShares,
                     cost: editingLotCost,
@@ -302,7 +302,7 @@ export default function HoldingsManager({
                 Save
               </button>
               <button
-                onClick={() => setEditingLotId(null)}
+                onClick={() => { setEditingLotId(null); setEditingLotDate("") }}
                 className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1"
               >
                 取消
@@ -351,6 +351,7 @@ export default function HoldingsManager({
                 <button
                   onClick={() => {
                     setEditingLotId(lot.id)
+                    setEditingLotDate(lot.date ? lot.date.split("T")[0] : "")
                     setEditingLotCost(String(lot.cost ?? 0))
                     setEditingLotValue(String(lot.valueAdded ?? lot.cost ?? 0))
                     setEditingLotFee(String(lot.fee || 0))
@@ -632,7 +633,7 @@ export default function HoldingsManager({
                         const hasMulti = groups.length > 1
                         return (
                           <tr className="bg-[#F8F9FA]">
-                            <td colSpan={6} className="px-6 py-4">
+                            <td colSpan={7} className="px-6 py-4">
                               <div className="pl-6 border-l-2 border-[#DEE2E6] ml-4 space-y-3">
                                 {groups.map((group, gi) => (
                                   <div key={gi} className="space-y-1">

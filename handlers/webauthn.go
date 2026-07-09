@@ -425,7 +425,7 @@ func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		if err := gormDB.Where("credential_id = ?", credential.ID).First(&cred).Error; err == nil {
 			gormDB.Model(&cred).Updates(map[string]any{
 				"sign_count":   credential.Authenticator.SignCount,
-				"last_used_at": time.Now().Unix(),
+				"last_used_at": time.Now(),
 			})
 		}
 
