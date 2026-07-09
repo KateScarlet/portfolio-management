@@ -183,12 +183,7 @@ export default function AccountView({
             </td>
           )}
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
-            {h.symbol ? (
-              <div>
-                <p>{formatPrice(h.price, h.currency || "CNY")}</p>
-                <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
-              </div>
-            ) : toDecimal(h.shares).isPositive() ? (
+            {toDecimal(h.shares).isPositive() ? (
               <div>
                 {toDecimal(h.costPrice).isPositive() && (
                   <p>{formatPrice(h.costPrice, h.currency || "CNY")}</p>
@@ -203,11 +198,26 @@ export default function AccountView({
             {h.cost && toDecimal(h.cost).isPositive() ? (
               <div>
                 <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
-                <p className={`text-[10px] ${profitColor}`}>
-                  {profit.isPositive() ? "+" : ""}
-                  {formatPercent(returnRate.toNumber())}
-                </p>
+                {toDecimal(h.totalDividends || "0").isPositive() && (
+                  <p className="text-[10px] text-yellow-600">
+                    含分红{" "}
+                    {formatCurrencyByCode(
+                      h.totalDividends || "0",
+                      h.currency || "CNY"
+                    )}
+                  </p>
+                )}
               </div>
+            ) : (
+              <span className="text-[#ADB5BD] text-xs">-</span>
+            )}
+          </td>
+          <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
+            {h.cost && toDecimal(h.cost).isPositive() ? (
+              <p className={profitColor}>
+                {profit.isPositive() ? "+" : ""}
+                {formatPercent(returnRate.toNumber())}
+              </p>
             ) : (
               <span className="text-[#ADB5BD] text-xs">-</span>
             )}
@@ -240,7 +250,7 @@ export default function AccountView({
         </tr>
         {isExpanded && h.lots && h.lots.length > 0 && (
           <tr>
-            <td colSpan={selectedAccount ? 6 : 7} className="px-6 py-3 bg-[#F8F9FA]">
+            <td colSpan={selectedAccount ? 7 : 8} className="px-6 py-3 bg-[#F8F9FA]">
               <div className="text-xs">
                 <div className="font-medium text-[#6C757D] mb-2">交易记录</div>
                 <table className="w-full">
@@ -289,7 +299,7 @@ export default function AccountView({
     )
   }
 
-  const colSpan = selectedAccount ? 6 : 7
+  const colSpan = selectedAccount ? 7 : 8
 
   return (
     <div className="flex flex-col gap-6">
@@ -361,8 +371,9 @@ export default function AccountView({
                   <th className="px-6 py-4 font-bold">资产大类</th>
                   <th className="px-6 py-4 font-bold">代码/名称</th>
                   {!selectedAccount && <th className="px-6 py-4 font-bold">账户</th>}
-                  <th className="px-6 py-4 font-bold text-right">单价 & 份额</th>
-                  <th className="px-6 py-4 font-bold text-right">总成本 & 盈亏</th>
+                  <th className="px-6 py-4 font-bold text-right">净值 & 份额</th>
+                  <th className="px-6 py-4 font-bold text-right">总成本</th>
+                  <th className="px-6 py-4 font-bold text-right">盈亏</th>
                   <th className="px-6 py-4 font-bold text-right">当前总市值</th>
                   <th className="px-6 py-4 font-bold text-right">操作</th>
                 </tr>

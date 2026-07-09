@@ -38,8 +38,8 @@ export default function AddHoldingForm({ onAddHolding, onClose, accounts, accoun
         await onAddHolding({
           assetId,
           symbol: "",
-          name: name.trim() || "手工资产",
-          market,
+          name: name.trim(),
+          market: "",
           currency,
           shares: "0",
           price: "0",

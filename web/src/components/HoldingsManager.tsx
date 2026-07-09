@@ -412,8 +412,9 @@ export default function HoldingsManager({
             <tr>
               <th className="px-6 py-4 font-bold">资产大类</th>
               <th className="px-6 py-4 font-bold">代码/名称</th>
-              <th className="px-6 py-4 font-bold text-right">单价 & 份额</th>
-              <th className="px-6 py-4 font-bold text-right">总成本 & 盈亏</th>
+              <th className="px-6 py-4 font-bold text-right">净值 & 份额</th>
+              <th className="px-6 py-4 font-bold text-right">总成本</th>
+              <th className="px-6 py-4 font-bold text-right">盈亏</th>
               <th className="px-6 py-4 font-bold text-right">当前总市值</th>
               <th className="px-6 py-4 font-bold text-right">操作</th>
             </tr>
@@ -421,7 +422,7 @@ export default function HoldingsManager({
           <tbody className="divide-y divide-[#F8F9FA] bg-white text-[#1A1A1A]">
             {holdings.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#ADB5BD]">
+                <td colSpan={7} className="px-6 py-12 text-center text-sm text-[#ADB5BD]">
                   暂无资产明细，请在上方点击"录入资产"开始构建组合。
                 </td>
               </tr>
@@ -500,48 +501,48 @@ export default function HoldingsManager({
                         {h.cost && toDecimal(h.cost).isPositive() ? (
                           <div>
                             <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
-                            {(() => {
-                              const value = toDecimal(h.value)
-                              const cost = toDecimal(h.cost)
-                              const totalDividends = toDecimal(h.totalDividends || "0")
-                              if (
-                                cost.isZero() ||
-                                !Number.isFinite(value.toNumber()) ||
-                                !Number.isFinite(cost.toNumber())
-                              ) {
-                                return <p className="text-[10px] text-[#ADB5BD]">-</p>
-                              }
-                              const profit = value.minus(cost).plus(totalDividends)
-                              const returnRate = profit.div(cost)
-                              const rateNum = returnRate.toNumber()
-                              if (!Number.isFinite(rateNum)) {
-                                return <p className="text-[10px] text-[#ADB5BD]">-</p>
-                              }
-                              const isPositive = profit.isPositive()
-                              return (
-                                <>
-                                  <p
-                                    className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
-                                  >
-                                    {isPositive ? "+" : ""}
-                                    {formatPercent(rateNum)}
-                                  </p>
-                                  {totalDividends.isPositive() && (
-                                    <p className="text-[10px] text-yellow-600">
-                                      含分红{" "}
-                                      {formatCurrencyByCode(
-                                        totalDividends.toString(),
-                                        h.currency || "CNY"
-                                      )}
-                                    </p>
-                                  )}
-                                </>
-                              )
-                            })()}
+                            {toDecimal(h.totalDividends || "0").isPositive() && (
+                              <p className="text-[10px] text-yellow-600">
+                                含分红{" "}
+                                {formatCurrencyByCode(
+                                  h.totalDividends || "0",
+                                  h.currency || "CNY"
+                                )}
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <span className="text-[#ADB5BD] text-xs">-</span>
                         )}
+                      </td>
+                      <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
+                        {(() => {
+                          const value = toDecimal(h.value)
+                          const cost = toDecimal(h.cost)
+                          const totalDividends = toDecimal(h.totalDividends || "0")
+                          if (
+                            cost.isZero() ||
+                            !Number.isFinite(value.toNumber()) ||
+                            !Number.isFinite(cost.toNumber())
+                          ) {
+                            return <span className="text-[#ADB5BD] text-xs">-</span>
+                          }
+                          const profit = value.minus(cost).plus(totalDividends)
+                          const returnRate = profit.div(cost)
+                          const rateNum = returnRate.toNumber()
+                          if (!Number.isFinite(rateNum)) {
+                            return <span className="text-[#ADB5BD] text-xs">-</span>
+                          }
+                          const isPositive = profit.isPositive()
+                          return (
+                            <p
+                              className={getProfitColor(isPositive, colorScheme)}
+                            >
+                              {isPositive ? "+" : ""}
+                              {formatPercent(rateNum)}
+                            </p>
+                          )
+                        })()}
                       </td>
                       <td
                         className="px-6 py-5 text-right font-medium text-sm font-mono"

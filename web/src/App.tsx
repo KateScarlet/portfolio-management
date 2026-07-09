@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Decimal from "decimal.js"
 import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
@@ -35,6 +35,7 @@ import AccountSelector from "./components/AccountSelector"
 import AccountManager from "./components/AccountManager"
 
 const STORAGE_KEY = "selectedPortfolioId"
+const ACCOUNT_STORAGE_KEY = "selectedAccountId"
 
 function getStoredPortfolioId(): string | null {
   try {
@@ -56,6 +57,26 @@ function setStoredPortfolioId(id: string | null) {
   }
 }
 
+function getStoredAccountId(): string | null {
+  try {
+    return localStorage.getItem(ACCOUNT_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setStoredAccountId(id: string | null) {
+  try {
+    if (id) {
+      localStorage.setItem(ACCOUNT_STORAGE_KEY, id)
+    } else {
+      localStorage.removeItem(ACCOUNT_STORAGE_KEY)
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 export default function App() {
   const [setupMode, setSetupMode] = useState<boolean | null>(null)
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -63,10 +84,32 @@ export default function App() {
   const [portfolios, setPortfolios] = useState<Portfolio[]>([])
   const [currentPortfolio, setCurrentPortfolioState] = useState<Portfolio | null>(null)
   const [showPortfolioManager, setShowPortfolioManager] = useState(false)
-  const [viewMode, setViewMode] = useState<"portfolio" | "account">("portfolio")
+  const [viewMode, setViewMode] = useState<"portfolio" | "account">(
+    () => (localStorage.getItem("viewMode") as "portfolio" | "account") || "portfolio"
+  )
   const [accounts, setAccounts] = useState<Account[]>([])
   const [currentAccount, setCurrentAccount] = useState<Account | null>(null)
   const [showAccountManager, setShowAccountManager] = useState(false)
+  const accountsLoadedRef = useRef(false)
+
+  useEffect(() => {
+    localStorage.setItem("viewMode", viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    if (currentAccount) {
+      setStoredAccountId(currentAccount.id)
+    } else if (accountsLoadedRef.current) {
+      setStoredAccountId(null)
+    }
+  }, [currentAccount])
+
+  // Restore selected account from localStorage when accounts load
+  useEffect(() => {
+    if (accounts.length > 0) {
+      accountsLoadedRef.current = true
+    }
+  }, [accounts])
 
   const setCurrentPortfolio = useCallback(
     (portfolio: Portfolio | null | ((prev: Portfolio | null) => Portfolio | null)) => {
@@ -198,8 +241,14 @@ export default function App() {
   const applyAccounts = useCallback((list: Account[]) => {
     setAccounts(list)
     setCurrentAccount((prev) => {
-      if (!prev) return null
-      return list.find((a) => a.id === prev.id) || null
+      if (prev) {
+        return list.find((a) => a.id === prev.id) || null
+      }
+      const storedId = getStoredAccountId()
+      if (storedId) {
+        return list.find((a) => a.id === storedId) || null
+      }
+      return null
     })
   }, [])
 
