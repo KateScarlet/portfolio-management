@@ -61,8 +61,8 @@ func GetSummary(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 
 			// Load lots for currency conversion
 			holdingIDs := make([]uuid.UUID, len(holdings))
-			for i, h := range holdings {
-				holdingIDs[i] = h.ID
+			for i := range holdings {
+				holdingIDs[i] = holdings[i].ID
 			}
 			lotsMap, err := models.LoadLotsByHoldingIDs(db, holdingIDs)
 			if err != nil {

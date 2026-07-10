@@ -69,7 +69,8 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 			}
 
 			lines := []string{}
-			for _, h := range holdings {
+			for i := range holdings {
+				h := &holdings[i]
 				lines = append(lines, fmt.Sprintf("%s (%s)\n当前价: %s %s",
 					h.Name, h.Symbol, h.Currency, h.Price.StringFixed(2)))
 			}

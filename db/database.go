@@ -148,8 +148,8 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	var holdingsWithNull []models.Holding
 	if err := db.Where("account_id IS NULL").Find(&holdingsWithNull).Error; err == nil && len(holdingsWithNull) > 0 {
 		userIDs := make(map[uuid.UUID]bool)
-		for _, h := range holdingsWithNull {
-			userIDs[h.UserID] = true
+		for i := range holdingsWithNull {
+			userIDs[holdingsWithNull[i].UserID] = true
 		}
 		for userID := range userIDs {
 			var defaultAccount models.Account

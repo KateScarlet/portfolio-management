@@ -27,10 +27,6 @@ type httpError struct {
 
 func (e *httpError) Error() string { return e.msg }
 
-func accountIDString(id uuid.UUID) string {
-	return id.String()
-}
-
 func convertHoldingsCurrency(holdings []models.Holding, lotsMap map[uuid.UUID][]models.HoldingLot, targetCurrency string, router *marketsource.Router, userID uuid.UUID) error {
 	for i := range holdings {
 		h := &holdings[i]
@@ -686,7 +682,8 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 			}
 
 			var realizedValue decimal.Decimal
-			for _, lot := range lots {
+			for i := range lots {
+				lot := &lots[i]
 				if lot.Type == "sell" {
 					realizedValue = realizedValue.Add(lot.ValueAdded).Sub(lot.Fee)
 				}

@@ -79,7 +79,7 @@ func UpdateAccount(db *gorm.DB) app.HandlerFunc {
 		}
 
 		id := c.Param("id")
-		account, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		_, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "账户不存在"})
 			return
@@ -116,7 +116,7 @@ func UpdateAccount(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		account, err = gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
+		account, err := gorm.G[models.Account](db).Where("user_id = ? AND id = ?", user.UserID, id).First(ctx)
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return

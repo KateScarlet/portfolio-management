@@ -70,7 +70,8 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 
 			lines := []string{"⚠️ <b>价格波动提醒</b>", ""}
-			for _, h := range holdings {
+			for i := range holdings {
+				h := &holdings[i]
 				lines = append(lines, fmt.Sprintf("<b>%s</b> (%s)\n当前价: %s %s",
 					h.Name, h.Symbol, h.Currency, h.Price.StringFixed(2)))
 			}
