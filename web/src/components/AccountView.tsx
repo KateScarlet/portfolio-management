@@ -185,9 +185,7 @@ export default function AccountView({
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
             {toDecimal(h.shares).isPositive() ? (
               <div>
-                {toDecimal(h.costPrice).isPositive() && (
-                  <p>{formatPrice(h.costPrice, h.currency || "CNY")}</p>
-                )}
+                <p>{formatPrice(toDecimal(h.value).div(h.shares), h.currency || "CNY")}</p>
                 <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
               </div>
             ) : (
@@ -200,11 +198,7 @@ export default function AccountView({
                 <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
                 {toDecimal(h.totalDividends || "0").isPositive() && (
                   <p className="text-[10px] text-yellow-600">
-                    含分红{" "}
-                    {formatCurrencyByCode(
-                      h.totalDividends || "0",
-                      h.currency || "CNY"
-                    )}
+                    含分红 {formatCurrencyByCode(h.totalDividends || "0", h.currency || "CNY")}
                   </p>
                 )}
               </div>

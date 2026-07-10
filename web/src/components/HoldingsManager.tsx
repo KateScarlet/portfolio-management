@@ -111,7 +111,12 @@ export default function HoldingsManager({
   }, [onSyncComplete, setHoldings, portfolioId])
 
   const saveEditLot = useCallback(
-    async (targetHoldingId: string, h: Holding, lotId: string, updatedFields: Partial<HoldingLot>) => {
+    async (
+      targetHoldingId: string,
+      h: Holding,
+      lotId: string,
+      updatedFields: Partial<HoldingLot>
+    ) => {
       try {
         await api.updateLot(portfolioId, targetHoldingId, lotId, updatedFields)
         const freshHoldings = await api.fetchHoldings(portfolioId)
@@ -302,7 +307,10 @@ export default function HoldingsManager({
                 Save
               </button>
               <button
-                onClick={() => { setEditingLotId(null); setEditingLotDate("") }}
+                onClick={() => {
+                  setEditingLotId(null)
+                  setEditingLotDate("")
+                }}
                 className="text-[10px] text-[#ADB5BD] hover:text-[#1A1A1A] px-1"
               >
                 取消
@@ -404,7 +412,11 @@ export default function HoldingsManager({
       </div>
 
       {isAdding && (
-        <AddHoldingForm onAddHolding={onAddHolding} onClose={() => setIsAdding(false)} accounts={accounts} />
+        <AddHoldingForm
+          onAddHolding={onAddHolding}
+          onClose={() => setIsAdding(false)}
+          accounts={accounts}
+        />
       )}
 
       <div className="grow overflow-x-auto">
@@ -489,9 +501,9 @@ export default function HoldingsManager({
                           </div>
                         ) : toDecimal(h.shares).isPositive() ? (
                           <div>
-                            {toDecimal(h.costPrice).isPositive() && (
-                              <p>{formatPrice(h.costPrice, h.currency || "CNY")}</p>
-                            )}
+                            <p>
+                              {formatPrice(toDecimal(h.value).div(h.shares), h.currency || "CNY")}
+                            </p>
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
                         ) : (
@@ -505,10 +517,7 @@ export default function HoldingsManager({
                             {toDecimal(h.totalDividends || "0").isPositive() && (
                               <p className="text-[10px] text-yellow-600">
                                 含分红{" "}
-                                {formatCurrencyByCode(
-                                  h.totalDividends || "0",
-                                  h.currency || "CNY"
-                                )}
+                                {formatCurrencyByCode(h.totalDividends || "0", h.currency || "CNY")}
                               </p>
                             )}
                           </div>
@@ -536,9 +545,7 @@ export default function HoldingsManager({
                           }
                           const isPositive = profit.isPositive()
                           return (
-                            <p
-                              className={getProfitColor(isPositive, colorScheme)}
-                            >
+                            <p className={getProfitColor(isPositive, colorScheme)}>
                               {isPositive ? "+" : ""}
                               {formatPercent(rateNum)}
                             </p>

@@ -16,7 +16,12 @@ interface AddHoldingFormProps {
   accountId?: string
 }
 
-export default function AddHoldingForm({ onAddHolding, onClose, accounts, accountId }: AddHoldingFormProps) {
+export default function AddHoldingForm({
+  onAddHolding,
+  onClose,
+  accounts,
+  accountId,
+}: AddHoldingFormProps) {
   const [selectedAccountId, setSelectedAccountId] = useState(
     accountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id || ""
   )
@@ -77,7 +82,7 @@ export default function AddHoldingForm({ onAddHolding, onClose, accounts, accoun
             shares: "0",
             price: String(data.price),
             value: "0",
-          accountId: selectedAccountId,
+            accountId: selectedAccountId,
           })
         } else {
           showToast("价格获取失败，请尝试手动录入", "error")
@@ -132,7 +137,8 @@ export default function AddHoldingForm({ onAddHolding, onClose, accounts, accoun
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}{a.broker ? ` (${a.broker})` : ""}
+                  {a.name}
+                  {a.broker ? ` (${a.broker})` : ""}
                 </option>
               ))}
             </select>

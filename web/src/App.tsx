@@ -357,8 +357,7 @@ export default function App() {
             s.barkPriceThreshold != null
               ? Number(s.barkPriceThreshold)
               : DEFAULT_SETTINGS.barkPriceThreshold,
-          barkSummaryInterval:
-            s.barkSummaryInterval || DEFAULT_SETTINGS.barkSummaryInterval,
+          barkSummaryInterval: s.barkSummaryInterval || DEFAULT_SETTINGS.barkSummaryInterval,
         })
       })
       .catch(console.error)

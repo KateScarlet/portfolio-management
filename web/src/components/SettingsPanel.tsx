@@ -74,7 +74,10 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
     "connection"
   )
   const [barkTesting, setBarkTesting] = useState(false)
-  const [barkTestResult, setBarkTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [barkTestResult, setBarkTestResult] = useState<{
+    success: boolean
+    message: string
+  } | null>(null)
   const [barkTestType, setBarkTestType] = useState<"connection" | "price" | "drift" | "summary">(
     "connection"
   )
@@ -922,9 +925,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                           </p>
                         </div>
                         <button
-                          onClick={() =>
-                            setDraft({ ...draft, barkEnabled: !draft.barkEnabled })
-                          }
+                          onClick={() => setDraft({ ...draft, barkEnabled: !draft.barkEnabled })}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                             draft.barkEnabled ? "bg-[#1A1A1A]" : "bg-[#E9ECEF]"
                           }`}
@@ -972,7 +973,9 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
                           <div className="flex items-center gap-2">
                             <select
                               value={barkTestType}
-                              onChange={(e) => setBarkTestType(e.target.value as typeof barkTestType)}
+                              onChange={(e) =>
+                                setBarkTestType(e.target.value as typeof barkTestType)
+                              }
                               className="px-2 py-1.5 text-xs border border-[#E9ECEF] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1A1A1A]"
                             >
                               <option value="connection">测试连接</option>
