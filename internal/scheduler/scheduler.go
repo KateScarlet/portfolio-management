@@ -3,7 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/models"
 	"strconv"
 	"sync"

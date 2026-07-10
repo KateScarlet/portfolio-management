@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"portfolio-management/middleware"
-	"portfolio-management/scheduler"
+	"portfolio-management/internal/scheduler"
 
 	"log/slog"
 

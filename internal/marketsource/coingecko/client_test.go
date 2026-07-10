@@ -3,7 +3,7 @@ package coingecko
 import (
 	"testing"
 
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 )
 
 func TestNormalizeForSource_CoinGecko(t *testing.T) {

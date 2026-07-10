@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"

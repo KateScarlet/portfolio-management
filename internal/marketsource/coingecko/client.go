@@ -9,7 +9,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
 
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 )
 
 var httpClient *resty.Client

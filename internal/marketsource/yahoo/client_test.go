@@ -3,7 +3,7 @@ package yahoo
 import (
 	"testing"
 
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 )
 
 func TestFetchQuote_UsesNormalizeForSource(t *testing.T) {

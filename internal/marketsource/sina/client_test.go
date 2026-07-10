@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 )
 
 func TestNormalizeForSource_Sina(t *testing.T) {

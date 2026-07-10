@@ -3,7 +3,7 @@ package tencent
 import (
 	"testing"
 
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 )
 
 func TestNormalizeForSource_Tencent(t *testing.T) {

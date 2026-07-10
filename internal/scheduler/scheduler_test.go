@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"os"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/models"
 	"sync"
 	"testing"

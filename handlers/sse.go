@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"portfolio-management/middleware"
-	"portfolio-management/scheduler"
+	"portfolio-management/internal/scheduler"
 	"sync"
 	"time"
 

@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"testing"

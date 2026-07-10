@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 	"sort"

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"portfolio-management/marketsource"
+	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"portfolio-management/telegram"
+	"portfolio-management/internal/notifications/telegram"
 	"strings"
 	"time"
 
