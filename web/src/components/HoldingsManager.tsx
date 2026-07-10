@@ -481,7 +481,7 @@ export default function HoldingsManager({
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <p className="text-sm text-[#6C757D]">{h.name || "手工资产"}</p>
+                            <p className="text-sm font-mono">{h.name || "手工资产"}</p>
                             {h.lots && h.lots.length > 0 && (
                               <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
                                 {h.lots.length} 笔
@@ -502,7 +502,7 @@ export default function HoldingsManager({
                         ) : toDecimal(h.shares).isPositive() ? (
                           <div>
                             <p>
-                              {formatPrice(toDecimal(h.value).div(h.shares), h.currency || "CNY")}
+                              {formatPrice(toDecimal(h.value).div(h.shares).toString(), h.currency || "CNY")}
                             </p>
                             <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
                           </div>
