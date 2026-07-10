@@ -30,6 +30,7 @@ const tinyHolding: Holding = {
   price: "100000",
   value: "0.001",
   cost: "0.001",
+  accountId: "account-1",
 }
 
 describe("SellModal", () => {

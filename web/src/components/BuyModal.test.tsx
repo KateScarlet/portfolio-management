@@ -29,6 +29,7 @@ const baseHolding: Holding = {
   shares: "1",
   price: "10",
   value: "10",
+  accountId: "account-1",
 }
 
 describe("BuyModal", () => {
