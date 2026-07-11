@@ -624,7 +624,6 @@ export default function App() {
           <AccountView
             selectedAccount={currentAccount}
             colorScheme={settings.colorScheme}
-            displayCurrency={settings.displayCurrency}
             portfolios={portfolios}
             currentPortfolio={currentPortfolio}
             accounts={accounts}

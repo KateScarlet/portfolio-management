@@ -26,7 +26,6 @@ import AssetIcon from "./AssetIcon"
 interface Props {
   selectedAccount: Account | null
   colorScheme: ColorScheme
-  displayCurrency: string
   portfolios: Portfolio[]
   currentPortfolio: Portfolio | null
   accounts: Account[]
@@ -37,7 +36,6 @@ interface Props {
 export default function AccountView({
   selectedAccount,
   colorScheme,
-  displayCurrency,
   portfolios: _portfolios,
   currentPortfolio,
   accounts,
@@ -55,18 +53,18 @@ export default function AccountView({
 
   const loadHoldings = useCallback(async () => {
     try {
-      const data = await api.fetchAccountViewHoldings(displayCurrency, selectedAccountId)
+      const data = await api.fetchAccountViewHoldings(undefined, selectedAccountId)
       setHoldings(data)
     } catch (e) {
       console.error("Failed to load account holdings", e)
       setHoldings([])
     }
-  }, [displayCurrency, selectedAccountId])
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
     api
-      .fetchAccountViewHoldings(displayCurrency, selectedAccountId)
+      .fetchAccountViewHoldings(undefined, selectedAccountId)
       .then((data) => {
         if (!cancelled) setHoldings(data)
       })
@@ -76,7 +74,7 @@ export default function AccountView({
     return () => {
       cancelled = true
     }
-  }, [displayCurrency, selectedAccountId])
+  }, [selectedAccountId])
 
   const handleAddHolding = useCallback(
     async (h: Omit<Holding, "id">) => {
@@ -96,14 +94,6 @@ export default function AccountView({
     await loadHoldings()
     onRefreshAvailableFunds()
   }, [loadHoldings, onRefreshAvailableFunds])
-
-  const totalValue = (holdings || []).reduce(
-    (sum, h) => sum.plus(toDecimal(h.value)),
-    new Decimal(0)
-  )
-  const totalCost = (holdings || []).reduce((sum, h) => sum.plus(toDecimal(h.cost)), new Decimal(0))
-  const totalProfit = totalValue.minus(totalCost)
-  const totalReturnPct = totalCost.isZero() ? new Decimal(0) : totalProfit.div(totalCost)
 
   // Group holdings by account when viewing all accounts
   const showGrouped = !selectedAccount && holdings && holdings.length > 0
@@ -306,29 +296,6 @@ export default function AccountView({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-6 text-sm">
-          <div>
-            <span className="text-[#6C757D]">总市值 </span>
-            <span className="font-medium">
-              {formatCurrencyByCode(totalValue.toString(), displayCurrency)}
-            </span>
-          </div>
-          <div>
-            <span className="text-[#6C757D]">总成本 </span>
-            <span className="font-medium">
-              {formatCurrencyByCode(totalCost.toString(), displayCurrency)}
-            </span>
-          </div>
-          <div>
-            <span className="text-[#6C757D]">总盈亏 </span>
-            <span
-              className={`font-medium ${totalProfit.isPositive() ? "text-emerald-600" : "text-orange-600"}`}
-            >
-              {formatCurrencyByCode(totalProfit.toString(), displayCurrency)}
-              <span className="ml-1 text-[10px]">({formatPercent(totalReturnPct.toString())})</span>
-            </span>
-          </div>
-        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-[#E9ECEF] shadow-sm flex flex-col overflow-hidden">
@@ -389,13 +356,7 @@ export default function AccountView({
                               {accountName}
                             </span>
                             <span className="text-[10px] text-[#6C757D]">
-                              {groupHoldings.length} 个持仓 · 市值{" "}
-                              {formatCurrencyByCode(
-                                groupHoldings
-                                  .reduce((s, h) => s.plus(toDecimal(h.value)), new Decimal(0))
-                                  .toString(),
-                                displayCurrency
-                              )}
+                              {groupHoldings.length} 个持仓
                             </span>
                           </div>
                         </td>
@@ -426,7 +387,7 @@ export default function AccountView({
         <SellModal
           portfolioId={sellingHolding.portfolioId}
           holding={sellingHolding}
-          displayCurrency={displayCurrency}
+          displayCurrency={sellingHolding.currency || "CNY"}
           onConfirm={handleSellConfirm}
           onClose={() => setSellingHolding(null)}
           accounts={accounts}
