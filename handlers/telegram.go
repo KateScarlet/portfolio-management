@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"portfolio-management/internal/marketsource"
+	"portfolio-management/internal/notifications/telegram"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"portfolio-management/internal/notifications/telegram"
 	"strings"
 	"time"
 

@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"context"
-	"portfolio-management/middleware"
 	"portfolio-management/internal/scheduler"
+	"portfolio-management/middleware"
 
 	"log/slog"
 

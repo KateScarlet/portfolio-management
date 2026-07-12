@@ -175,7 +175,9 @@ export default function AccountView({
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
             {toDecimal(h.shares).isPositive() ? (
               <div>
-                <p>{formatPrice(toDecimal(h.value).div(h.shares).toString(), h.currency || "CNY")}</p>
+                <p>
+                  {formatPrice(toDecimal(h.value).div(h.shares).toString(), h.currency || "CNY")}
+                </p>
                 <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
               </div>
             ) : (

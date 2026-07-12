@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"portfolio-management/internal/notifications/bark"
 	"portfolio-management/internal/marketsource"
+	"portfolio-management/internal/notifications/bark"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 

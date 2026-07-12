@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"portfolio-management/middleware"
 	"portfolio-management/internal/scheduler"
+	"portfolio-management/middleware"
 	"sync"
 	"time"
 

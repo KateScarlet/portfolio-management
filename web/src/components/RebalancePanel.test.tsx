@@ -3,9 +3,7 @@ import { describe, it, expect, vi } from "vitest"
 import RebalancePanel from "./RebalancePanel"
 
 vi.mock("./AssetIcon", () => ({
-  default: ({ assetId }: { assetId: string }) => (
-    <div data-testid={`icon-${assetId}`} />
-  ),
+  default: ({ assetId }: { assetId: string }) => <div data-testid={`icon-${assetId}`} />,
 }))
 
 const defaultTargetPcts = {

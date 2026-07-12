@@ -15,8 +15,8 @@ import (
 	"portfolio-management/internal/marketsource/sina"
 	"portfolio-management/internal/marketsource/tencent"
 	"portfolio-management/internal/marketsource/yahoo"
-	"portfolio-management/middleware"
 	"portfolio-management/internal/scheduler"
+	"portfolio-management/middleware"
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app/server"

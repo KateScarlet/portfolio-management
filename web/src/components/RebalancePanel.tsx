@@ -45,7 +45,13 @@ export default function RebalancePanel({
       difference,
       driftPct,
       isBalanced,
-      action: !isBalanced ? (toDecimal(difference).gt(0) ? "buy" : toDecimal(difference).lt(0) ? "sell" : "keep") : "keep",
+      action: !isBalanced
+        ? toDecimal(difference).gt(0)
+          ? "buy"
+          : toDecimal(difference).lt(0)
+            ? "sell"
+            : "keep"
+        : "keep",
     }
   })
 
