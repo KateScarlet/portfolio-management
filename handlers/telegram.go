@@ -235,12 +235,12 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			lines := []string{
 				fmt.Sprintf("📊 <b>投资组合摘要</b> — %s", now.Format("2006-01-02")),
 				"",
-				fmt.Sprintf("总资产: ¥%s", total.StringFixed(0)),
-				fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(0)),
+				fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
+				fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
 			}
 			if principal.IsPositive() {
 				pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
-				lines = append(lines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(1)))
+				lines = append(lines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(2)))
 			}
 			lines = append(lines, "")
 
@@ -249,7 +249,7 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				if total.IsPositive() {
 					pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 				}
-				lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(0)))
+				lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
 			}
 			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
 

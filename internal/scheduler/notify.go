@@ -563,19 +563,19 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 	tgLines := []string{
 		fmt.Sprintf("📊 <b>投资组合摘要</b> — %s — %s", portfolioName, now.Format("2006-01-02")),
 		"",
-		fmt.Sprintf("总资产: ¥%s", total.StringFixed(0)),
-		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(0)),
+		fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
+		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
 	}
 	barkLines := []string{
 		fmt.Sprintf("📊 投资组合摘要 — %s — %s", portfolioName, now.Format("2006-01-02")),
 		"",
-		fmt.Sprintf("总资产: ¥%s", total.StringFixed(0)),
-		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(0)),
+		fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
+		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
 	}
 	if principal.IsPositive() {
 		pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
-		tgLines = append(tgLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(1)))
-		barkLines = append(barkLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(1)))
+		tgLines = append(tgLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(2)))
+		barkLines = append(barkLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(2)))
 	}
 	tgLines = append(tgLines, "")
 	barkLines = append(barkLines, "")
@@ -585,8 +585,8 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 		if total.IsPositive() {
 			pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 		}
-		tgLines = append(tgLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(0)))
-		barkLines = append(barkLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(0)))
+		tgLines = append(tgLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
+		barkLines = append(barkLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
 	}
 
 	if tgShouldSend && tgClient != nil {

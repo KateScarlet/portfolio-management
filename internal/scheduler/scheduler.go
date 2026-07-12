@@ -354,7 +354,12 @@ func (s *PriceScheduler) syncPortfolio(userID, portfolioID uuid.UUID, state *syn
 	}
 
 	if s.notifier != nil {
-		s.notifier.NotifyAfterSync(userID, portfolioID, holdings, syncedPrices)
+		var notifyHoldings []models.Holding
+		if err := s.db.Where("portfolio_id = ?", portfolioID).Find(&notifyHoldings).Error; err != nil {
+			slog.Error("failed to re-query holdings for notification", "portfolioId", portfolioID, "error", err)
+		} else {
+			s.notifier.NotifyAfterSync(userID, portfolioID, notifyHoldings, syncedPrices)
+		}
 	}
 }
 
