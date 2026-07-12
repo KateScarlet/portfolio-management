@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	frontend "portfolio-management"
 	"portfolio-management/db"
@@ -31,6 +32,14 @@ func main() {
 	middleware.SetJWTSecret(cfg.JWTSecret)
 
 	h := server.Default(server.WithHostPorts(":3000"))
+
+	pprofMux := http.NewServeMux()
+	pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+	pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	h.GET("/debug/pprof/*filepath", adaptor.HertzHandler(pprofMux))
 
 	h.GET("/api/setup/status", handlers.SetupStatus())
 
