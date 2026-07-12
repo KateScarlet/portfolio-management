@@ -31,6 +31,10 @@ func TestNormalizeSymbol(t *testing.T) {
 		{"AAPL", "US", "AAPL.US"},
 		{"aapl", "US", "AAPL.US"},
 		{"AAPL.US", "US", "AAPL.US"},
+		{"SHOP", "US", "SHOP.US"},
+		{"SZK", "US", "SZK.US"},
+		{"HKD", "US", "HKD.US"},
+		{"SHO", "US", "SHO.US"},
 
 		// Crypto
 		{"BTC", "CRYPTO", "BTC.CC"},

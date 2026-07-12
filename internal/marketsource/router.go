@@ -262,7 +262,7 @@ func (r *Router) loadUserConfig(userID uuid.UUID) map[string][]string {
 
 	var value string
 	err := r.db.Table("settings").
-		Where(`"key" = ? AND user_id = ? AND portfolio_id = ?`, "marketSources", userID, "").
+		Where(`"key" = ? AND user_id = ? AND portfolio_id = ?`, "marketSources", userID, uuid.UUID{}).
 		Pluck("value", &value).Error
 	if err != nil {
 		slog.Error("failed to load user config from db", "userId", userID, "error", err)

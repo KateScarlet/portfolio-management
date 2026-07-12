@@ -42,8 +42,9 @@ export function usePortfolio(
 
   const assets: Record<AssetId, string> = { stocks: "0", bonds: "0", cash: "0", commodities: "0" }
   holdings.forEach((h) => {
+    if (h.currency !== displayCurrency && !exchangeRates[h.currency]) return
     const rate = h.currency === displayCurrency ? "1" : exchangeRates[h.currency]
-    const convertedValue = rate ? toDecimal(h.value).times(rate) : toDecimal(h.value)
+    const convertedValue = toDecimal(h.value).times(rate)
     assets[h.assetId] = toDecimal(assets[h.assetId]).plus(convertedValue).toString()
   })
 

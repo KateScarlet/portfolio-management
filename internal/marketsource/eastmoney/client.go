@@ -86,6 +86,13 @@ type searchResponse struct {
 	} `json:"QuotationCodeTable"`
 }
 
+// isUSQuoteID checks whether a QuoteID belongs to a US exchange.
+// US exchange prefixes: 105=NASDAQ, 106=NYSE, 107=AMEX.
+func isUSQuoteID(quoteID string) bool {
+	prefix := strings.SplitN(quoteID, ".", 2)[0]
+	return prefix == "105" || prefix == "106" || prefix == "107"
+}
+
 // resolveUSSecid queries the search API to get the correct secid for US stocks.
 // Different US exchanges use different market IDs: 105=NASDAQ, 106=NYSE, 107=AMEX.
 func resolveUSSecid(ticker string) (string, error) {
@@ -115,7 +122,7 @@ func resolveUSSecid(ticker string) (string, error) {
 
 	// Find the matching US stock entry
 	for _, item := range resp.QuotationCodeTable.Data {
-		if item.QuoteID != "" {
+		if item.QuoteID != "" && isUSQuoteID(item.QuoteID) {
 			secid := item.QuoteID
 			usSecidCache.Store(ticker, secid)
 			return secid, nil

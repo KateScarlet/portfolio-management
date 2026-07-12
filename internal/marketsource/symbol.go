@@ -9,8 +9,8 @@ import (
 func NormalizeSymbol(symbol, market string) string {
 	s := strings.ToUpper(strings.TrimSpace(symbol))
 
-	// Strip common source-specific prefixes
-	s = stripPrefixes(s)
+	// Strip common source-specific prefixes (only for the relevant market)
+	s = stripPrefixes(s, market)
 
 	switch market {
 	case "CN":
@@ -32,16 +32,20 @@ func NormalizeSymbol(symbol, market string) string {
 	}
 }
 
-func stripPrefixes(s string) string {
-	// sh/sz prefix (e.g., sh600519 -> 600519)
-	if strings.HasPrefix(s, "SH") && len(s) > 2 {
-		s = s[2:]
-	} else if strings.HasPrefix(s, "SZ") && len(s) > 2 {
-		s = s[2:]
+func stripPrefixes(s string, market string) string {
+	// sh/sz prefix (e.g., sh600519 -> 600519) — only for CN market
+	if market == "CN" {
+		if strings.HasPrefix(s, "SH") && len(s) > 2 {
+			s = s[2:]
+		} else if strings.HasPrefix(s, "SZ") && len(s) > 2 {
+			s = s[2:]
+		}
 	}
-	// hk prefix (e.g., hk00700 -> 00700)
-	if strings.HasPrefix(s, "HK") && len(s) > 2 {
-		s = s[2:]
+	// hk prefix (e.g., hk00700 -> 00700) — only for HK market
+	if market == "HK" {
+		if strings.HasPrefix(s, "HK") && len(s) > 2 {
+			s = s[2:]
+		}
 	}
 	// gb_ prefix for US stocks (e.g., gb_aapl -> AAPL)
 	s = strings.TrimPrefix(s, "GB_")
