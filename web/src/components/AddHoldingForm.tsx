@@ -171,7 +171,13 @@ export default function AddHoldingForm({
                 value={market}
                 onChange={(e) => {
                   const m = e.target.value as
-                    "US" | "CN" | "HK" | "FUND" | "COMMODITY_CN" | "COMMODITY_INTL" | "CRYPTO"
+                    | "US"
+                    | "CN"
+                    | "HK"
+                    | "FUND"
+                    | "COMMODITY_CN"
+                    | "COMMODITY_INTL"
+                    | "CRYPTO"
                   setMarket(m)
                   setSymbol("")
                 }}

@@ -63,7 +63,12 @@ const SECTIONS = [
   { id: "security", label: "安全", icon: Shield, adminOnly: true },
 ]
 
-export default function SettingsPanel({ settings, onSave, userRole, portfolioId }: SettingsPanelProps) {
+export default function SettingsPanel({
+  settings,
+  onSave,
+  userRole,
+  portfolioId,
+}: SettingsPanelProps) {
   const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState("invest")
@@ -258,7 +263,12 @@ export default function SettingsPanel({ settings, onSave, userRole, portfolioId 
     setBarkTesting(true)
     setBarkTestResult(null)
     try {
-      const result = await api.testBarkMessage(draft.barkDeviceKey, draft.barkServerURL, type, portfolioId)
+      const result = await api.testBarkMessage(
+        draft.barkDeviceKey,
+        draft.barkServerURL,
+        type,
+        portfolioId
+      )
       if (result.success) {
         const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
         setBarkTestResult({ success: true, message: `已发送${labels[type]}测试消息` })

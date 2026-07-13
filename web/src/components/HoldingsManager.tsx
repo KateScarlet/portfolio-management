@@ -674,7 +674,6 @@ export default function HoldingsManager({
                     {isExpanded &&
                       (() => {
                         const groups = lotGroupsByHolding.get(h.id) || []
-                        const hasMulti = groups.length > 1
                         return (
                           <tr className="bg-[#F8F9FA]">
                             <td colSpan={7} className="px-6 pb-4">
