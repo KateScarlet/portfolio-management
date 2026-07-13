@@ -7,10 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "format": "oxfmt --ignore-path .oxfmtignore .",
+    "format:check": "oxfmt --check --ignore-path .oxfmtignore .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -29,7 +29,6 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.1.1",
@@ -37,15 +36,11 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.2",
     "esbuild": "^0.28.1",
-    "eslint": "^10.7.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
     "jsdom": "^29.1.1",
-    "prettier": "^3.9.5",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~7.0.2",
-    "typescript-eslint": "^8.63.0",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
   }
