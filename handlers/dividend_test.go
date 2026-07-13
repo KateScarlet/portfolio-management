@@ -154,3 +154,179 @@ func TestDividendReinvestmentCannotBeDeletedAfterSale(t *testing.T) {
 		t.Fatal("rejected deletion must keep the dividend record")
 	}
 }
+
+func TestListDividends_FiltersByHoldingAndUser(t *testing.T) {
+	db := setupTestDB(t)
+	firstHoldingID := uuid.MustParse(createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900))
+	secondHoldingID := uuid.New()
+	if err := db.Create(&models.Holding{
+		ID: secondHoldingID, UserID: testUserID, PortfolioID: testPortfolioID,
+		AssetId: "stocks", Symbol: "SECOND", Currency: "USD",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	otherUserID := uuid.New()
+	baseDate := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	dividends := []models.Dividend{
+		{
+			ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID, HoldingID: firstHoldingID,
+			Type: DividendTypeCash, GrossAmount: decimal.NewFromInt(10), NetAmount: decimal.NewFromInt(10),
+			Currency: "USD", PaymentDate: baseDate, FundTxID: uuid.New(),
+		},
+		{
+			ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID, HoldingID: secondHoldingID,
+			Type: DividendTypeCash, GrossAmount: decimal.NewFromInt(20), NetAmount: decimal.NewFromInt(20),
+			Currency: "USD", PaymentDate: baseDate.Add(time.Hour), FundTxID: uuid.New(),
+		},
+		{
+			ID: uuid.New(), UserID: otherUserID, PortfolioID: testPortfolioID, HoldingID: firstHoldingID,
+			Type: DividendTypeCash, GrossAmount: decimal.NewFromInt(30), NetAmount: decimal.NewFromInt(30),
+			Currency: "USD", PaymentDate: baseDate.Add(2 * time.Hour), FundTxID: uuid.New(),
+		},
+	}
+	if err := db.Create(&dividends).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	listCtx := newDividendCtx("GET", "", nil)
+	listCtx.Request.SetRequestURI("/api/dividends")
+	ListDividends(db)(context.Background(), listCtx)
+	if listCtx.Response.StatusCode() != 200 {
+		t.Fatalf("list: expected 200, got %d: %s", listCtx.Response.StatusCode(), listCtx.Response.Body())
+	}
+	var result []models.Dividend
+	if err := json.Unmarshal(listCtx.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 2 || result[0].HoldingID != secondHoldingID {
+		t.Fatalf("expected own dividends in descending order, got %+v", result)
+	}
+
+	filterCtx := newDividendCtx("GET", "", nil)
+	filterCtx.Request.SetRequestURI("/api/dividends?holdingId=" + firstHoldingID.String())
+	ListDividends(db)(context.Background(), filterCtx)
+	if err := json.Unmarshal(filterCtx.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if filterCtx.Response.StatusCode() != 200 || len(result) != 1 || result[0].HoldingID != firstHoldingID {
+		t.Fatalf("unexpected holding filter result: %+v", result)
+	}
+
+	invalidCtx := newDividendCtx("GET", "", nil)
+	invalidCtx.Request.SetRequestURI("/api/dividends?holdingId=invalid")
+	ListDividends(db)(context.Background(), invalidCtx)
+	if invalidCtx.Response.StatusCode() != 400 {
+		t.Fatalf("invalid holding filter: expected 400, got %d", invalidCtx.Response.StatusCode())
+	}
+}
+
+func TestUpdateDividend_CashReinvestCashLifecycle(t *testing.T) {
+	db := setupTestDB(t)
+	holdingID := uuid.MustParse(createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900))
+	paymentDate := time.Now().Add(-24 * time.Hour).Truncate(time.Second)
+	createCtx := newDividendCtx("POST", "", CreateDividendRequest{
+		HoldingID: holdingID, GrossAmount: decimal.NewFromInt(110), TaxAmount: decimal.NewFromInt(10),
+		Type: DividendTypeCash, PaymentDate: paymentDate, Note: "cash",
+	})
+	RecordDividend(db)(context.Background(), createCtx)
+	if createCtx.Response.StatusCode() != 201 {
+		t.Fatalf("create: expected 201, got %d: %s", createCtx.Response.StatusCode(), createCtx.Response.Body())
+	}
+	var dividend models.Dividend
+	if err := json.Unmarshal(createCtx.Response.Body(), &dividend); err != nil {
+		t.Fatal(err)
+	}
+	originalFundTxID := dividend.FundTxID
+
+	reinvestCtx := newDividendCtx("PUT", dividend.ID.String(), UpdateDividendRequest{
+		GrossAmount: decimal.NewFromInt(120), TaxAmount: decimal.NewFromInt(20),
+		Type: DividendTypeReinvest, PaymentDate: paymentDate, ReinvestmentPrice: decimal.NewFromInt(20),
+		Note: "reinvested",
+	})
+	UpdateDividend(db)(context.Background(), reinvestCtx)
+	if reinvestCtx.Response.StatusCode() != 200 {
+		t.Fatalf("cash to reinvest: expected 200, got %d: %s", reinvestCtx.Response.StatusCode(), reinvestCtx.Response.Body())
+	}
+	if err := json.Unmarshal(reinvestCtx.Response.Body(), &dividend); err != nil {
+		t.Fatal(err)
+	}
+	if dividend.Type != DividendTypeReinvest || dividend.HoldingLotID == nil ||
+		!dividend.ReinvestedShares.Equal(decimal.NewFromInt(5)) || dividend.FundTxID == originalFundTxID {
+		t.Fatalf("unexpected reinvested dividend: %+v", dividend)
+	}
+	var holding models.Holding
+	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !holding.Shares.Equal(decimal.NewFromInt(15)) || !holding.TotalDividends.Equal(decimal.NewFromInt(100)) {
+		t.Fatalf("unexpected holding after reinvestment: shares=%s dividends=%s", holding.Shares, holding.TotalDividends)
+	}
+	var fund models.AvailableFund
+	if err := db.Where("portfolio_id = ? AND currency = ?", testPortfolioID, "USD").First(&fund).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !fund.Amount.IsZero() {
+		t.Fatalf("expected cash dividend removed from funds, got %s", fund.Amount)
+	}
+
+	cashCtx := newDividendCtx("PUT", dividend.ID.String(), UpdateDividendRequest{
+		GrossAmount: decimal.NewFromInt(90), TaxAmount: decimal.NewFromInt(10),
+		Type: DividendTypeCash, PaymentDate: paymentDate.Add(time.Hour), Note: "cash again",
+	})
+	UpdateDividend(db)(context.Background(), cashCtx)
+	if cashCtx.Response.StatusCode() != 200 {
+		t.Fatalf("reinvest to cash: expected 200, got %d: %s", cashCtx.Response.StatusCode(), cashCtx.Response.Body())
+	}
+	var cashDividend models.Dividend
+	if err := json.Unmarshal(cashCtx.Response.Body(), &cashDividend); err != nil {
+		t.Fatal(err)
+	}
+	if cashDividend.Type != DividendTypeCash || cashDividend.HoldingLotID != nil || !cashDividend.ReinvestedShares.IsZero() {
+		t.Fatalf("unexpected cash dividend after update: %+v", cashDividend)
+	}
+	var persistedDividend models.Dividend
+	if err := db.First(&persistedDividend, "id = ?", cashDividend.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if persistedDividend.HoldingLotID != nil {
+		t.Fatalf("expected persisted holding lot reference cleared, got %s", *persistedDividend.HoldingLotID)
+	}
+	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !holding.Shares.Equal(decimal.NewFromInt(10)) || !holding.TotalDividends.Equal(decimal.NewFromInt(80)) {
+		t.Fatalf("unexpected holding after cash update: shares=%s dividends=%s", holding.Shares, holding.TotalDividends)
+	}
+	if err := db.First(&fund, "id = ?", fund.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !fund.Amount.Equal(decimal.NewFromInt(80)) {
+		t.Fatalf("expected 80 USD available funds, got %s", fund.Amount)
+	}
+	var txs []models.FundTransaction
+	if err := db.Where("holding_id = ?", holdingID).Find(&txs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(txs) != 1 || txs[0].Type != "dividend_cash" || !txs[0].Amount.Equal(decimal.NewFromInt(80)) {
+		t.Fatalf("expected one replacement cash transaction, got %+v", txs)
+	}
+}
+
+func TestUpdateDividend_RejectsInvalidOrMissingRecord(t *testing.T) {
+	db := setupTestDB(t)
+	validBody := UpdateDividendRequest{
+		GrossAmount: decimal.NewFromInt(10), Type: DividendTypeCash, PaymentDate: time.Now(),
+	}
+
+	invalidCtx := newDividendCtx("PUT", "invalid", validBody)
+	UpdateDividend(db)(context.Background(), invalidCtx)
+	if invalidCtx.Response.StatusCode() != 400 {
+		t.Fatalf("invalid id: expected 400, got %d", invalidCtx.Response.StatusCode())
+	}
+
+	missingCtx := newDividendCtx("PUT", uuid.NewString(), validBody)
+	UpdateDividend(db)(context.Background(), missingCtx)
+	if missingCtx.Response.StatusCode() != 404 {
+		t.Fatalf("missing record: expected 404, got %d: %s", missingCtx.Response.StatusCode(), missingCtx.Response.Body())
+	}
+}

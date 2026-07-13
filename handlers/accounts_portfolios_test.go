@@ -157,6 +157,110 @@ func TestDeleteAccount_ReassignsHoldingsAndProtectsDefault(t *testing.T) {
 	}
 }
 
+func TestListAllAccountHoldings_FiltersAndAttachesAccountData(t *testing.T) {
+	db := setupTestDB(t)
+	firstAccount := models.Account{ID: uuid.New(), UserID: testUserID, Name: "Broker A", IsDefault: true}
+	secondAccount := models.Account{ID: uuid.New(), UserID: testUserID, Name: "Broker B"}
+	otherUserID := uuid.New()
+	otherAccount := models.Account{ID: uuid.New(), UserID: otherUserID, Name: "Other Broker"}
+	if err := db.Create(&[]models.Account{firstAccount, secondAccount, otherAccount}).Error; err != nil {
+		t.Fatal(err)
+	}
+	firstHolding := models.Holding{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		AccountID: firstAccount.ID, AssetId: "stocks", Symbol: "AAA",
+	}
+	secondHolding := models.Holding{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		AccountID: secondAccount.ID, AssetId: "funds", Symbol: "BBB",
+	}
+	otherHolding := models.Holding{
+		ID: uuid.New(), UserID: otherUserID, PortfolioID: uuid.New(),
+		AccountID: otherAccount.ID, AssetId: "stocks", Symbol: "PRIVATE",
+	}
+	if err := db.Create(&[]models.Holding{firstHolding, secondHolding, otherHolding}).Error; err != nil {
+		t.Fatal(err)
+	}
+	lot := models.HoldingLot{
+		ID: uuid.New(), HoldingID: secondHolding.ID,
+		Shares: decimal.NewFromInt(2), Cost: decimal.NewFromInt(100),
+	}
+	if err := db.Create(&lot).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	allCtx := newResourceCtx("GET", "/api/account-holdings", nil)
+	ListAllAccountHoldings(db, testRouter())(context.Background(), allCtx)
+	if allCtx.Response.StatusCode() != 200 {
+		t.Fatalf("list all: expected 200, got %d: %s", allCtx.Response.StatusCode(), allCtx.Response.Body())
+	}
+	var all []HoldingWithAccount
+	if err := json.Unmarshal(allCtx.Response.Body(), &all); err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected two own holdings, got %+v", all)
+	}
+	for _, holding := range all {
+		if holding.Symbol == "PRIVATE" || holding.AccountName == "" {
+			t.Fatalf("unexpected ownership/account enrichment result: %+v", all)
+		}
+	}
+
+	filterCtx := newResourceCtx("GET", "/api/account-holdings?account_id="+secondAccount.ID.String(), nil)
+	ListAllAccountHoldings(db, testRouter())(context.Background(), filterCtx)
+	var filtered []HoldingWithAccount
+	if err := json.Unmarshal(filterCtx.Response.Body(), &filtered); err != nil {
+		t.Fatal(err)
+	}
+	if len(filtered) != 1 || filtered[0].ID != secondHolding.ID || filtered[0].AccountName != "Broker B" || len(filtered[0].Lots) != 1 {
+		t.Fatalf("unexpected filtered holdings: %+v", filtered)
+	}
+}
+
+func TestListAccountHoldings_OwnershipAndLots(t *testing.T) {
+	db := setupTestDB(t)
+	account := models.Account{ID: uuid.New(), UserID: testUserID, Name: "Broker"}
+	otherAccount := models.Account{ID: uuid.New(), UserID: uuid.New(), Name: "Other"}
+	if err := db.Create(&[]models.Account{account, otherAccount}).Error; err != nil {
+		t.Fatal(err)
+	}
+	holding := models.Holding{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		AccountID: account.ID, AssetId: "stocks", Symbol: "LOTS",
+	}
+	if err := db.Create(&holding).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.HoldingLot{ID: uuid.New(), HoldingID: holding.ID, Shares: decimal.NewFromInt(3)}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newResourceCtx("GET", "/api/accounts/"+account.ID.String()+"/holdings", nil)
+	c.Params = param.Params{{Key: "id", Value: account.ID.String()}}
+	ListAccountHoldings(db, testRouter())(context.Background(), c)
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("own account: expected 200, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var result []struct {
+		models.Holding
+		Lots []models.HoldingLot `json:"lots"`
+	}
+	if err := json.Unmarshal(c.Response.Body(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 1 || result[0].ID != holding.ID || len(result[0].Lots) != 1 {
+		t.Fatalf("unexpected account holdings: %+v", result)
+	}
+
+	otherCtx := newResourceCtx("GET", "/api/accounts/"+otherAccount.ID.String()+"/holdings", nil)
+	otherCtx.Params = param.Params{{Key: "id", Value: otherAccount.ID.String()}}
+	ListAccountHoldings(db, testRouter())(context.Background(), otherCtx)
+	if otherCtx.Response.StatusCode() != 404 {
+		t.Fatalf("other user's account: expected 404, got %d", otherCtx.Response.StatusCode())
+	}
+}
+
 func TestPortfolios_CRUDAndOwnership(t *testing.T) {
 	db := setupTestDB(t)
 	other := models.Portfolio{ID: uuid.New(), UserID: uuid.New(), Name: "Other"}

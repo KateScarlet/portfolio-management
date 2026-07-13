@@ -380,7 +380,18 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			}
 			dividend.FundTxID = fundTxID
 			dividend.Note = input.Note
-			return tx.Save(&dividend).Error
+			if err := tx.Save(&dividend).Error; err != nil {
+				return err
+			}
+			// GORM may omit nil pointer fields when saving the struct. Explicitly
+			// clear the old reinvestment lot reference when converting to cash.
+			if input.Type == DividendTypeCash {
+				if err := tx.Model(&dividend).Update("holding_lot_id", nil).Error; err != nil {
+					return err
+				}
+				dividend.HoldingLotID = nil
+			}
+			return nil
 		})
 		if err != nil {
 			writeDividendError(c, err)

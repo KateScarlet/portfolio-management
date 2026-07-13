@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -117,5 +118,105 @@ func TestHolding_BuyFees(t *testing.T) {
 	}
 	if !BuyFees(lots).Equal(decimal.NewFromInt(8)) {
 		t.Errorf("expected buyFees=8, got %s", BuyFees(lots))
+	}
+	if !SellFees(lots).Equal(decimal.NewFromInt(2)) {
+		t.Errorf("expected sellFees=2, got %s", SellFees(lots))
+	}
+}
+
+func TestHolding_RecalcFromLots_Empty(t *testing.T) {
+	h := &Holding{
+		Shares: decimal.NewFromInt(10), Value: decimal.NewFromInt(100),
+		Cost: decimal.NewFromInt(80), CostPrice: decimal.NewFromInt(8),
+	}
+	RecalcFromLots(h, nil)
+	if !h.Shares.IsZero() || !h.Value.IsZero() || !h.Cost.IsZero() || !h.CostPrice.IsZero() {
+		t.Fatalf("empty lots should reset calculated fields: %+v", h)
+	}
+}
+
+func TestAssetMapColumn_ScanAndValue(t *testing.T) {
+	var assets AssetMapColumn
+	if err := assets.Scan(nil); err != nil || len(assets) != 0 {
+		t.Fatalf("nil scan: assets=%v err=%v", assets, err)
+	}
+	if err := assets.Scan(`{"stocks":"12.5"}`); err != nil {
+		t.Fatal(err)
+	}
+	if !assets["stocks"].Equal(decimal.RequireFromString("12.5")) {
+		t.Fatalf("unexpected scanned assets: %+v", assets)
+	}
+	if err := assets.Scan([]byte(`{"cash":"7"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if !assets["cash"].Equal(decimal.NewFromInt(7)) {
+		t.Fatalf("unexpected byte scan result: %+v", assets)
+	}
+	if err := assets.Scan(123); err == nil {
+		t.Fatal("unsupported scan type should fail")
+	}
+	if err := assets.Scan("{"); err == nil {
+		t.Fatal("invalid JSON should fail")
+	}
+
+	value, err := (AssetMapColumn{"bonds": decimal.NewFromInt(3)}).Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]decimal.Decimal
+	if err := json.Unmarshal(value.([]byte), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !decoded["bonds"].Equal(decimal.NewFromInt(3)) {
+		t.Fatalf("unexpected serialized assets: %s", value)
+	}
+	nilValue, err := (AssetMapColumn(nil)).Value()
+	if err != nil || nilValue != "{}" {
+		t.Fatalf("nil assets should serialize as {}, got %v, err=%v", nilValue, err)
+	}
+}
+
+func TestHoldingSnapshotColumn_ScanAndValue(t *testing.T) {
+	var snapshots HoldingSnapshotColumn
+	if err := snapshots.Scan(nil); err != nil || len(snapshots) != 0 {
+		t.Fatalf("nil scan: snapshots=%v err=%v", snapshots, err)
+	}
+	payload := `[{"symbol":"AAPL","shares":"2","value":"300"}]`
+	if err := snapshots.Scan(payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshots) != 1 || snapshots[0].Symbol != "AAPL" || !snapshots[0].Shares.Equal(decimal.NewFromInt(2)) {
+		t.Fatalf("unexpected scanned snapshots: %+v", snapshots)
+	}
+	if err := snapshots.Scan([]byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshots.Scan(true); err == nil {
+		t.Fatal("unsupported scan type should fail")
+	}
+	if err := snapshots.Scan("["); err == nil {
+		t.Fatal("invalid JSON should fail")
+	}
+
+	value, err := snapshots.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []HoldingSnapshot
+	if err := json.Unmarshal(value.([]byte), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded) != 1 || decoded[0].Symbol != "AAPL" {
+		t.Fatalf("unexpected serialized snapshots: %s", value)
+	}
+	nilValue, err := (HoldingSnapshotColumn(nil)).Value()
+	if err != nil || nilValue != "[]" {
+		t.Fatalf("nil snapshots should serialize as [], got %v, err=%v", nilValue, err)
+	}
+}
+
+func TestDividendTableName(t *testing.T) {
+	if got := (Dividend{}).TableName(); got != "dividend_events" {
+		t.Fatalf("expected dividend_events, got %q", got)
 	}
 }

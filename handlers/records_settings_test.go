@@ -384,6 +384,137 @@ func TestTransferOut_Success(t *testing.T) {
 	}
 }
 
+func TestTransferBetween_SuccessAndTransactionHistory(t *testing.T) {
+	db := setupTestDB(t)
+	targetPortfolioID := uuid.New()
+	if err := db.Create(&models.Portfolio{
+		ID: targetPortfolioID, UserID: testUserID, Name: "Target",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.AvailableFund{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: decimal.NewFromInt(1000),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("POST", "/api/funds/transfer-between", map[string]any{
+		"currency": "USD", "amount": 250,
+		"targetPortfolioId": targetPortfolioID.String(), "note": "rebalance",
+	})
+	TransferBetween(db)(context.Background(), c)
+	if c.Response.StatusCode() != 201 {
+		t.Fatalf("expected 201, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+
+	assertFundAmount := func(portfolioID uuid.UUID, want decimal.Decimal) {
+		t.Helper()
+		var fund models.AvailableFund
+		if err := db.Where("portfolio_id = ? AND currency = ?", portfolioID, "USD").First(&fund).Error; err != nil {
+			t.Fatal(err)
+		}
+		if !fund.Amount.Equal(want) {
+			t.Fatalf("portfolio %s: expected %s USD, got %s", portfolioID, want, fund.Amount)
+		}
+	}
+	assertFundAmount(testPortfolioID, decimal.NewFromInt(750))
+	assertFundAmount(targetPortfolioID, decimal.NewFromInt(250))
+
+	listCtx := newUserCtx("GET", "/api/funds/transactions?type=transfer_out", nil)
+	ListFundTransactions(db)(context.Background(), listCtx)
+	if listCtx.Response.StatusCode() != 200 {
+		t.Fatalf("list: expected 200, got %d: %s", listCtx.Response.StatusCode(), listCtx.Response.Body())
+	}
+	var transactions []models.FundTransaction
+	if err := json.Unmarshal(listCtx.Response.Body(), &transactions); err != nil {
+		t.Fatal(err)
+	}
+	if len(transactions) != 1 || transactions[0].Type != "transfer_out" ||
+		transactions[0].TargetPortfolioID == nil || *transactions[0].TargetPortfolioID != targetPortfolioID ||
+		transactions[0].Note != "rebalance" {
+		t.Fatalf("unexpected source transaction history: %+v", transactions)
+	}
+
+	var targetTx models.FundTransaction
+	if err := db.Where("portfolio_id = ? AND type = ?", targetPortfolioID, "transfer_in").First(&targetTx).Error; err != nil {
+		t.Fatal(err)
+	}
+	if targetTx.TargetPortfolioID == nil || *targetTx.TargetPortfolioID != testPortfolioID || !targetTx.Amount.Equal(decimal.NewFromInt(250)) {
+		t.Fatalf("unexpected target transaction: %+v", targetTx)
+	}
+}
+
+func TestTransferBetween_InsufficientFundsRollsBack(t *testing.T) {
+	db := setupTestDB(t)
+	targetPortfolioID := uuid.New()
+	if err := db.Create(&models.Portfolio{
+		ID: targetPortfolioID, UserID: testUserID, Name: "Target",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.AvailableFund{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "CNY", Amount: decimal.NewFromInt(100),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("POST", "/api/funds/transfer-between", map[string]any{
+		"currency": "CNY", "amount": 200, "targetPortfolioId": targetPortfolioID.String(),
+	})
+	TransferBetween(db)(context.Background(), c)
+	if c.Response.StatusCode() != 400 {
+		t.Fatalf("expected 400, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+
+	var source models.AvailableFund
+	if err := db.Where("portfolio_id = ? AND currency = ?", testPortfolioID, "CNY").First(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !source.Amount.Equal(decimal.NewFromInt(100)) {
+		t.Fatalf("expected source balance unchanged, got %s", source.Amount)
+	}
+	var targetFunds, transactionCount int64
+	db.Model(&models.AvailableFund{}).Where("portfolio_id = ?", targetPortfolioID).Count(&targetFunds)
+	db.Model(&models.FundTransaction{}).Where("portfolio_id IN ?", []uuid.UUID{testPortfolioID, targetPortfolioID}).Count(&transactionCount)
+	if targetFunds != 0 || transactionCount != 0 {
+		t.Fatalf("expected complete rollback, target funds=%d transactions=%d", targetFunds, transactionCount)
+	}
+}
+
+func TestTransferBetween_ValidatesTargetOwnership(t *testing.T) {
+	db := setupTestDB(t)
+	otherPortfolioID := uuid.New()
+	if err := db.Create(&models.Portfolio{
+		ID: otherPortfolioID, UserID: uuid.New(), Name: "Other user's portfolio",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name   string
+		target string
+		want   int
+	}{
+		{name: "missing target", target: "", want: 400},
+		{name: "malformed target", target: "not-a-uuid", want: 400},
+		{name: "same portfolio", target: testPortfolioID.String(), want: 400},
+		{name: "other user's portfolio", target: otherPortfolioID.String(), want: 403},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newUserCtx("POST", "/api/funds/transfer-between", map[string]any{
+				"currency": "USD", "amount": 1, "targetPortfolioId": tt.target,
+			})
+			TransferBetween(db)(context.Background(), c)
+			if c.Response.StatusCode() != tt.want {
+				t.Fatalf("expected %d, got %d: %s", tt.want, c.Response.StatusCode(), c.Response.Body())
+			}
+		})
+	}
+}
+
 func TestTransferIn_MissingCurrency(t *testing.T) {
 	db := setupTestDB(t)
 
