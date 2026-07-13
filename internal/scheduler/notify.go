@@ -1,10 +1,10 @@
 package scheduler
 
 import (
-	"fmt"
 	"log/slog"
 	"maps"
 	"portfolio-management/internal/marketsource"
+	"portfolio-management/internal/notifications"
 	"portfolio-management/internal/notifications/bark"
 	"portfolio-management/internal/notifications/telegram"
 	"portfolio-management/models"
@@ -17,145 +17,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type cachedTelegram struct {
-	client *telegram.Client
-	token  string
-	chatID string
-}
-
-type cachedBark struct {
-	client    *bark.Client
-	deviceKey string
-	serverURL string
-}
-
 type Notifier struct {
 	db              *gorm.DB
 	router          *marketsource.Router
 	mu              sync.RWMutex
-	prevPrices      map[uuid.UUID]map[string]decimal.Decimal
-	lastDriftAlert  map[uuid.UUID]time.Time
-	lastSummaryTime map[uuid.UUID]time.Time
-	telegramClients map[uuid.UUID]*cachedTelegram
-	barkClients     map[uuid.UUID]*cachedBark
+	prevPrices      map[string]map[string]decimal.Decimal
+	lastDriftAlert  map[string]time.Time
+	lastSummaryTime map[string]time.Time
+	channels        []notifications.Channel
 }
 
 func NewNotifier(db *gorm.DB, router *marketsource.Router) *Notifier {
-	return &Notifier{
+	n := &Notifier{
 		db:              db,
 		router:          router,
-		prevPrices:      make(map[uuid.UUID]map[string]decimal.Decimal),
-		lastDriftAlert:  make(map[uuid.UUID]time.Time),
-		lastSummaryTime: make(map[uuid.UUID]time.Time),
-		telegramClients: make(map[uuid.UUID]*cachedTelegram),
-		barkClients:     make(map[uuid.UUID]*cachedBark),
+		prevPrices:      make(map[string]map[string]decimal.Decimal),
+		lastDriftAlert:  make(map[string]time.Time),
+		lastSummaryTime: make(map[string]time.Time),
 	}
-}
-
-func (n *Notifier) loadPortfolioSettings(portfolioID uuid.UUID) map[string]string {
-	var settings []models.Setting
-	if err := n.db.Where("portfolio_id = ?", portfolioID).Find(&settings).Error; err != nil {
-		slog.Error("failed to load portfolio settings", "portfolioId", portfolioID, "error", err)
+	n.channels = []notifications.Channel{
+		telegram.NewChannel(db),
+		bark.NewChannel(db),
 	}
-	result := make(map[string]string, len(settings))
-	for i := range settings {
-		result[settings[i].Key] = settings[i].Value
-	}
-	return result
-}
-
-func (n *Notifier) loadUserTelegramConfig(userID uuid.UUID) (token, chatID, enabled string) {
-	var settings []models.Setting
-	if err := n.db.Where(`user_id = ? AND "key" IN ('telegramBotToken', 'telegramChatID', 'telegramEnabled')`, userID).Find(&settings).Error; err != nil {
-		slog.Error("failed to load user telegram config", "userId", userID, "error", err)
-	}
-	for _, s := range settings {
-		switch s.Key {
-		case "telegramBotToken":
-			token = s.Value
-		case "telegramChatID":
-			chatID = s.Value
-		case "telegramEnabled":
-			enabled = s.Value
-		}
-	}
-	return
-}
-
-func (n *Notifier) LoadTelegramConfig(userID uuid.UUID) (*telegram.Client, error) {
-	token, chatID, enabled := n.loadUserTelegramConfig(userID)
-
-	if enabled != "true" || token == "" || chatID == "" {
-		n.mu.Lock()
-		delete(n.telegramClients, userID)
-		n.mu.Unlock()
-		return nil, nil
-	}
-
-	n.mu.RLock()
-	cached, ok := n.telegramClients[userID]
-	n.mu.RUnlock()
-	if ok && cached.token == token && cached.chatID == chatID {
-		return cached.client, nil
-	}
-
-	client, err := telegram.NewClient(token, chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	n.mu.Lock()
-	n.telegramClients[userID] = &cachedTelegram{client: client, token: token, chatID: chatID}
-	n.mu.Unlock()
-
-	return client, nil
-}
-
-func (n *Notifier) loadUserBarkConfig(userID uuid.UUID) (deviceKey, serverURL, enabled string) {
-	var settings []models.Setting
-	if err := n.db.Where(`user_id = ? AND "key" IN ('barkDeviceKey', 'barkServerURL', 'barkEnabled')`, userID).Find(&settings).Error; err != nil {
-		slog.Error("failed to load user bark config", "userId", userID, "error", err)
-	}
-	for _, s := range settings {
-		switch s.Key {
-		case "barkDeviceKey":
-			deviceKey = s.Value
-		case "barkServerURL":
-			serverURL = s.Value
-		case "barkEnabled":
-			enabled = s.Value
-		}
-	}
-	return
-}
-
-func (n *Notifier) LoadBarkConfig(userID uuid.UUID) (*bark.Client, error) {
-	deviceKey, serverURL, enabled := n.loadUserBarkConfig(userID)
-
-	if enabled != "true" || deviceKey == "" {
-		n.mu.Lock()
-		delete(n.barkClients, userID)
-		n.mu.Unlock()
-		return nil, nil
-	}
-
-	n.mu.RLock()
-	cached, ok := n.barkClients[userID]
-	n.mu.RUnlock()
-	if ok && cached.deviceKey == deviceKey && cached.serverURL == serverURL {
-		return cached.client, nil
-	}
-
-	client, err := bark.NewClient(deviceKey, serverURL)
-	if err != nil {
-		return nil, err
-	}
-
-	n.mu.Lock()
-	n.barkClients[userID] = &cachedBark{client: client, deviceKey: deviceKey, serverURL: serverURL}
-	n.mu.Unlock()
-
-	return client, nil
+	return n
 }
 
 func (n *Notifier) loadPortfolioName(portfolioID uuid.UUID) string {
@@ -168,49 +52,34 @@ func (n *Notifier) loadPortfolioName(portfolioID uuid.UUID) string {
 }
 
 func (n *Notifier) NotifyAfterSync(userID, portfolioID uuid.UUID, holdings []models.Holding, syncedSymbols map[string]decimal.Decimal) {
-	tgClient, _ := n.LoadTelegramConfig(userID)
-	barkClient, _ := n.LoadBarkConfig(userID)
-
-	if tgClient == nil && barkClient == nil {
+	var activeChannels []notifications.Channel
+	for _, ch := range n.channels {
+		if ch.IsEnabled(userID, portfolioID, n.db) {
+			activeChannels = append(activeChannels, ch)
+		}
+	}
+	if len(activeChannels) == 0 {
 		return
 	}
 
 	portfolioName := n.loadPortfolioName(portfolioID)
-	n.checkPriceAlert(userID, portfolioID, portfolioName, tgClient, barkClient, holdings, syncedSymbols)
-	n.checkDriftAlert(userID, portfolioID, portfolioName, tgClient, barkClient)
-	n.checkSummary(userID, portfolioID, portfolioName, tgClient, barkClient, holdings)
+	n.checkPriceAlert(userID, portfolioID, portfolioName, activeChannels, holdings, syncedSymbols)
+	n.checkDriftAlert(userID, portfolioID, portfolioName, activeChannels)
+	n.checkSummary(userID, portfolioID, portfolioName, activeChannels, holdings)
 }
 
-func (n *Notifier) checkPriceAlert(userID, portfolioID uuid.UUID, portfolioName string, tgClient *telegram.Client, barkClient *bark.Client, holdings []models.Holding, syncedPrices map[string]decimal.Decimal) {
-	settings := n.loadPortfolioSettings(portfolioID)
+func (n *Notifier) checkPriceAlert(userID, portfolioID uuid.UUID, portfolioName string, channels []notifications.Channel, holdings []models.Holding, syncedPrices map[string]decimal.Decimal) {
+	settings := notifications.LoadPortfolioSettings(n.db, portfolioID)
+	threshold := notifications.ParseThreshold(settings, "telegramPriceThreshold", "barkPriceThreshold")
 
-	tgEnabled := tgClient != nil && settings["telegramPriceAlert"] == "true"
-	barkEnabled := barkClient != nil && settings["barkPriceAlert"] == "true"
-
-	if !tgEnabled && !barkEnabled {
-		return
-	}
-
-	threshold := decimal.NewFromInt(5)
-	if v := settings["telegramPriceThreshold"]; v != "" {
-		if t, err := decimal.NewFromString(v); err == nil {
-			threshold = t
-		}
-	}
-	if v := settings["barkPriceThreshold"]; v != "" {
-		if t, err := decimal.NewFromString(v); err == nil {
-			threshold = t
-		}
-	}
-
+	key := notifications.StateKey(userID, portfolioID)
 	n.mu.Lock()
-	if n.prevPrices[userID] == nil {
-		n.prevPrices[userID] = make(map[string]decimal.Decimal)
+	if n.prevPrices[key] == nil {
+		n.prevPrices[key] = make(map[string]decimal.Decimal)
 	}
-	oldPrices := n.prevPrices[userID]
+	oldPrices := n.prevPrices[key]
 
-	var tgAlerts []string
-	var barkAlerts []string
+	var alerts []notifications.PriceAlert
 	for symbol, newPrice := range syncedPrices {
 		oldPrice, ok := oldPrices[symbol]
 		if !ok || oldPrice.IsZero() {
@@ -226,20 +95,13 @@ func (n *Notifier) checkPriceAlert(userID, portfolioID uuid.UUID, portfolioName 
 					if changePct.IsNegative() {
 						arrow = "📉"
 					}
-					if tgEnabled {
-						tgAlerts = append(tgAlerts, fmt.Sprintf(
-							"%s <b>%s</b> (%s)\n当前价: ¥%s | 涨跌: %s%%",
-							arrow, h.Name, h.Symbol,
-							newPrice.StringFixed(2), changePct.StringFixed(1),
-						))
-					}
-					if barkEnabled {
-						barkAlerts = append(barkAlerts, fmt.Sprintf(
-							"%s %s (%s)\n当前价: ¥%s | 涨跌: %s%%",
-							arrow, h.Name, h.Symbol,
-							newPrice.StringFixed(2), changePct.StringFixed(1),
-						))
-					}
+					alerts = append(alerts, notifications.PriceAlert{
+						Arrow:     arrow,
+						Name:      h.Name,
+						Symbol:    h.Symbol,
+						Price:     newPrice.StringFixed(2),
+						ChangePct: changePct.StringFixed(1),
+					})
 					break
 				}
 			}
@@ -249,57 +111,30 @@ func (n *Notifier) checkPriceAlert(userID, portfolioID uuid.UUID, portfolioName 
 	maps.Copy(oldPrices, syncedPrices)
 	n.mu.Unlock()
 
-	if len(tgAlerts) > 0 && tgClient != nil {
-		title := "⚠️ <b>价格波动提醒</b>"
-		if portfolioName != "" {
-			title += " — <i>" + portfolioName + "</i>"
-		}
-		msg := title + "\n\n" + strings.Join(tgAlerts, "\n\n")
-		if err := tgClient.SendMessage(msg); err != nil {
-			slog.Error("failed to send price alert via telegram", "userId", userID, "portfolioId", portfolioID, "error", err)
-		} else {
-			slog.Info("sent price alert via telegram", "userId", userID, "portfolioId", portfolioID, "count", len(tgAlerts))
-		}
+	if len(alerts) == 0 {
+		return
 	}
 
-	if len(barkAlerts) > 0 && barkClient != nil {
-		msg := strings.Join(barkAlerts, "\n\n")
-		barkTitle := "价格波动提醒"
-		if portfolioName != "" {
-			barkTitle += " — " + portfolioName
-		}
-		if err := barkClient.SendNotification(barkTitle, msg, "价格告警"); err != nil {
-			slog.Error("failed to send price alert via bark", "userId", userID, "portfolioId", portfolioID, "error", err)
-		} else {
-			slog.Info("sent price alert via bark", "userId", userID, "portfolioId", portfolioID, "count", len(barkAlerts))
+	for _, ch := range channels {
+		if err := ch.SendPriceAlert(userID, portfolioID, portfolioName, alerts, n.db); err != nil {
+			slog.Error("failed to send price alert", "channel", ch.Name(), "userId", userID, "portfolioId", portfolioID, "error", err)
 		}
 	}
 }
 
-func (n *Notifier) checkDriftAlert(userID, portfolioID uuid.UUID, portfolioName string, tgClient *telegram.Client, barkClient *bark.Client) {
-	settings := n.loadPortfolioSettings(portfolioID)
+func (n *Notifier) checkDriftAlert(userID, portfolioID uuid.UUID, portfolioName string, channels []notifications.Channel) {
+	settings := notifications.LoadPortfolioSettings(n.db, portfolioID)
 
-	tgEnabled := tgClient != nil && settings["telegramDriftAlert"] == "true"
-	barkEnabled := barkClient != nil && settings["barkDriftAlert"] == "true"
-
-	if !tgEnabled && !barkEnabled {
-		return
-	}
-
+	key := notifications.StateKey(userID, portfolioID)
 	n.mu.RLock()
-	lastAlert, exists := n.lastDriftAlert[userID]
+	lastAlert, exists := n.lastDriftAlert[key]
 	n.mu.RUnlock()
 
 	if exists && time.Since(lastAlert) < 24*time.Hour {
 		return
 	}
 
-	driftThreshold := decimal.NewFromInt(5)
-	if v := settings["driftThreshold"]; v != "" {
-		if t, err := decimal.NewFromString(v); err == nil {
-			driftThreshold = t
-		}
-	}
+	driftThreshold := notifications.ParseThreshold(settings, "driftThreshold")
 
 	var holdings []models.Holding
 	if err := n.db.Where("portfolio_id = ?", portfolioID).Find(&holdings).Error; err != nil {
@@ -374,8 +209,6 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID uuid.UUID, portfolioName 
 		}
 	}
 
-	var tgAlerts []string
-	var barkAlerts []string
 	assetNames := map[string]string{
 		"stocks":      "股票",
 		"bonds":       "债券",
@@ -383,106 +216,55 @@ func (n *Notifier) checkDriftAlert(userID, portfolioID uuid.UUID, portfolioName 
 		"commodities": "商品",
 	}
 
+	var alerts []notifications.DriftAlert
 	for id, value := range assets {
 		pct := value.Div(total).Mul(decimal.NewFromInt(100))
 		diff := pct.Sub(targetPcts[id])
 		if diff.GreaterThan(driftThreshold) || diff.LessThan(driftThreshold.Neg()) {
-			if tgEnabled {
-				tgAlerts = append(tgAlerts, fmt.Sprintf(
-					"<b>%s</b>: %s%% (目标 %s%%, 偏离 %s%%)",
-					assetNames[id], pct.StringFixed(1), targetPcts[id].StringFixed(0), diff.StringFixed(1),
-				))
-			}
-			if barkEnabled {
-				barkAlerts = append(barkAlerts, fmt.Sprintf(
-					"%s: %s%% (目标 %s%%, 偏离 %s%%)",
-					assetNames[id], pct.StringFixed(1), targetPcts[id].StringFixed(0), diff.StringFixed(1),
-				))
-			}
+			alerts = append(alerts, notifications.DriftAlert{
+				AssetName: assetNames[id],
+				Pct:       pct.StringFixed(1),
+				Target:    targetPcts[id].StringFixed(0),
+				Diff:      diff.StringFixed(1),
+			})
 		}
 	}
 
-	if len(tgAlerts) > 0 && tgClient != nil {
-		title := "⚠️ <b>配比偏离提醒</b>"
-		if portfolioName != "" {
-			title += " — <i>" + portfolioName + "</i>"
-		}
-		msg := title + "\n\n当前资产配置:\n" + strings.Join(tgAlerts, "\n")
-		if err := tgClient.SendMessage(msg); err != nil {
-			slog.Error("failed to send drift alert via telegram", "userId", userID, "portfolioId", portfolioID, "error", err)
-		} else {
-			n.mu.Lock()
-			n.lastDriftAlert[userID] = time.Now()
-			n.mu.Unlock()
-			slog.Info("sent drift alert via telegram", "userId", userID, "portfolioId", portfolioID, "count", len(tgAlerts))
-		}
-	}
-
-	if len(barkAlerts) > 0 && barkClient != nil {
-		msg := "当前资产配置:\n" + strings.Join(barkAlerts, "\n")
-		barkTitle := "配比偏离提醒"
-		if portfolioName != "" {
-			barkTitle += " — " + portfolioName
-		}
-		if err := barkClient.SendNotification(barkTitle, msg, "配比偏离"); err != nil {
-			slog.Error("failed to send drift alert via bark", "userId", userID, "portfolioId", portfolioID, "error", err)
-		} else {
-			n.mu.Lock()
-			n.lastDriftAlert[userID] = time.Now()
-			n.mu.Unlock()
-			slog.Info("sent drift alert via bark", "userId", userID, "portfolioId", portfolioID, "count", len(barkAlerts))
-		}
-	}
-}
-
-func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName string, tgClient *telegram.Client, barkClient *bark.Client, holdings []models.Holding) {
-	settings := n.loadPortfolioSettings(portfolioID)
-
-	tgEnabled := tgClient != nil && settings["telegramSummary"] == "true"
-	barkEnabled := barkClient != nil && settings["barkSummary"] == "true"
-
-	if !tgEnabled && !barkEnabled {
+	if len(alerts) == 0 {
 		return
 	}
 
-	tgInterval := settings["telegramSummaryInterval"]
-	barkInterval := settings["barkSummaryInterval"]
+	sent := false
+	for _, ch := range channels {
+		if err := ch.SendDriftAlert(userID, portfolioID, portfolioName, alerts, n.db); err != nil {
+			slog.Error("failed to send drift alert", "channel", ch.Name(), "userId", userID, "portfolioId", portfolioID, "error", err)
+		} else {
+			sent = true
+		}
+	}
 
-	tgShouldSend := false
-	barkShouldSend := false
+	if sent {
+		n.mu.Lock()
+		n.lastDriftAlert[key] = time.Now()
+		n.mu.Unlock()
+	}
+}
+
+func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName string, channels []notifications.Channel, holdings []models.Holding) {
 	now := time.Now()
+	key := notifications.StateKey(userID, portfolioID)
 
 	n.mu.RLock()
-	lastTime, exists := n.lastSummaryTime[userID]
+	lastTime := n.lastSummaryTime[key]
 	n.mu.RUnlock()
 
-	if tgEnabled {
-		switch tgInterval {
-		case "daily":
-			if !exists || now.Sub(lastTime) >= 24*time.Hour {
-				tgShouldSend = true
-			}
-		case "weekly":
-			if !exists || now.Sub(lastTime) >= 7*24*time.Hour {
-				tgShouldSend = true
-			}
+	var shouldSendChannels []notifications.Channel
+	for _, ch := range channels {
+		if ch.ShouldSendSummary(userID, portfolioID, lastTime, now, n.db) {
+			shouldSendChannels = append(shouldSendChannels, ch)
 		}
 	}
-
-	if barkEnabled {
-		switch barkInterval {
-		case "daily":
-			if !exists || now.Sub(lastTime) >= 24*time.Hour {
-				barkShouldSend = true
-			}
-		case "weekly":
-			if !exists || now.Sub(lastTime) >= 7*24*time.Hour {
-				barkShouldSend = true
-			}
-		}
-	}
-
-	if !tgShouldSend && !barkShouldSend {
+	if len(shouldSendChannels) == 0 {
 		return
 	}
 
@@ -560,58 +342,42 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 		"commodities": "商品",
 	}
 
-	tgLines := []string{
-		fmt.Sprintf("📊 <b>投资组合摘要</b> — %s — %s", portfolioName, now.Format("2006-01-02")),
-		"",
-		fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
-		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
-	}
-	barkLines := []string{
-		fmt.Sprintf("📊 投资组合摘要 — %s — %s", portfolioName, now.Format("2006-01-02")),
-		"",
-		fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
-		fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
-	}
-	if principal.IsPositive() {
-		pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
-		tgLines = append(tgLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(2)))
-		barkLines = append(barkLines, fmt.Sprintf("累计收益: %s%%", pnl.StringFixed(2)))
-	}
-	tgLines = append(tgLines, "")
-	barkLines = append(barkLines, "")
-
+	summaryAssets := make([]notifications.SummaryAsset, 0, 4)
 	for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
 		pct := decimal.Zero
 		if total.IsPositive() {
 			pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 		}
-		tgLines = append(tgLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
-		barkLines = append(barkLines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
+		summaryAssets = append(summaryAssets, notifications.SummaryAsset{
+			Name:  assetNames[id],
+			Pct:   pct.StringFixed(1),
+			Value: assets[id].StringFixed(2),
+		})
 	}
 
-	if tgShouldSend && tgClient != nil {
-		if err := tgClient.SendMessage(strings.Join(tgLines, "\n")); err != nil {
-			slog.Error("failed to send portfolio summary via telegram", "userId", userID, "portfolioId", portfolioID, "error", err)
+	data := notifications.SummaryData{
+		Total:     total.StringFixed(2),
+		Principal: principal.StringFixed(2),
+		Date:      now.Format("2006-01-02"),
+		Assets:    summaryAssets,
+	}
+	if principal.IsPositive() {
+		pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
+		data.PnL = pnl.StringFixed(2)
+	}
+
+	sent := false
+	for _, ch := range shouldSendChannels {
+		if err := ch.SendSummary(userID, portfolioID, portfolioName, data, n.db); err != nil {
+			slog.Error("failed to send summary", "channel", ch.Name(), "userId", userID, "portfolioId", portfolioID, "error", err)
 		} else {
-			n.mu.Lock()
-			n.lastSummaryTime[userID] = now
-			n.mu.Unlock()
-			slog.Info("sent portfolio summary via telegram", "userId", userID, "portfolioId", portfolioID)
+			sent = true
 		}
 	}
 
-	if barkShouldSend && barkClient != nil {
-		barkTitle := "投资组合摘要"
-		if portfolioName != "" {
-			barkTitle += " — " + portfolioName
-		}
-		if err := barkClient.SendNotification(barkTitle, strings.Join(barkLines, "\n"), "组合摘要"); err != nil {
-			slog.Error("failed to send portfolio summary via bark", "userId", userID, "portfolioId", portfolioID, "error", err)
-		} else {
-			n.mu.Lock()
-			n.lastSummaryTime[userID] = now
-			n.mu.Unlock()
-			slog.Info("sent portfolio summary via bark", "userId", userID, "portfolioId", portfolioID)
-		}
+	if sent {
+		n.mu.Lock()
+		n.lastSummaryTime[key] = now
+		n.mu.Unlock()
 	}
 }
