@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"os"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
@@ -26,19 +28,66 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if dsn == "" {
 		dsn = "postgres://localhost:5432/portfolio_test?sslmode=disable"
 	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Dividend{}); err != nil {
+	adminSQLDB, err := adminDB.DB()
+	if err != nil {
 		t.Fatal(err)
 	}
-	db.Create(&models.Portfolio{
+
+	schema := "test_" + uuid.NewString()
+	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA %q`, schema)).Error; err != nil {
+		adminSQLDB.Close() //nolint:errcheck // best effort after setup failure
+		t.Fatal(err)
+	}
+
+	testURL, err := url.Parse(dsn)
+	if err != nil {
+		adminDB.Exec(fmt.Sprintf(`DROP SCHEMA %q CASCADE`, schema)) //nolint:errcheck // best effort after setup failure
+		adminSQLDB.Close()                                          //nolint:errcheck // best effort after setup failure
+		t.Fatal(err)
+	}
+	query := testURL.Query()
+	query.Set("search_path", schema)
+	testURL.RawQuery = query.Encode()
+
+	db, err := gorm.Open(postgres.Open(testURL.String()), &gorm.Config{})
+	if err != nil {
+		adminDB.Exec(fmt.Sprintf(`DROP SCHEMA %q CASCADE`, schema)) //nolint:errcheck // best effort after setup failure
+		adminSQLDB.Close()                                          //nolint:errcheck // best effort after setup failure
+		t.Fatal(err)
+	}
+	testSQLDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		testSQLDB.Close() //nolint:errcheck // test cleanup
+		adminDB.Exec(fmt.Sprintf(`DROP SCHEMA %q CASCADE`, schema))
+		adminSQLDB.Close() //nolint:errcheck // test cleanup
+	})
+
+	if err := db.AutoMigrate(
+		&models.Portfolio{}, &models.Account{}, &models.Holding{}, &models.HoldingLot{},
+		&models.Setting{}, &models.PortfolioRecord{}, &models.AvailableFund{},
+		&models.FundTransaction{}, &models.User{}, &models.WebAuthnCredential{},
+		&models.WebAuthnSession{}, &models.Dividend{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE UNIQUE INDEX idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.Portfolio{
 		ID:        testPortfolioID,
 		UserID:    testUserID,
 		Name:      "默认组合",
 		IsDefault: true,
-	})
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
 	return db
 }
 
@@ -72,11 +121,11 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		HoldingID: id,
 		Date:      time.UnixMilli(1000000),
 		Shares:    dShares,
-		CostPrice: dCost.Div(dShares),
 		Cost:      dCost,
 		Fee:       decimal.Zero,
 	}
 	if shares > 0 {
+		lot.CostPrice = dCost.Div(dShares)
 		lot.ValueAdded = dShares.Mul(dPrice)
 	} else {
 		lot.ValueAdded = dPrice

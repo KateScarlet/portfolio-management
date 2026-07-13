@@ -356,10 +356,11 @@ func TestDeleteUser_CannotDeleteSelf(t *testing.T) {
 func TestDeleteUser_NotFound(t *testing.T) {
 	db := setupAuthTestDB(t)
 	adminID := createTestUser(t, db, "admin", "admin")
+	missingID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/users/nonexistent")
+	c.Params = param.Params{{Key: "id", Value: missingID}}
+	c.Request.SetRequestURI("/api/users/" + missingID)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID:   adminID,

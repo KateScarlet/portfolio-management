@@ -176,10 +176,11 @@ func TestDeleteRecord_Success(t *testing.T) {
 
 func TestDeleteRecord_NotFound(t *testing.T) {
 	db := setupRecordsTestDB(t)
+	missingID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 	c := app.NewContext(1)
-	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: "nonexistent"}}
-	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/records/nonexistent")
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: missingID}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/records/" + missingID)
 	c.Request.Header.SetMethod("DELETE")
 	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{
 		UserID: testUserID, Username: "testuser", Role: "user",

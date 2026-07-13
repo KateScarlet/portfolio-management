@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"os"
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/models"
@@ -144,7 +145,8 @@ func TestPriceScheduler_ConcurrentDifferentPortfolios(t *testing.T) {
 	for i := range goroutines {
 		go func(idx int) {
 			defer wg.Done()
-			s.TriggerSyncForPortfolio(uuid.MustParse("00000000-0000-0000-0000-0000000000"+string(rune('A'+idx%26))), uuid.MustParse("00000000-0000-0000-0000-0000000000"+string(rune('A'+idx%26))))
+			id := uuid.MustParse(fmt.Sprintf("00000000-0000-0000-0000-%012d", idx%26+1))
+			s.TriggerSyncForPortfolio(id, id)
 		}(i)
 	}
 
