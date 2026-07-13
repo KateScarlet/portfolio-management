@@ -14,6 +14,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -21,9 +22,10 @@ import (
 func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			DeviceKey string `json:"deviceKey"`
-			ServerURL string `json:"serverURL"`
-			Type      string `json:"type"` // connection, price, drift, summary
+			DeviceKey   string `json:"deviceKey"`
+			ServerURL   string `json:"serverURL"`
+			Type        string `json:"type"` // connection, price, drift, summary
+			PortfolioID string `json:"portfolioId"`
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -57,8 +59,19 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 				return
 			}
 
+			portfolioID, err := uuid.Parse(body.PortfolioID)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+				return
+			}
+			owned, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+			if err != nil || !owned {
+				c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问该组合"})
+				return
+			}
+
 			var holdings []models.Holding
-			if err := db.Where("user_id = ?", user.UserID).Limit(5).Find(&holdings).Error; err != nil {
+			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Limit(5).Find(&holdings).Error; err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
 				return
 			}
@@ -88,9 +101,15 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 				return
 			}
 
+			portfolioID, err := uuid.Parse(body.PortfolioID)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+				return
+			}
+
 			var portfolio models.Portfolio
-			if err := db.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&portfolio).Error; err != nil {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "未找到默认组合"})
+			if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
+				c.JSON(consts.StatusNotFound, map[string]string{"error": "组合不存在"})
 				return
 			}
 
@@ -190,7 +209,19 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 				c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
 				return
 			}
-			holdings, err := gorm.G[models.Holding](db).Where("user_id = ?", user.UserID).Find(ctx)
+
+			portfolioID, err := uuid.Parse(body.PortfolioID)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的组合ID"})
+				return
+			}
+			owned, err := userOwnsPortfolio(db, user.UserID, portfolioID)
+			if err != nil || !owned {
+				c.JSON(consts.StatusForbidden, map[string]string{"error": "无权访问该组合"})
+				return
+			}
+
+			holdings, err := gorm.G[models.Holding](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(ctx)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
 				return
@@ -205,7 +236,7 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 			}
 
 			var funds []models.AvailableFund
-			if err := db.Where("user_id = ?", user.UserID).Find(&funds).Error; err != nil {
+			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(&funds).Error; err != nil {
 				slog.Error("failed to load available funds for summary test", "error", err)
 			}
 			for _, f := range funds {
@@ -220,7 +251,7 @@ func TestBarkNotification(db *gorm.DB, router *marketsource.Router) app.HandlerF
 				total = total.Add(amt)
 			}
 
-			principal, err := CalcPrincipalByUser(db, user.UserID, "CNY", router)
+			principal, err := CalcPrincipal(db, portfolioID, "CNY", router)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "计算累计投入失败: " + err.Error()})
 				return

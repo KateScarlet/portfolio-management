@@ -280,11 +280,12 @@ export async function testTelegramConnection(
 export async function testTelegramMessage(
   botToken: string,
   chatID: string,
-  type: "price" | "drift" | "summary"
+  type: "price" | "drift" | "summary",
+  portfolioId: string
 ): Promise<{ success: boolean; error?: string }> {
   return request<{ success: boolean; error?: string }>("/api/telegram/test", {
     method: "POST",
-    body: JSON.stringify({ botToken, chatID, type }),
+    body: JSON.stringify({ botToken, chatID, type, portfolioId }),
   })
 }
 
@@ -301,11 +302,12 @@ export async function testBarkConnection(
 export async function testBarkMessage(
   deviceKey: string,
   serverURL: string,
-  type: "price" | "drift" | "summary"
+  type: "price" | "drift" | "summary",
+  portfolioId: string
 ): Promise<{ success: boolean; error?: string }> {
   return request<{ success: boolean; error?: string }>("/api/bark/test", {
     method: "POST",
-    body: JSON.stringify({ deviceKey, serverURL, type }),
+    body: JSON.stringify({ deviceKey, serverURL, type, portfolioId }),
   })
 }
 

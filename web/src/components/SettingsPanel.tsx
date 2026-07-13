@@ -28,6 +28,7 @@ interface SettingsPanelProps {
   settings: Settings
   onSave: (settings: Settings) => void | Promise<void>
   userRole: "admin" | "user"
+  portfolioId: string
 }
 
 const SYNC_PRESETS = [
@@ -62,7 +63,7 @@ const SECTIONS = [
   { id: "security", label: "安全", icon: Shield, adminOnly: true },
 ]
 
-export default function SettingsPanel({ settings, onSave, userRole }: SettingsPanelProps) {
+export default function SettingsPanel({ settings, onSave, userRole, portfolioId }: SettingsPanelProps) {
   const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [activeSection, setActiveSection] = useState("invest")
@@ -206,7 +207,8 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
       const result = await api.testTelegramMessage(
         draft.telegramBotToken,
         draft.telegramChatID,
-        type
+        type,
+        portfolioId
       )
       if (result.success) {
         const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
@@ -256,7 +258,7 @@ export default function SettingsPanel({ settings, onSave, userRole }: SettingsPa
     setBarkTesting(true)
     setBarkTestResult(null)
     try {
-      const result = await api.testBarkMessage(draft.barkDeviceKey, draft.barkServerURL, type)
+      const result = await api.testBarkMessage(draft.barkDeviceKey, draft.barkServerURL, type, portfolioId)
       if (result.success) {
         const labels = { price: "价格告警", drift: "配比偏离", summary: "组合摘要" }
         setBarkTestResult({ success: true, message: `已发送${labels[type]}测试消息` })

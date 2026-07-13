@@ -605,7 +605,7 @@ export default function App() {
           >
             汇总
           </button>
-          <SettingsPanel settings={settings} onSave={handleSaveSettings} userRole={user.role} />
+          <SettingsPanel settings={settings} onSave={handleSaveSettings} userRole={user.role} portfolioId={currentPortfolio.id} />
           {user.role === "admin" && <UserManager />}
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#6C757D]">{user.username}</span>
