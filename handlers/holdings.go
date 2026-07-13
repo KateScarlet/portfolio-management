@@ -768,12 +768,6 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var existingLot models.HoldingLot
-		if err := db.Where("id = ? AND holding_id = ?", lotID, holdingID).First(&existingLot).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "交易记录不存在"})
-			return
-		}
-
 		var input struct {
 			Date       *time.Time       `json:"date"`
 			Shares     *decimal.Decimal `json:"shares"`
@@ -825,12 +819,26 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
+		var holding models.Holding
+		var remainingLots []models.HoldingLot
 		err = db.Transaction(func(tx *gorm.DB) error {
-			// 先记录旧值，计算资金差额
-			var holding models.Holding
-			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
+			// 持仓必须同时属于当前用户和 URL 中的组合，不能只信任持仓 UUID。
+			if err := tx.Where("id = ? AND portfolio_id = ? AND user_id = ?", holdingID, portfolioID, user.UserID).First(&holding).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
+				}
 				return err
 			}
+
+			var existingLot models.HoldingLot
+			if err := tx.Where("id = ? AND holding_id = ?", lotID, holding.ID).First(&existingLot).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "交易记录不存在"}
+				}
+				return err
+			}
+
+			// 先记录旧值，计算资金差额
 			currency := holding.Currency
 			if currency == "" {
 				currency = "CNY"
@@ -901,10 +909,10 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			if err := tx.Model(&models.HoldingLot{}).Where("id = ?", lotID).Updates(updates).Error; err != nil {
+			if err := tx.Model(&models.HoldingLot{}).Where("id = ? AND holding_id = ?", lotID, holding.ID).Updates(updates).Error; err != nil {
 				return err
 			}
-			remainingLots, err := models.LoadLots(tx, holdingID)
+			remainingLots, err = models.LoadLots(tx, holding.ID)
 			if err != nil {
 				return err
 			}
@@ -920,9 +928,6 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		remainingLots, _ := models.LoadLots(db, holdingID)
-		var holding models.Holding
-		db.First(&holding, "id = ?", holdingID)
 		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: remainingLots})
 	}
 }
@@ -962,15 +967,22 @@ func DeleteLot(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		var lot models.HoldingLot
-		if err := db.Where("id = ? AND holding_id = ?", lotID, holdingID).First(&lot).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "交易记录不存在"})
-			return
-		}
-
+		var holding models.Holding
+		var remainingLots []models.HoldingLot
 		err = db.Transaction(func(tx *gorm.DB) error {
-			var holding models.Holding
-			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
+			// 持仓必须同时属于当前用户和 URL 中的组合，不能只信任持仓 UUID。
+			if err := tx.Where("id = ? AND portfolio_id = ? AND user_id = ?", holdingID, portfolioID, user.UserID).First(&holding).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
+				}
+				return err
+			}
+
+			var lot models.HoldingLot
+			if err := tx.Where("id = ? AND holding_id = ?", lotID, holding.ID).First(&lot).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "交易记录不存在"}
+				}
 				return err
 			}
 
@@ -1017,10 +1029,10 @@ func DeleteLot(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
-			if err := models.DeleteLotByID(tx, lotID); err != nil {
+			if err := tx.Where("id = ? AND holding_id = ?", lotID, holding.ID).Delete(&models.HoldingLot{}).Error; err != nil {
 				return err
 			}
-			remainingLots, err := models.LoadLots(tx, holdingID)
+			remainingLots, err = models.LoadLots(tx, holding.ID)
 			if err != nil {
 				return err
 			}
@@ -1036,9 +1048,6 @@ func DeleteLot(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		remainingLots, _ := models.LoadLots(db, holdingID)
-		var holding models.Holding
-		db.First(&holding, "id = ?", holdingID)
 		c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: remainingLots})
 	}
 }

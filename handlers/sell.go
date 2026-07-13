@@ -221,8 +221,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			var he *httpError
-			if errors.As(err, &he) {
+			if he, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(he.status, map[string]string{"error": he.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

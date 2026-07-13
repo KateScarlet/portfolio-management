@@ -572,6 +572,88 @@ func TestDeleteHolding_OtherUserCannotDelete(t *testing.T) {
 	}
 }
 
+func createOtherUserHoldingLot(t *testing.T, db *gorm.DB) (uuid.UUID, uuid.UUID) {
+	t.Helper()
+
+	otherUserID := uuid.New()
+	otherPortfolioID := uuid.New()
+	holdingID := uuid.New()
+	lotID := uuid.New()
+
+	if err := db.Create(&models.Portfolio{
+		ID: otherPortfolioID, UserID: otherUserID, Name: "Other",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.Holding{
+		ID: holdingID, UserID: otherUserID, PortfolioID: otherPortfolioID,
+		AssetId: "stocks", Symbol: "PRIVATE", Name: "Private Holding",
+		Currency: "CNY", Shares: decimal.NewFromInt(10), Price: decimal.NewFromInt(100),
+		Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(900), CostPrice: decimal.NewFromInt(90),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.HoldingLot{
+		ID: lotID, HoldingID: holdingID, Type: "buy", Date: time.Now(),
+		Shares: decimal.NewFromInt(10), CostPrice: decimal.NewFromInt(90),
+		Cost: decimal.NewFromInt(900), ValueAdded: decimal.NewFromInt(1000),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	return holdingID, lotID
+}
+
+func TestUpdateLot_OtherUserCannotUpdate(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	holdingID, lotID := createOtherUserHoldingLot(t, db)
+
+	c := newUserCtx("PATCH", "/api/portfolios/"+testPortfolioID.String()+"/holdings/"+holdingID.String()+"/lots/"+lotID.String(), map[string]any{
+		"cost": "800",
+	})
+	c.Params = append(c.Params,
+		param.Param{Key: "hid", Value: holdingID.String()},
+		param.Param{Key: "lid", Value: lotID.String()},
+	)
+
+	UpdateLot(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 404 {
+		t.Fatalf("expected 404 for another user's holding, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var lot models.HoldingLot
+	if err := db.First(&lot, "id = ?", lotID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !lot.Cost.Equal(decimal.NewFromInt(900)) {
+		t.Fatalf("other user's lot was modified: expected cost 900, got %s", lot.Cost)
+	}
+}
+
+func TestDeleteLot_OtherUserCannotDelete(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	holdingID, lotID := createOtherUserHoldingLot(t, db)
+
+	c := newUserCtx("DELETE", "/api/portfolios/"+testPortfolioID.String()+"/holdings/"+holdingID.String()+"/lots/"+lotID.String(), nil)
+	c.Params = append(c.Params,
+		param.Param{Key: "hid", Value: holdingID.String()},
+		param.Param{Key: "lid", Value: lotID.String()},
+	)
+
+	DeleteLot(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 404 {
+		t.Fatalf("expected 404 for another user's holding, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var count int64
+	if err := db.Model(&models.HoldingLot{}).Where("id = ?", lotID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatal("other user's lot should still exist")
+	}
+}
+
 func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80)},
