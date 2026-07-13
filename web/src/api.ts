@@ -318,7 +318,12 @@ export async function fetchSetupStatus(): Promise<{ configured: boolean }> {
 
 export async function submitSetup(config: {
   databaseType: string
-  databaseDsn: string
+  databaseHost: string
+  databasePort: string
+  databaseName: string
+  databaseUsername: string
+  databasePassword: string
+  databaseSslMode: string
   username: string
   password: string
 }): Promise<{ success: boolean }> {

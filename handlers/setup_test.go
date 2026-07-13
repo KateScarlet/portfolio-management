@@ -40,3 +40,31 @@ func TestSetupComplete_InitFailureKeepsSetupMode(t *testing.T) {
 		t.Fatal("initialization failure must leave the application in setup mode")
 	}
 }
+
+func TestBuildPostgresDSN(t *testing.T) {
+	dsn, err := buildPostgresDSN("db.internal", "5433", "my portfolio", "app@example.com", "p@ss:/word", "require")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "postgres://app%40example.com:p%40ss%3A%2Fword@db.internal:5433/my%20portfolio?sslmode=require"
+	if dsn != want {
+		t.Fatalf("expected %q, got %q", want, dsn)
+	}
+}
+
+func TestBuildPostgresDSNDefaults(t *testing.T) {
+	dsn, err := buildPostgresDSN("", "", "", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "postgres://localhost:5432/portfolio?sslmode=disable"
+	if dsn != want {
+		t.Fatalf("expected %q, got %q", want, dsn)
+	}
+}
+
+func TestBuildPostgresDSNRejectsInvalidPort(t *testing.T) {
+	if _, err := buildPostgresDSN("localhost", "70000", "portfolio", "", "", "disable"); err == nil {
+		t.Fatal("expected an invalid port error")
+	}
+}

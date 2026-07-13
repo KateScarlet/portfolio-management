@@ -3,8 +3,13 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"portfolio-management/db"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,10 +42,16 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 		}
 
 		var body struct {
-			DatabaseType string `json:"databaseType"`
-			DatabaseDSN  string `json:"databaseDsn"`
-			Username     string `json:"username"`
-			Password     string `json:"password"` //nolint:gosec // Request body field
+			DatabaseType     string `json:"databaseType"`
+			DatabaseDSN      string `json:"databaseDsn"`
+			DatabaseHost     string `json:"databaseHost"`
+			DatabasePort     string `json:"databasePort"`
+			DatabaseName     string `json:"databaseName"`
+			DatabaseUsername string `json:"databaseUsername"`
+			DatabasePassword string `json:"databasePassword"` //nolint:gosec // Request body field
+			DatabaseSSLMode  string `json:"databaseSslMode"`
+			Username         string `json:"username"`
+			Password         string `json:"password"` //nolint:gosec // Request body field
 		}
 		if err := c.BindAndValidate(&body); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -51,7 +62,19 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 			body.DatabaseType = "postgres"
 		}
 		if body.DatabaseDSN == "" {
-			body.DatabaseDSN = "postgres://localhost:5432/portfolio?sslmode=disable"
+			var err error
+			body.DatabaseDSN, err = buildPostgresDSN(
+				body.DatabaseHost,
+				body.DatabasePort,
+				body.DatabaseName,
+				body.DatabaseUsername,
+				body.DatabasePassword,
+				body.DatabaseSSLMode,
+			)
+			if err != nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
 		}
 
 		if body.Username == "" || body.Password == "" {
@@ -102,4 +125,56 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 			h.Shutdown(context.Background())
 		}()
 	}
+}
+
+func buildPostgresDSN(host, port, name, username, password, sslMode string) (string, error) {
+	host = strings.TrimSpace(host)
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	}
+	port = strings.TrimSpace(port)
+	name = strings.TrimSpace(name)
+	username = strings.TrimSpace(username)
+	sslMode = strings.TrimSpace(sslMode)
+
+	if host == "" {
+		host = "localhost"
+	}
+	if port == "" {
+		port = "5432"
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil || portNumber < 1 || portNumber > 65535 {
+		return "", errors.New("数据库端口必须是 1 到 65535 之间的数字")
+	}
+	if name == "" {
+		name = "portfolio"
+	}
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	validSSLModes := map[string]bool{
+		"disable": true, "allow": true, "prefer": true, "require": true,
+		"verify-ca": true, "verify-full": true,
+	}
+	if !validSSLModes[sslMode] {
+		return "", fmt.Errorf("不支持的 SSL 模式: %s", sslMode)
+	}
+
+	dsn := &url.URL{
+		Scheme: "postgres",
+		Host:   net.JoinHostPort(host, port),
+		Path:   name,
+	}
+	if username != "" {
+		if password == "" {
+			dsn.User = url.User(username)
+		} else {
+			dsn.User = url.UserPassword(username, password)
+		}
+	}
+	query := url.Values{}
+	query.Set("sslmode", sslMode)
+	dsn.RawQuery = query.Encode()
+	return dsn.String(), nil
 }
