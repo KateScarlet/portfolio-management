@@ -2,13 +2,19 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"os"
 	"portfolio-management/db"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"gorm.io/gorm"
 )
+
+var setupMu sync.Mutex
 
 func SetupStatus() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
@@ -20,6 +26,16 @@ func SetupStatus() app.HandlerFunc {
 
 func SetupComplete(h *server.Hertz) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		setupMu.Lock()
+		defer setupMu.Unlock()
+
+		// The route can receive concurrent requests before the successful setup
+		// shuts the server down. Only the first request may initialize the app.
+		if !db.IsSetupMode() {
+			c.JSON(consts.StatusConflict, map[string]string{"error": "系统已完成初始化"})
+			return
+		}
+
 		var body struct {
 			DatabaseType string `json:"databaseType"`
 			DatabaseDSN  string `json:"databaseDsn"`
@@ -52,19 +68,30 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 		cfg.Database.Type = body.DatabaseType
 		cfg.Database.DSN = body.DatabaseDSN
 
-		if err := db.SaveConfig(cfg); err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-
 		database, err := db.Init(cfg)
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "初始化数据库失败: " + err.Error()})
 			return
 		}
 
-		if err := CreateUserForSetup(database, body.Username, body.Password, "admin"); err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建管理员失败: " + err.Error()})
+		// Keep administrator creation uncommitted until the config file has been
+		// written. If either operation or the transaction commit fails, removing
+		// the config keeps the application in setup mode and the DB rolls back.
+		err = database.Transaction(func(tx *gorm.DB) error {
+			if err := CreateUserForSetup(tx, body.Username, body.Password, "admin"); err != nil {
+				return err
+			}
+			return db.SaveConfig(cfg)
+		})
+		if err != nil {
+			cleanupErr := os.Remove(db.ConfigFile())
+			if cleanupErr != nil && !errors.Is(cleanupErr, os.ErrNotExist) {
+				c.JSON(consts.StatusInternalServerError, map[string]string{
+					"error": "初始化失败，且无法清理未完成的配置: " + cleanupErr.Error(),
+				})
+				return
+			}
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "完成初始化失败: " + err.Error()})
 			return
 		}
 
