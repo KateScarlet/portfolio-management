@@ -368,11 +368,10 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 				hPnL = pnl.StringFixed(1)
 			}
 			summaryHoldings = append(summaryHoldings, notifications.SummaryHolding{
-				Name:   h.Name,
-				Symbol: h.Symbol,
-				Pct:    hPct.StringFixed(1),
-				Value:  h.Value.StringFixed(2),
-				PnL:    hPnL,
+				Name:  h.Name,
+				Pct:   hPct.StringFixed(1),
+				Value: h.Value.StringFixed(2),
+				PnL:   hPnL,
 			})
 		}
 

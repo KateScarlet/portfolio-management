@@ -168,7 +168,7 @@ func (c *Channel) SendSummary(userID, portfolioID uuid.UUID, portfolioName strin
 	for _, a := range data.Assets {
 		lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", a.Name, a.Pct, a.Value))
 		for _, h := range a.Holdings {
-			line := fmt.Sprintf("  · %s (%s)  %s%%  ¥%s", h.Name, h.Symbol, h.Pct, h.Value)
+			line := fmt.Sprintf("  · %s  %s%%  ¥%s", h.Name, h.Pct, h.Value)
 			if h.PnL != "" {
 				line += fmt.Sprintf("  %s%%", h.PnL)
 			}

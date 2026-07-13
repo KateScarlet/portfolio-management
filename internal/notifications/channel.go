@@ -61,11 +61,10 @@ type SummaryAsset struct {
 
 // SummaryHolding is a single holding within an asset class.
 type SummaryHolding struct {
-	Name   string
-	Symbol string
-	Pct    string // percentage of total portfolio
-	Value  string
-	PnL    string // percentage gain/loss, empty if not applicable
+	Name  string
+	Pct   string // percentage of total portfolio
+	Value string
+	PnL   string // percentage gain/loss, empty if not applicable
 }
 
 // StateKey creates a composite key from userID and portfolioID for per-portfolio state.
