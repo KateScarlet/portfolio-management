@@ -53,9 +53,19 @@ type SummaryData struct {
 
 // SummaryAsset is one asset class in the summary.
 type SummaryAsset struct {
-	Name  string
-	Pct   string
-	Value string
+	Name     string
+	Pct      string
+	Value    string
+	Holdings []SummaryHolding
+}
+
+// SummaryHolding is a single holding within an asset class.
+type SummaryHolding struct {
+	Name   string
+	Symbol string
+	Pct    string // percentage of total portfolio
+	Value  string
+	PnL    string // percentage gain/loss, empty if not applicable
 }
 
 // StateKey creates a composite key from userID and portfolioID for per-portfolio state.
@@ -97,4 +107,27 @@ func ParseThreshold(settings map[string]string, keys ...string) decimal.Decimal 
 		}
 	}
 	return threshold
+}
+
+// IsEnabled checks if a channel is enabled by reading the given setting key.
+func IsEnabled(db *gorm.DB, userID, portfolioID uuid.UUID, enabledKey string) bool {
+	return LoadSetting(db, userID, portfolioID, enabledKey) == "true"
+}
+
+// ShouldSendSummary checks if a summary should be sent based on the interval setting.
+func ShouldSendSummary(db *gorm.DB, userID, portfolioID uuid.UUID, intervalKey string, lastTime, now time.Time) bool {
+	settings := LoadPortfolioSettings(db, portfolioID)
+	interval := settings[intervalKey]
+	if interval == "" {
+		return false
+	}
+
+	exists := !lastTime.IsZero()
+	switch interval {
+	case "daily":
+		return !exists || now.Sub(lastTime) >= 24*time.Hour
+	case "weekly":
+		return !exists || now.Sub(lastTime) >= 7*24*time.Hour
+	}
+	return false
 }

@@ -36,24 +36,11 @@ func NewChannel(db *gorm.DB) *Channel {
 func (c *Channel) Name() string { return "bark" }
 
 func (c *Channel) IsEnabled(userID, portfolioID uuid.UUID, db *gorm.DB) bool {
-	return notifications.LoadSetting(db, userID, portfolioID, "barkEnabled") == "true"
+	return notifications.IsEnabled(db, userID, portfolioID, "barkEnabled")
 }
 
 func (c *Channel) ShouldSendSummary(userID, portfolioID uuid.UUID, lastTime, now time.Time, db *gorm.DB) bool {
-	settings := notifications.LoadPortfolioSettings(db, portfolioID)
-	interval := settings["barkSummaryInterval"]
-	if interval == "" {
-		return false
-	}
-
-	exists := !lastTime.IsZero()
-	switch interval {
-	case "daily":
-		return !exists || now.Sub(lastTime) >= 24*time.Hour
-	case "weekly":
-		return !exists || now.Sub(lastTime) >= 7*24*time.Hour
-	}
-	return false
+	return notifications.ShouldSendSummary(db, userID, portfolioID, "barkSummaryInterval", lastTime, now)
 }
 
 func (c *Channel) getClient(userID, portfolioID uuid.UUID) (*Client, error) {
@@ -180,6 +167,13 @@ func (c *Channel) SendSummary(userID, portfolioID uuid.UUID, portfolioName strin
 
 	for _, a := range data.Assets {
 		lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", a.Name, a.Pct, a.Value))
+		for _, h := range a.Holdings {
+			line := fmt.Sprintf("  · %s (%s)  %s%%  ¥%s", h.Name, h.Symbol, h.Pct, h.Value)
+			if h.PnL != "" {
+				line += fmt.Sprintf("  %s%%", h.PnL)
+			}
+			lines = append(lines, line)
+		}
 	}
 
 	title := "投资组合摘要"

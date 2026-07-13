@@ -36,24 +36,11 @@ func NewChannel(db *gorm.DB) *Channel {
 func (c *Channel) Name() string { return "telegram" }
 
 func (c *Channel) IsEnabled(userID, portfolioID uuid.UUID, db *gorm.DB) bool {
-	return notifications.LoadSetting(db, userID, portfolioID, "telegramEnabled") == "true"
+	return notifications.IsEnabled(db, userID, portfolioID, "telegramEnabled")
 }
 
 func (c *Channel) ShouldSendSummary(userID, portfolioID uuid.UUID, lastTime, now time.Time, db *gorm.DB) bool {
-	settings := notifications.LoadPortfolioSettings(db, portfolioID)
-	interval := settings["telegramSummaryInterval"]
-	if interval == "" {
-		return false
-	}
-
-	exists := !lastTime.IsZero()
-	switch interval {
-	case "daily":
-		return !exists || now.Sub(lastTime) >= 24*time.Hour
-	case "weekly":
-		return !exists || now.Sub(lastTime) >= 7*24*time.Hour
-	}
-	return false
+	return notifications.ShouldSendSummary(db, userID, portfolioID, "telegramSummaryInterval", lastTime, now)
 }
 
 func (c *Channel) getClient(userID, portfolioID uuid.UUID) (*Client, error) {
@@ -179,7 +166,14 @@ func (c *Channel) SendSummary(userID, portfolioID uuid.UUID, portfolioName strin
 	lines = append(lines, "")
 
 	for _, a := range data.Assets {
-		lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", a.Name, a.Pct, a.Value))
+		lines = append(lines, fmt.Sprintf("<b>%s</b>  %s%%  ¥%s", a.Name, a.Pct, a.Value))
+		for _, h := range a.Holdings {
+			line := fmt.Sprintf("  · %s (%s)  %s%%  ¥%s", h.Name, h.Symbol, h.Pct, h.Value)
+			if h.PnL != "" {
+				line += fmt.Sprintf("  %s%%", h.PnL)
+			}
+			lines = append(lines, line)
+		}
 	}
 
 	if err := client.SendMessage(strings.Join(lines, "\n")); err != nil {

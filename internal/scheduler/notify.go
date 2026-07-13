@@ -342,16 +342,45 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 		"commodities": "商品",
 	}
 
+	// Group holdings by asset class
+	holdingsByAsset := make(map[string][]models.Holding)
+	for i := range holdings {
+		h := &holdings[i]
+		holdingsByAsset[h.AssetId] = append(holdingsByAsset[h.AssetId], *h)
+	}
+
 	summaryAssets := make([]notifications.SummaryAsset, 0, 4)
 	for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
 		pct := decimal.Zero
 		if total.IsPositive() {
 			pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 		}
+
+		var summaryHoldings []notifications.SummaryHolding
+		for _, h := range holdingsByAsset[id] {
+			hPct := decimal.Zero
+			if total.IsPositive() {
+				hPct = h.Value.Div(total).Mul(decimal.NewFromInt(100))
+			}
+			hPnL := ""
+			if h.Cost.IsPositive() {
+				pnl := h.Value.Sub(h.Cost).Div(h.Cost).Mul(decimal.NewFromInt(100))
+				hPnL = pnl.StringFixed(1)
+			}
+			summaryHoldings = append(summaryHoldings, notifications.SummaryHolding{
+				Name:   h.Name,
+				Symbol: h.Symbol,
+				Pct:    hPct.StringFixed(1),
+				Value:  h.Value.StringFixed(2),
+				PnL:    hPnL,
+			})
+		}
+
 		summaryAssets = append(summaryAssets, notifications.SummaryAsset{
-			Name:  assetNames[id],
-			Pct:   pct.StringFixed(1),
-			Value: assets[id].StringFixed(2),
+			Name:     assetNames[id],
+			Pct:      pct.StringFixed(1),
+			Value:    assets[id].StringFixed(2),
+			Holdings: summaryHoldings,
 		})
 	}
 
