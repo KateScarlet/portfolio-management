@@ -71,6 +71,12 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 
+			var portfolio models.Portfolio
+			if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
+				c.JSON(consts.StatusNotFound, map[string]string{"error": "组合不存在"})
+				return
+			}
+
 			var holdings []models.Holding
 			if err := db.Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Limit(5).Find(&holdings).Error; err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
@@ -82,7 +88,11 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 
-			lines := []string{"⚠️ <b>价格波动提醒</b>", ""}
+			title := "⚠️ <b>价格波动提醒</b>"
+			if portfolio.Name != "" {
+				title += " — <i>" + portfolio.Name + "</i>"
+			}
+			lines := []string{title, ""}
 			for i := range holdings {
 				h := &holdings[i]
 				lines = append(lines, fmt.Sprintf("<b>%s</b> (%s)\n当前价: %s %s",
@@ -114,6 +124,18 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 
+			settings := make(map[string]string)
+			var settingList []models.Setting
+			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&settingList).Error; err == nil {
+				for _, s := range settingList {
+					settings[s.Key] = s.Value
+				}
+			}
+			displayCurrency := settings["displayCurrency"]
+			if displayCurrency == "" {
+				displayCurrency = "CNY"
+			}
+
 			var holdings []models.Holding
 			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&holdings).Error; err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
@@ -122,8 +144,8 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 
 			for i := range holdings {
 				h := &holdings[i]
-				if h.Currency != "" && h.Currency != "CNY" {
-					pair := h.Currency + "CNY"
+				if h.Currency != "" && h.Currency != displayCurrency {
+					pair := h.Currency + displayCurrency
 					rate, err := router.ExchangeRate(user.UserID, pair)
 					if err == nil {
 						h.Value = h.Value.Mul(rate)
@@ -145,8 +167,8 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 			for _, f := range funds {
 				amt := f.Amount
-				if f.Currency != "" && f.Currency != "CNY" {
-					pair := f.Currency + "CNY"
+				if f.Currency != "" && f.Currency != displayCurrency {
+					pair := f.Currency + displayCurrency
 					rate, err := router.ExchangeRate(user.UserID, pair)
 					if err == nil {
 						amt = amt.Mul(rate)
@@ -158,14 +180,6 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			if total.IsZero() {
 				c.JSON(consts.StatusOK, map[string]any{"success": false, "error": "组合无资产数据"})
 				return
-			}
-
-			settings := make(map[string]string)
-			var settingList []models.Setting
-			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&settingList).Error; err == nil {
-				for _, s := range settingList {
-					settings[s.Key] = s.Value
-				}
 			}
 
 			targetPcts := map[string]decimal.Decimal{
@@ -190,7 +204,11 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 
 			assetNames := map[string]string{"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品"}
-			lines := []string{"⚠️ <b>配比偏离提醒</b>", "", "当前资产配置:"}
+			title := "⚠️ <b>配比偏离提醒</b>"
+			if portfolio.Name != "" {
+				title += " — <i>" + portfolio.Name + "</i>"
+			}
+			lines := []string{title, "", "当前资产配置:"}
 			for _, id := range []string{"stocks", "bonds", "cash", "commodities"} {
 				pct := assets[id].Div(total).Mul(decimal.NewFromInt(100))
 				diff := pct.Sub(targetPcts[id])
@@ -222,10 +240,39 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				return
 			}
 
+			var portfolio models.Portfolio
+			if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
+				c.JSON(consts.StatusNotFound, map[string]string{"error": "组合不存在"})
+				return
+			}
+
+			settings := make(map[string]string)
+			var settingList []models.Setting
+			if err := db.Where("portfolio_id = ?", portfolio.ID).Find(&settingList).Error; err == nil {
+				for _, s := range settingList {
+					settings[s.Key] = s.Value
+				}
+			}
+			displayCurrency := settings["displayCurrency"]
+			if displayCurrency == "" {
+				displayCurrency = "CNY"
+			}
+
 			holdings, err := gorm.G[models.Holding](db).Where("user_id = ? AND portfolio_id = ?", user.UserID, portfolioID).Find(ctx)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询持仓失败: " + err.Error()})
 				return
+			}
+
+			for i := range holdings {
+				h := &holdings[i]
+				if h.Currency != "" && h.Currency != displayCurrency {
+					pair := h.Currency + displayCurrency
+					rate, err := router.ExchangeRate(user.UserID, pair)
+					if err == nil {
+						h.Value = h.Value.Mul(rate)
+					}
+				}
 			}
 
 			assets := map[string]decimal.Decimal{"stocks": decimal.Zero, "bonds": decimal.Zero, "cash": decimal.Zero, "commodities": decimal.Zero}
@@ -242,8 +289,8 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			}
 			for _, f := range funds {
 				amt := f.Amount
-				if f.Currency != "" && f.Currency != "CNY" {
-					pair := f.Currency + "CNY"
+				if f.Currency != "" && f.Currency != displayCurrency {
+					pair := f.Currency + displayCurrency
 					rate, err := router.ExchangeRate(user.UserID, pair)
 					if err == nil {
 						amt = amt.Mul(rate)
@@ -252,7 +299,7 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				total = total.Add(amt)
 			}
 
-			principal, err := CalcPrincipal(db, portfolioID, "CNY", router)
+			principal, err := CalcPrincipal(db, portfolioID, displayCurrency, router)
 			if err != nil {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "计算累计投入失败: " + err.Error()})
 				return
@@ -261,13 +308,25 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 			assetNames := map[string]string{
 				"stocks": "股票", "bonds": "债券", "cash": "现金", "commodities": "商品",
 			}
+			currencySymbols := map[string]string{
+				"CNY": "¥", "USD": "$", "HKD": "HK$", "EUR": "€", "JPY": "¥", "GBP": "£",
+			}
+			symbol := currencySymbols[displayCurrency]
+			if symbol == "" {
+				symbol = displayCurrency + " "
+			}
 
 			now := time.Now()
+			summaryTitle := "📊 <b>投资组合摘要</b>"
+			if portfolio.Name != "" {
+				summaryTitle += " — " + portfolio.Name
+			}
+			summaryTitle += " — " + now.Format("2006-01-02")
 			lines := []string{
-				fmt.Sprintf("📊 <b>投资组合摘要</b> — %s", now.Format("2006-01-02")),
+				summaryTitle,
 				"",
-				fmt.Sprintf("总资产: ¥%s", total.StringFixed(2)),
-				fmt.Sprintf("累计投入: ¥%s", principal.StringFixed(2)),
+				fmt.Sprintf("总资产: %s%s", symbol, total.StringFixed(2)),
+				fmt.Sprintf("累计投入: %s%s", symbol, principal.StringFixed(2)),
 			}
 			if principal.IsPositive() {
 				pnl := total.Sub(principal).Div(principal).Mul(decimal.NewFromInt(100))
@@ -280,7 +339,7 @@ func TestTelegramMessage(db *gorm.DB, router *marketsource.Router) app.HandlerFu
 				if total.IsPositive() {
 					pct = assets[id].Div(total).Mul(decimal.NewFromInt(100))
 				}
-				lines = append(lines, fmt.Sprintf("%s  %s%%  ¥%s", assetNames[id], pct.StringFixed(1), assets[id].StringFixed(2)))
+				lines = append(lines, fmt.Sprintf("%s  %s%%  %s%s", assetNames[id], pct.StringFixed(1), symbol, assets[id].StringFixed(2)))
 			}
 			lines = append(lines, "", "<i>— 这是一条测试消息</i>")
 
