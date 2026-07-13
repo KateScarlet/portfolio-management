@@ -155,7 +155,7 @@ type FundTransaction struct {
 	ID                uuid.UUID       `gorm:"type:uuid;primaryKey;comment:交易唯一ID" json:"id"`
 	UserID            uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属用户ID" json:"userId"`
 	PortfolioID       uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属组合ID" json:"portfolioId"`
-	Type              string          `gorm:"size:20;not null;comment:交易类型(deposit/withdraw/transfer_in/transfer_out/dividend/dividend_reinvest)" json:"type"`
+	Type              string          `gorm:"size:20;not null;comment:交易类型(deposit/withdraw/transfer_in/transfer_out/dividend_cash/dividend_reinvest)" json:"type"`
 	Amount            decimal.Decimal `gorm:"type:decimal;not null;comment:交易金额" json:"amount"`
 	Currency          string          `gorm:"size:10;not null;comment:货币代码" json:"currency"`
 	TargetPortfolioID *uuid.UUID      `gorm:"type:uuid;comment:划转目标组合ID(仅transfer类型)" json:"targetPortfolioId,omitempty"`
@@ -284,25 +284,26 @@ func SellFees(lots []HoldingLot) decimal.Decimal {
 }
 
 type Dividend struct {
-	ID               uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID           uuid.UUID       `gorm:"type:uuid;index;not null" json:"userId"`
-	PortfolioID      uuid.UUID       `gorm:"type:uuid;index;not null" json:"portfolioId"`
-	HoldingID        uuid.UUID       `gorm:"type:uuid;index;not null" json:"holdingId"`
-	AssetId          string          `gorm:"size:20;not null" json:"assetId"`
-	Symbol           string          `gorm:"size:20;default:''" json:"symbol"`
-	Amount           decimal.Decimal `gorm:"type:decimal;not null" json:"amount"`
-	TaxWithheld      decimal.Decimal `gorm:"type:decimal;default:0" json:"taxWithheld"`
-	NetAmount        decimal.Decimal `gorm:"type:decimal;not null" json:"netAmount"`
-	Currency         string          `gorm:"size:10;not null" json:"currency"`
-	SharesHeld       decimal.Decimal `gorm:"type:decimal;default:0" json:"sharesHeld"`
-	DividendPerShare decimal.Decimal `gorm:"type:decimal;default:0" json:"dividendPerShare"`
-	ExDate           time.Time       `gorm:"timestamptz" json:"exDate"`
-	PayDate          time.Time       `gorm:"timestamptz" json:"payDate"`
-	Reinvest         bool            `gorm:"default:false" json:"reinvest"`
-	ReinvestPrice    decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestPrice"`
-	ReinvestShares   decimal.Decimal `gorm:"type:decimal;default:0" json:"reinvestShares"`
-	HoldingLotID     *uuid.UUID      `gorm:"type:uuid;comment:关联持仓批次ID(仅再投资)" json:"holdingLotId,omitempty"`
-	FundTxID         *uuid.UUID      `gorm:"type:uuid;comment:关联资金交易ID" json:"fundTxId,omitempty"`
-	Note             string          `gorm:"size:500;default:''" json:"note,omitempty"`
-	CreatedAt        time.Time       `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
+	ID                uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID            uuid.UUID       `gorm:"type:uuid;index;not null" json:"userId"`
+	PortfolioID       uuid.UUID       `gorm:"type:uuid;index;not null" json:"portfolioId"`
+	HoldingID         uuid.UUID       `gorm:"type:uuid;index;not null" json:"holdingId"`
+	Type              string          `gorm:"size:16;not null" json:"type"`
+	GrossAmount       decimal.Decimal `gorm:"type:decimal;not null" json:"grossAmount"`
+	TaxAmount         decimal.Decimal `gorm:"type:decimal;not null;default:0" json:"taxAmount"`
+	NetAmount         decimal.Decimal `gorm:"type:decimal;not null" json:"netAmount"`
+	Currency          string          `gorm:"size:10;not null" json:"currency"`
+	PaymentDate       time.Time       `gorm:"timestamptz;not null;index" json:"paymentDate"`
+	SharesAtPayment   decimal.Decimal `gorm:"type:decimal;not null;default:0" json:"sharesAtPayment"`
+	ReinvestmentPrice decimal.Decimal `gorm:"type:decimal;not null;default:0" json:"reinvestmentPrice"`
+	ReinvestedShares  decimal.Decimal `gorm:"type:decimal;not null;default:0" json:"reinvestedShares"`
+	HoldingLotID      *uuid.UUID      `gorm:"type:uuid" json:"holdingLotId,omitempty"`
+	FundTxID          uuid.UUID       `gorm:"type:uuid;not null" json:"fundTxId"`
+	Note              string          `gorm:"size:500;not null;default:''" json:"note,omitempty"`
+	CreatedAt         time.Time       `gorm:"autoCreateTime;timestamptz" json:"createdAt"`
+	UpdatedAt         time.Time       `gorm:"autoUpdateTime;timestamptz" json:"updatedAt"`
 }
+
+// TableName deliberately uses a new table. The old dividends table represented
+// a different accounting contract and is not migrated.
+func (Dividend) TableName() string { return "dividend_events" }

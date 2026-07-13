@@ -5,6 +5,7 @@ import (
 	"errors"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -12,339 +13,278 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-type UpdateDividendRequest struct {
-	Amount           decimal.Decimal `json:"amount" binding:"required"`
-	TaxWithheld      decimal.Decimal `json:"taxWithheld"`
-	Currency         string          `json:"currency"`
-	DividendPerShare decimal.Decimal `json:"dividendPerShare"`
-	ExDate           time.Time       `json:"exDate"`
-	PayDate          time.Time       `json:"payDate"`
-	Reinvest         bool            `json:"reinvest"`
-	ReinvestPrice    decimal.Decimal `json:"reinvestPrice"`
-	Note             string          `json:"note"`
+const (
+	DividendTypeCash     = "cash"
+	DividendTypeReinvest = "reinvest"
+)
+
+type CreateDividendRequest struct {
+	HoldingID         uuid.UUID       `json:"holdingId"`
+	GrossAmount       decimal.Decimal `json:"grossAmount"`
+	TaxAmount         decimal.Decimal `json:"taxAmount"`
+	Type              string          `json:"type"`
+	PaymentDate       time.Time       `json:"paymentDate"`
+	ReinvestmentPrice decimal.Decimal `json:"reinvestmentPrice"`
+	Note              string          `json:"note"`
 }
 
-type RecordDividendRequest struct {
-	HoldingID        uuid.UUID       `json:"holdingId" binding:"required"`
-	Amount           decimal.Decimal `json:"amount" binding:"required"`
-	TaxWithheld      decimal.Decimal `json:"taxWithheld"`
-	Currency         string          `json:"currency"`
-	DividendPerShare decimal.Decimal `json:"dividendPerShare"`
-	ExDate           time.Time       `json:"exDate"`
-	PayDate          time.Time       `json:"payDate"`
-	Reinvest         bool            `json:"reinvest"`
-	ReinvestPrice    decimal.Decimal `json:"reinvestPrice"`
-	Note             string          `json:"note"`
+type UpdateDividendRequest struct {
+	GrossAmount       decimal.Decimal `json:"grossAmount"`
+	TaxAmount         decimal.Decimal `json:"taxAmount"`
+	Type              string          `json:"type"`
+	PaymentDate       time.Time       `json:"paymentDate"`
+	ReinvestmentPrice decimal.Decimal `json:"reinvestmentPrice"`
+	Note              string          `json:"note"`
+}
+
+type dividendInput struct {
+	GrossAmount       decimal.Decimal
+	TaxAmount         decimal.Decimal
+	Type              string
+	PaymentDate       time.Time
+	ReinvestmentPrice decimal.Decimal
+	Note              string
+}
+
+func validateDividendInput(input dividendInput) (decimal.Decimal, *httpError) {
+	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
+	if !input.GrossAmount.IsPositive() {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "分红总额必须大于0"}
+	}
+	if input.TaxAmount.IsNegative() {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "预扣税不能为负数"}
+	}
+	if input.TaxAmount.GreaterThanOrEqual(input.GrossAmount) {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "预扣税必须小于分红总额"}
+	}
+	if input.Type != DividendTypeCash && input.Type != DividendTypeReinvest {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "分红类型必须是 cash 或 reinvest"}
+	}
+	if input.PaymentDate.IsZero() {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "支付日期不能为空"}
+	}
+	if input.Type == DividendTypeReinvest && !input.ReinvestmentPrice.IsPositive() {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "再投资价格必须大于0"}
+	}
+	if len(input.Note) > 500 {
+		return decimal.Zero, &httpError{status: consts.StatusBadRequest, msg: "备注不能超过500个字符"}
+	}
+	return input.GrossAmount.Sub(input.TaxAmount), nil
+}
+
+func writeDividendError(c *app.RequestContext, err error) {
+	if he, ok := errors.AsType[*httpError](err); ok {
+		c.JSON(he.status, map[string]string{"error": he.msg})
+		return
+	}
+	c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+}
+
+func parsePortfolioAndUser(c *app.RequestContext) (*middleware.JWTClaims, uuid.UUID, *httpError) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		return nil, uuid.Nil, &httpError{status: consts.StatusUnauthorized, msg: "未登录"}
+	}
+	portfolioID, err := uuid.Parse(c.Param("pid"))
+	if err != nil {
+		return nil, uuid.Nil, &httpError{status: consts.StatusBadRequest, msg: "无效的投资组合ID"}
+	}
+	return user, portfolioID, nil
+}
+
+func lockHolding(tx *gorm.DB, userID, portfolioID, holdingID uuid.UUID) (models.Holding, error) {
+	var holding models.Holding
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND portfolio_id = ? AND user_id = ?", holdingID, portfolioID, userID).
+		First(&holding).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return holding, &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
+	}
+	return holding, err
+}
+
+func changeAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, delta decimal.Decimal) error {
+	if delta.IsZero() {
+		return nil
+	}
+	if delta.IsPositive() {
+		fund := models.AvailableFund{ID: uuid.New(), UserID: userID, PortfolioID: portfolioID, Currency: currency, Amount: delta}
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "portfolio_id"}, {Name: "currency"}},
+			DoUpdates: clause.Assignments(map[string]any{"amount": gorm.Expr("available_funds.amount + EXCLUDED.amount")}),
+		}).Create(&fund).Error
+	}
+	var fund models.AvailableFund
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
+		First(&fund).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
+	}
+	if err != nil {
+		return err
+	}
+	newAmount := fund.Amount.Add(delta)
+	if newAmount.IsNegative() {
+		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
+	}
+	return tx.Model(&fund).Update("amount", newAmount).Error
+}
+
+func ensureReinvestmentReversible(tx *gorm.DB, dividend models.Dividend) error {
+	if dividend.Type != DividendTypeReinvest || dividend.HoldingLotID == nil {
+		return nil
+	}
+	var count int64
+	if err := tx.Model(&models.HoldingLot{}).
+		Where("holding_id = ? AND type = ? AND date >= ?", dividend.HoldingID, "sell", dividend.PaymentDate).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return &httpError{status: consts.StatusConflict, msg: "该再投资分红之后已有卖出记录，不能修改或删除"}
+	}
+	return nil
+}
+
+func ensureNoSalesSince(tx *gorm.DB, holdingID uuid.UUID, date time.Time) error {
+	var count int64
+	if err := tx.Model(&models.HoldingLot{}).
+		Where("holding_id = ? AND type = ? AND date >= ?", holdingID, "sell", date).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return &httpError{status: consts.StatusConflict, msg: "支付日期之后已有卖出记录，不能新增或改为再投资分红"}
+	}
+	return nil
+}
+
+func createDividendLot(holding models.Holding, paymentDate time.Time, netAmount, price decimal.Decimal) models.HoldingLot {
+	return models.HoldingLot{
+		ID: uuid.New(), HoldingID: holding.ID, Type: "buy", Date: paymentDate,
+		Shares: netAmount.Div(price), CostPrice: price, Cost: netAmount,
+		ValueAdded: netAmount, Fee: decimal.Zero,
+	}
 }
 
 func RecordDividend(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		user := middleware.GetUser(c)
-		if user == nil {
-			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+		user, portfolioID, he := parsePortfolioAndUser(c)
+		if he != nil {
+			writeDividendError(c, he)
 			return
 		}
 
-		portfolioID, err := uuid.Parse(c.Param("pid"))
-		if err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
-			return
-		}
-
-		var req RecordDividendRequest
-		if err := c.BindAndValidate(&req); err != nil {
+		var req CreateDividendRequest
+		if err := c.BindJSON(&req); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-
-		var portfolio models.Portfolio
-		if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "投资组合不存在"})
+		input := dividendInput{req.GrossAmount, req.TaxAmount, strings.ToLower(strings.TrimSpace(req.Type)), req.PaymentDate, req.ReinvestmentPrice, strings.TrimSpace(req.Note)}
+		netAmount, he := validateDividendInput(input)
+		if he != nil {
+			writeDividendError(c, he)
 			return
 		}
-
-		var holding models.Holding
-		if err := db.Where("id = ? AND portfolio_id = ? AND user_id = ?", req.HoldingID, portfolioID, user.UserID).First(&holding).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "持仓不存在"})
+		if req.HoldingID == uuid.Nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "持仓ID不能为空"})
 			return
-		}
-
-		netAmount := req.Amount.Sub(req.TaxWithheld)
-		if netAmount.LessThanOrEqual(decimal.Zero) {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "净分红金额必须大于0"})
-			return
-		}
-
-		if req.Reinvest && req.ReinvestPrice.LessThanOrEqual(decimal.Zero) {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "再投资价格必须大于0"})
-			return
-		}
-
-		currency := req.Currency
-		if currency == "" {
-			currency = holding.Currency
 		}
 
 		var dividend models.Dividend
-
-		err = db.Transaction(func(tx *gorm.DB) error {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			holding, err := lockHolding(tx, user.UserID, portfolioID, req.HoldingID)
+			if err != nil {
+				return err
+			}
+			currency := holding.Currency
+			if currency == "" {
+				currency = "CNY"
+			}
+			fundTxID := uuid.New()
 			dividend = models.Dividend{
-				ID:               uuid.New(),
-				UserID:           user.UserID,
-				PortfolioID:      portfolioID,
-				HoldingID:        req.HoldingID,
-				AssetId:          holding.AssetId,
-				Symbol:           holding.Symbol,
-				Amount:           req.Amount,
-				TaxWithheld:      req.TaxWithheld,
-				NetAmount:        netAmount,
-				Currency:         currency,
-				SharesHeld:       holding.Shares,
-				DividendPerShare: req.DividendPerShare,
-				ExDate:           req.ExDate,
-				PayDate:          req.PayDate,
-				Reinvest:         req.Reinvest,
-				ReinvestPrice:    req.ReinvestPrice,
-				Note:             req.Note,
+				ID: uuid.New(), UserID: user.UserID, PortfolioID: portfolioID, HoldingID: holding.ID,
+				Type: input.Type, GrossAmount: input.GrossAmount, TaxAmount: input.TaxAmount, NetAmount: netAmount,
+				Currency: currency, PaymentDate: input.PaymentDate, SharesAtPayment: holding.Shares,
+				ReinvestmentPrice: input.ReinvestmentPrice, FundTxID: fundTxID, Note: input.Note,
 			}
-
-			if err := tx.Create(&dividend).Error; err != nil {
-				return err
-			}
-
-			holding.TotalDividends = holding.TotalDividends.Add(netAmount)
-			if err := tx.Save(&holding).Error; err != nil {
-				return err
-			}
-
-			if req.Reinvest {
-				reinvestShares := netAmount.Div(req.ReinvestPrice)
-
-				lot := models.HoldingLot{
-					ID:         uuid.New(),
-					HoldingID:  holding.ID,
-					Type:       "buy",
-					Date:       time.Now(),
-					Shares:     reinvestShares,
-					CostPrice:  req.ReinvestPrice,
-					Cost:       netAmount,
-					ValueAdded: netAmount,
-					Fee:        decimal.Zero,
+			if input.Type == DividendTypeCash {
+				dividend.ReinvestmentPrice = decimal.Zero
+				if err := changeAvailableFund(tx, user.UserID, portfolioID, currency, netAmount); err != nil {
+					return err
 				}
-
+			} else {
+				if err := ensureNoSalesSince(tx, holding.ID, input.PaymentDate); err != nil {
+					return err
+				}
+				lot := createDividendLot(holding, input.PaymentDate, netAmount, input.ReinvestmentPrice)
 				if err := models.CreateLot(tx, &lot); err != nil {
 					return err
 				}
-
+				dividend.HoldingLotID = &lot.ID
+				dividend.ReinvestedShares = lot.Shares
 				lots, err := models.LoadLots(tx, holding.ID)
 				if err != nil {
 					return err
 				}
 				models.RecalcFromLots(&holding, lots)
-				if err := tx.Save(&holding).Error; err != nil {
-					return err
-				}
-
-				dividend.HoldingLotID = &lot.ID
-				if err := tx.Save(&dividend).Error; err != nil {
-					return err
-				}
-
-				fundTx := models.FundTransaction{
-					ID:          uuid.New(),
-					UserID:      user.UserID,
-					PortfolioID: portfolioID,
-					Type:        "dividend_reinvest",
-					Amount:      netAmount,
-					Currency:    currency,
-					HoldingID:   &req.HoldingID,
-					Note:        req.Note,
-				}
-				if err := tx.Create(&fundTx).Error; err != nil {
-					return err
-				}
-
-				dividend.FundTxID = &fundTx.ID
-				if err := tx.Save(&dividend).Error; err != nil {
-					return err
-				}
-			} else {
-				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, netAmount); err != nil {
-					return err
-				}
-
-				fundTx := models.FundTransaction{
-					ID:          uuid.New(),
-					UserID:      user.UserID,
-					PortfolioID: portfolioID,
-					Type:        "dividend",
-					Amount:      netAmount,
-					Currency:    currency,
-					HoldingID:   &req.HoldingID,
-					Note:        req.Note,
-				}
-				if err := tx.Create(&fundTx).Error; err != nil {
-					return err
-				}
-
-				dividend.FundTxID = &fundTx.ID
-				if err := tx.Save(&dividend).Error; err != nil {
-					return err
-				}
 			}
-
-			return nil
+			if err := tx.Model(&holding).Updates(map[string]any{
+				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost,
+				"cost_price": holding.CostPrice, "total_dividends": gorm.Expr("total_dividends + ?", netAmount),
+			}).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&models.FundTransaction{
+				ID: fundTxID, UserID: user.UserID, PortfolioID: portfolioID,
+				Type: "dividend_" + input.Type, Amount: netAmount, Currency: currency, HoldingID: &holding.ID, Note: input.Note,
+			}).Error; err != nil {
+				return err
+			}
+			return tx.Create(&dividend).Error
 		})
 		if err != nil {
-			if httpErr, ok := errors.AsType[*httpError](err); ok {
-				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
-			} else {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			}
+			writeDividendError(c, err)
 			return
 		}
-
 		c.JSON(consts.StatusCreated, dividend)
 	}
 }
 
 func ListDividends(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		user := middleware.GetUser(c)
-		if user == nil {
-			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
+		user, portfolioID, he := parsePortfolioAndUser(c)
+		if he != nil {
+			writeDividendError(c, he)
 			return
 		}
-
-		portfolioID, err := uuid.Parse(c.Param("pid"))
-		if err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
-			return
-		}
-
-		var portfolio models.Portfolio
-		if err := db.Where("id = ? AND user_id = ?", portfolioID, user.UserID).First(&portfolio).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "投资组合不存在"})
-			return
-		}
-
 		query := db.Where("portfolio_id = ? AND user_id = ?", portfolioID, user.UserID)
-
-		holdingIDStr := c.Query("holdingId")
-		if holdingIDStr != "" {
-			holdingID, err := uuid.Parse(holdingIDStr)
+		if value := c.Query("holdingId"); value != "" {
+			holdingID, err := uuid.Parse(value)
 			if err != nil {
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的持仓ID"})
 				return
 			}
 			query = query.Where("holding_id = ?", holdingID)
 		}
-
 		var dividends []models.Dividend
-		if err := query.Order("created_at DESC").Find(&dividends).Error; err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+		if err := query.Order("payment_date DESC, created_at DESC").Find(&dividends).Error; err != nil {
+			writeDividendError(c, err)
 			return
 		}
-
 		c.JSON(consts.StatusOK, dividends)
-	}
-}
-
-func DeleteDividend(db *gorm.DB) app.HandlerFunc {
-	return func(ctx context.Context, c *app.RequestContext) {
-		user := middleware.GetUser(c)
-		if user == nil {
-			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
-			return
-		}
-
-		portfolioID, err := uuid.Parse(c.Param("pid"))
-		if err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
-			return
-		}
-		dividendID, err := uuid.Parse(c.Param("id"))
-		if err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的分红记录ID"})
-			return
-		}
-
-		var dividend models.Dividend
-		if err := db.Where("id = ? AND portfolio_id = ? AND user_id = ?", dividendID, portfolioID, user.UserID).First(&dividend).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "分红记录不存在"})
-			return
-		}
-
-		err = db.Transaction(func(tx *gorm.DB) error {
-			if dividend.Reinvest && dividend.HoldingLotID != nil {
-				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
-					return err
-				}
-
-				lots, err := models.LoadLots(tx, dividend.HoldingID)
-				if err != nil {
-					return err
-				}
-				var holding models.Holding
-				if err := tx.Where("id = ? AND user_id = ?", dividend.HoldingID, user.UserID).First(&holding).Error; err != nil {
-					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
-				}
-				models.RecalcFromLots(&holding, lots)
-				if err := tx.Save(&holding).Error; err != nil {
-					return err
-				}
-			} else {
-				if err := deductAvailableFund(tx, user.UserID, portfolioID, dividend.Currency, dividend.NetAmount); err != nil {
-					return err
-				}
-			}
-
-			var holding models.Holding
-			if err := tx.Where("id = ? AND user_id = ?", dividend.HoldingID, user.UserID).First(&holding).Error; err == nil {
-				holding.TotalDividends = holding.TotalDividends.Sub(dividend.NetAmount)
-				if err := tx.Save(&holding).Error; err != nil {
-					return err
-				}
-			}
-
-			if dividend.FundTxID != nil {
-				if err := tx.Where("id = ?", *dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
-					return err
-				}
-			}
-
-			if err := tx.Delete(&dividend).Error; err != nil {
-				return err
-			}
-
-			return nil
-		})
-		if err != nil {
-			if httpErr, ok := errors.AsType[*httpError](err); ok {
-				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
-			} else {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			}
-			return
-		}
-
-		c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
 func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		user := middleware.GetUser(c)
-		if user == nil {
-			c.JSON(consts.StatusUnauthorized, map[string]string{"error": "未登录"})
-			return
-		}
-
-		portfolioID, err := uuid.Parse(c.Param("pid"))
-		if err != nil {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的投资组合ID"})
+		user, portfolioID, he := parsePortfolioAndUser(c)
+		if he != nil {
+			writeDividendError(c, he)
 			return
 		}
 		dividendID, err := uuid.Parse(c.Param("id"))
@@ -352,168 +292,160 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的分红记录ID"})
 			return
 		}
-
 		var req UpdateDividendRequest
-		if err := c.BindAndValidate(&req); err != nil {
+		if err := c.BindJSON(&req); err != nil {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		input := dividendInput{req.GrossAmount, req.TaxAmount, strings.ToLower(strings.TrimSpace(req.Type)), req.PaymentDate, req.ReinvestmentPrice, strings.TrimSpace(req.Note)}
+		newNetAmount, he := validateDividendInput(input)
+		if he != nil {
+			writeDividendError(c, he)
 			return
 		}
 
 		var dividend models.Dividend
-		if err := db.Where("id = ? AND portfolio_id = ? AND user_id = ?", dividendID, portfolioID, user.UserID).First(&dividend).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "分红记录不存在"})
-			return
-		}
-
-		var holding models.Holding
-		if err := db.Where("id = ? AND portfolio_id = ? AND user_id = ?", dividend.HoldingID, portfolioID, user.UserID).First(&holding).Error; err != nil {
-			c.JSON(consts.StatusNotFound, map[string]string{"error": "持仓不存在"})
-			return
-		}
-
-		newNetAmount := req.Amount.Sub(req.TaxWithheld)
-		if newNetAmount.LessThanOrEqual(decimal.Zero) {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "净分红金额必须大于0"})
-			return
-		}
-
-		if req.Reinvest && req.ReinvestPrice.LessThanOrEqual(decimal.Zero) {
-			c.JSON(consts.StatusBadRequest, map[string]string{"error": "再投资价格必须大于0"})
-			return
-		}
-
-		currency := req.Currency
-		if currency == "" {
-			currency = dividend.Currency
-		}
-
 		err = db.Transaction(func(tx *gorm.DB) error {
-			// 1. Reverse old side effects
-			if dividend.Reinvest && dividend.HoldingLotID != nil {
-				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
-					return err
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND portfolio_id = ? AND user_id = ?", dividendID, portfolioID, user.UserID).First(&dividend).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "分红记录不存在"}
 				}
-
-				lots, err := models.LoadLots(tx, dividend.HoldingID)
-				if err != nil {
-					return err
-				}
-				models.RecalcFromLots(&holding, lots)
-				if err := tx.Save(&holding).Error; err != nil {
-					return err
-				}
-			} else {
-				if err := deductAvailableFund(tx, user.UserID, portfolioID, dividend.Currency, dividend.NetAmount); err != nil {
-					return err
-				}
+				return err
 			}
-
-			holding.TotalDividends = holding.TotalDividends.Sub(dividend.NetAmount)
-			if err := tx.Save(&holding).Error; err != nil {
+			holding, err := lockHolding(tx, user.UserID, portfolioID, dividend.HoldingID)
+			if err != nil {
+				return err
+			}
+			if err := ensureReinvestmentReversible(tx, dividend); err != nil {
 				return err
 			}
 
-			if dividend.FundTxID != nil {
-				if err := tx.Where("id = ?", *dividend.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
+			cashDelta := decimal.Zero
+			if dividend.Type == DividendTypeCash {
+				cashDelta = cashDelta.Sub(dividend.NetAmount)
+			}
+			if input.Type == DividendTypeCash {
+				cashDelta = cashDelta.Add(newNetAmount)
+			}
+			if err := changeAvailableFund(tx, user.UserID, portfolioID, dividend.Currency, cashDelta); err != nil {
+				return err
+			}
+
+			if dividend.HoldingLotID != nil {
+				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
 					return err
 				}
 			}
-
-			// 2. Apply new side effects
-			holding.TotalDividends = holding.TotalDividends.Add(newNetAmount)
-
-			if req.Reinvest {
-				reinvestShares := newNetAmount.Div(req.ReinvestPrice)
-
-				lot := models.HoldingLot{
-					ID:         uuid.New(),
-					HoldingID:  holding.ID,
-					Type:       "buy",
-					Date:       time.Now(),
-					Shares:     reinvestShares,
-					CostPrice:  req.ReinvestPrice,
-					Cost:       newNetAmount,
-					ValueAdded: newNetAmount,
-					Fee:        decimal.Zero,
+			dividend.HoldingLotID = nil
+			dividend.ReinvestedShares = decimal.Zero
+			if input.Type == DividendTypeReinvest {
+				if err := ensureNoSalesSince(tx, holding.ID, input.PaymentDate); err != nil {
+					return err
 				}
-
+				lot := createDividendLot(holding, input.PaymentDate, newNetAmount, input.ReinvestmentPrice)
 				if err := models.CreateLot(tx, &lot); err != nil {
 					return err
 				}
+				dividend.HoldingLotID = &lot.ID
+				dividend.ReinvestedShares = lot.Shares
+			}
+			lots, err := models.LoadLots(tx, holding.ID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, lots)
+			if err := tx.Model(&holding).Updates(map[string]any{
+				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost, "cost_price": holding.CostPrice,
+				"total_dividends": gorm.Expr("total_dividends + ?", newNetAmount.Sub(dividend.NetAmount)),
+			}).Error; err != nil {
+				return err
+			}
 
+			if err := tx.Where("id = ? AND user_id = ?", dividend.FundTxID, user.UserID).Delete(&models.FundTransaction{}).Error; err != nil {
+				return err
+			}
+			fundTxID := uuid.New()
+			if err := tx.Create(&models.FundTransaction{ID: fundTxID, UserID: user.UserID, PortfolioID: portfolioID, Type: "dividend_" + input.Type, Amount: newNetAmount, Currency: dividend.Currency, HoldingID: &holding.ID, Note: input.Note}).Error; err != nil {
+				return err
+			}
+
+			dividend.Type = input.Type
+			dividend.GrossAmount = input.GrossAmount
+			dividend.TaxAmount = input.TaxAmount
+			dividend.NetAmount = newNetAmount
+			dividend.PaymentDate = input.PaymentDate
+			dividend.ReinvestmentPrice = decimal.Zero
+			if input.Type == DividendTypeReinvest {
+				dividend.ReinvestmentPrice = input.ReinvestmentPrice
+			}
+			dividend.FundTxID = fundTxID
+			dividend.Note = input.Note
+			return tx.Save(&dividend).Error
+		})
+		if err != nil {
+			writeDividendError(c, err)
+			return
+		}
+		c.JSON(consts.StatusOK, dividend)
+	}
+}
+
+func DeleteDividend(db *gorm.DB) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		user, portfolioID, he := parsePortfolioAndUser(c)
+		if he != nil {
+			writeDividendError(c, he)
+			return
+		}
+		dividendID, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的分红记录ID"})
+			return
+		}
+		err = db.Transaction(func(tx *gorm.DB) error {
+			var dividend models.Dividend
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND portfolio_id = ? AND user_id = ?", dividendID, portfolioID, user.UserID).First(&dividend).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return &httpError{status: consts.StatusNotFound, msg: "分红记录不存在"}
+				}
+				return err
+			}
+			holding, err := lockHolding(tx, user.UserID, portfolioID, dividend.HoldingID)
+			if err != nil {
+				return err
+			}
+			if err := ensureReinvestmentReversible(tx, dividend); err != nil {
+				return err
+			}
+			if dividend.Type == DividendTypeCash {
+				if err := changeAvailableFund(tx, user.UserID, portfolioID, dividend.Currency, dividend.NetAmount.Neg()); err != nil {
+					return err
+				}
+			} else if dividend.HoldingLotID != nil {
+				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
+					return err
+				}
 				lots, err := models.LoadLots(tx, holding.ID)
 				if err != nil {
 					return err
 				}
 				models.RecalcFromLots(&holding, lots)
-				if err := tx.Save(&holding).Error; err != nil {
-					return err
-				}
-
-				dividend.HoldingLotID = &lot.ID
-
-				fundTx := models.FundTransaction{
-					ID:          uuid.New(),
-					UserID:      user.UserID,
-					PortfolioID: portfolioID,
-					Type:        "dividend_reinvest",
-					Amount:      newNetAmount,
-					Currency:    currency,
-					HoldingID:   &dividend.HoldingID,
-					Note:        req.Note,
-				}
-				if err := tx.Create(&fundTx).Error; err != nil {
-					return err
-				}
-				dividend.FundTxID = &fundTx.ID
-			} else {
-				if err := addAvailableFund(tx, user.UserID, portfolioID, currency, newNetAmount); err != nil {
-					return err
-				}
-
-				fundTx := models.FundTransaction{
-					ID:          uuid.New(),
-					UserID:      user.UserID,
-					PortfolioID: portfolioID,
-					Type:        "dividend",
-					Amount:      newNetAmount,
-					Currency:    currency,
-					HoldingID:   &dividend.HoldingID,
-					Note:        req.Note,
-				}
-				if err := tx.Create(&fundTx).Error; err != nil {
-					return err
-				}
-				dividend.FundTxID = &fundTx.ID
 			}
-
-			// 3. Update dividend record fields
-			dividend.Amount = req.Amount
-			dividend.TaxWithheld = req.TaxWithheld
-			dividend.NetAmount = newNetAmount
-			dividend.Currency = currency
-			dividend.DividendPerShare = req.DividendPerShare
-			dividend.ExDate = req.ExDate
-			dividend.PayDate = req.PayDate
-			dividend.Reinvest = req.Reinvest
-			dividend.ReinvestPrice = req.ReinvestPrice
-			dividend.Note = req.Note
-
-			if err := tx.Save(&dividend).Error; err != nil {
+			if err := tx.Model(&holding).Updates(map[string]any{
+				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost, "cost_price": holding.CostPrice,
+				"total_dividends": gorm.Expr("total_dividends - ?", dividend.NetAmount),
+			}).Error; err != nil {
 				return err
 			}
-
-			return nil
+			if err := tx.Where("id = ? AND user_id = ?", dividend.FundTxID, user.UserID).Delete(&models.FundTransaction{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&dividend).Error
 		})
 		if err != nil {
-			if httpErr, ok := errors.AsType[*httpError](err); ok {
-				c.JSON(httpErr.status, map[string]string{"error": httpErr.msg})
-			} else {
-				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-			}
+			writeDividendError(c, err)
 			return
 		}
-
-		c.JSON(consts.StatusOK, dividend)
+		c.Status(consts.StatusNoContent)
 	}
 }

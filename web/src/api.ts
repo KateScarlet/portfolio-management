@@ -33,6 +33,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || res.statusText)
   }
+  if (res.status === 204) return undefined as T
   return res.json()
 }
 
@@ -572,14 +573,11 @@ export async function recordDividend(
   pid: string,
   data: {
     holdingId: string
-    amount: string
-    taxWithheld?: string
-    currency?: string
-    dividendPerShare?: string
-    exDate?: string
-    payDate?: string
-    reinvest: boolean
-    reinvestPrice?: string
+    grossAmount: string
+    taxAmount: string
+    type: "cash" | "reinvest"
+    paymentDate: string
+    reinvestmentPrice: string
     note?: string
   }
 ): Promise<Dividend> {
@@ -595,7 +593,7 @@ export async function fetchDividends(pid: string, holdingId?: string): Promise<D
 }
 
 export async function deleteDividend(pid: string, id: string): Promise<void> {
-  await request<{ status: string }>(`/api/portfolios/${pid}/dividends/${id}`, {
+	await request<void>(`/api/portfolios/${pid}/dividends/${id}`, {
     method: "DELETE",
   })
 }
@@ -604,14 +602,11 @@ export async function updateDividend(
   pid: string,
   id: string,
   data: {
-    amount: string
-    taxWithheld?: string
-    currency?: string
-    dividendPerShare?: string
-    exDate?: string
-    payDate?: string
-    reinvest: boolean
-    reinvestPrice?: string
+    grossAmount: string
+    taxAmount: string
+    type: "cash" | "reinvest"
+    paymentDate: string
+    reinvestmentPrice: string
     note?: string
   }
 ): Promise<Dividend> {

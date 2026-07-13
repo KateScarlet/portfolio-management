@@ -710,6 +710,19 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				}
 			}
 
+			var dividends []models.Dividend
+			if err := tx.Where("holding_id = ? AND user_id = ?", holding.ID, user.UserID).Find(&dividends).Error; err != nil {
+				return err
+			}
+			for i := range dividends {
+				if err := tx.Where("id = ? AND user_id = ?", dividends[i].FundTxID, user.UserID).Delete(&models.FundTransaction{}).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Where("holding_id = ? AND user_id = ?", holding.ID, user.UserID).Delete(&models.Dividend{}).Error; err != nil {
+				return err
+			}
+
 			if err := models.DeleteLotsByHoldingID(tx, holding.ID); err != nil {
 				return err
 			}
@@ -836,6 +849,13 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 					return &httpError{status: consts.StatusNotFound, msg: "交易记录不存在"}
 				}
 				return err
+			}
+			var dividendLotCount int64
+			if err := tx.Model(&models.Dividend{}).Where("holding_lot_id = ?", lotID).Count(&dividendLotCount).Error; err != nil {
+				return err
+			}
+			if dividendLotCount > 0 {
+				return &httpError{status: consts.StatusConflict, msg: "分红再投资批次只能通过编辑分红记录修改"}
 			}
 
 			// 先记录旧值，计算资金差额
@@ -984,6 +1004,13 @@ func DeleteLot(db *gorm.DB) app.HandlerFunc {
 					return &httpError{status: consts.StatusNotFound, msg: "交易记录不存在"}
 				}
 				return err
+			}
+			var dividendLotCount int64
+			if err := tx.Model(&models.Dividend{}).Where("holding_lot_id = ?", lotID).Count(&dividendLotCount).Error; err != nil {
+				return err
+			}
+			if dividendLotCount > 0 {
+				return &httpError{status: consts.StatusConflict, msg: "分红再投资批次只能通过删除分红记录撤销"}
 			}
 
 			// 回退资金: 买入退回 cost+fee, 卖出扣回 valueAdded-fee

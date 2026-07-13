@@ -737,9 +737,9 @@ export default function HoldingsManager({
                                       >
                                         <span className="flex items-center gap-2">
                                           <span className="text-[9px] bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded font-bold">
-                                            {div.reinvest ? "再投资" : "分红"}
+                                            {div.type === "reinvest" ? "再投资" : "现金"}
                                           </span>
-                                          {new Date(div.createdAt).toLocaleDateString()}
+                                          {new Date(div.paymentDate).toLocaleDateString()}
                                         </span>
                                         <div className="flex items-center gap-2 text-right">
                                           <span className="w-24 text-right text-yellow-600">
@@ -749,9 +749,9 @@ export default function HoldingsManager({
                                               div.currency || "CNY"
                                             )}
                                           </span>
-                                          {div.reinvest && div.reinvestShares && (
+                                          {div.type === "reinvest" && toDecimal(div.reinvestedShares).isPositive() && (
                                             <span className="w-20 text-right text-[#6C757D]">
-                                              ×{div.reinvestShares}
+                                              ×{div.reinvestedShares}
                                             </span>
                                           )}
                                           <button
@@ -829,7 +829,7 @@ export default function HoldingsManager({
       {deletingDividend && (
         <ConfirmDialog
           title="删除分红记录"
-          message={`确定删除此分红记录？${deletingDividend.reinvest ? "再投资份额将被撤销。" : "可用资金将被扣除。"}此操作不可撤销。`}
+          message={`确定删除此分红记录？${deletingDividend.type === "reinvest" ? "再投资份额将被撤销。" : "可用资金将被扣除。"}此操作不可撤销。`}
           onConfirm={async () => {
             try {
               await api.deleteDividend(portfolioId, deletingDividend.id)

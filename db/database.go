@@ -140,6 +140,9 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
+	if err := removeLegacyDividendLedger(db); err != nil {
+		return nil, err
+	}
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
 	}
@@ -173,9 +176,70 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_dividend_events_holding_date ON dividend_events(holding_id, payment_date DESC)")
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
 
 	return db, nil
+}
+
+// removeLegacyDividendLedger is a one-time destructive migration. The old
+// dividends table used a different accounting contract, so its records cannot
+// be represented safely in dividend_events. Linked DRIP lots and transaction
+// log rows are removed; existing cash balances are retained as opening cash.
+func removeLegacyDividendLedger(db *gorm.DB) error {
+	if !db.Migrator().HasTable("dividends") {
+		return nil
+	}
+	type legacyDividend struct {
+		HoldingID    uuid.UUID
+		HoldingLotID *uuid.UUID
+		FundTxID     *uuid.UUID
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var rows []legacyDividend
+		if err := tx.Table("dividends").Select("holding_id", "holding_lot_id", "fund_tx_id").Find(&rows).Error; err != nil {
+			return err
+		}
+		holdingIDs := make([]uuid.UUID, 0, len(rows))
+		seen := make(map[uuid.UUID]struct{}, len(rows))
+		for _, row := range rows {
+			if row.HoldingLotID != nil {
+				if err := tx.Where("id = ?", *row.HoldingLotID).Delete(&models.HoldingLot{}).Error; err != nil {
+					return err
+				}
+			}
+			if row.FundTxID != nil {
+				if err := tx.Where("id = ?", *row.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
+					return err
+				}
+			}
+			if _, ok := seen[row.HoldingID]; !ok {
+				seen[row.HoldingID] = struct{}{}
+				holdingIDs = append(holdingIDs, row.HoldingID)
+			}
+		}
+		for _, holdingID := range holdingIDs {
+			var holding models.Holding
+			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					continue
+				}
+				return err
+			}
+			lots, err := models.LoadLots(tx, holdingID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, lots)
+			if err := tx.Model(&holding).Updates(map[string]any{
+				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost,
+				"cost_price": holding.CostPrice, "total_dividends": 0,
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Migrator().DropTable("dividends")
+	})
 }
 
 func IsSetupMode() bool {

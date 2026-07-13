@@ -19,7 +19,7 @@ export interface FundTransaction {
     | "convert"
     | "buy"
     | "sell"
-    | "dividend"
+    | "dividend_cash"
     | "dividend_reinvest"
   amount: string
   currency: string
@@ -324,21 +324,18 @@ export interface Dividend {
   userId: string
   portfolioId: string
   holdingId: string
-  assetId: string
-  symbol: string
-  amount: string
-  taxWithheld: string
+  type: "cash" | "reinvest"
+  grossAmount: string
+  taxAmount: string
   netAmount: string
   currency: string
-  sharesHeld: string
-  dividendPerShare: string
-  exDate?: string
-  payDate?: string
-  reinvest: boolean
-  reinvestPrice: string
-  reinvestShares: string
+  paymentDate: string
+  sharesAtPayment: string
+  reinvestmentPrice: string
+  reinvestedShares: string
   holdingLotId?: string
-  fundTxId?: string
+  fundTxId: string
   note?: string
   createdAt: string
+  updatedAt: string
 }
