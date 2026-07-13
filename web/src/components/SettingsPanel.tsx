@@ -55,13 +55,21 @@ const DISPLAY_CURRENCIES = [
   { value: "GBP", label: "GBP £" },
 ]
 
-const SECTIONS = [
+const PORTFOLIO_SECTIONS = [
   { id: "invest", label: "投资", icon: Target },
   { id: "sync", label: "同步", icon: RefreshCw },
   { id: "display", label: "显示", icon: Palette },
   { id: "notify", label: "通知", icon: Bell },
-  { id: "security", label: "安全", icon: Shield, adminOnly: true },
 ]
+
+const USER_SECTIONS = [
+  { id: "sources", label: "行情源", icon: RefreshCw },
+  { id: "security", label: "安全", icon: Shield },
+]
+
+const SYSTEM_SECTIONS = [{ id: "system-security", label: "认证", icon: Shield }]
+
+type SettingsScope = "portfolio" | "user" | "system"
 
 export default function SettingsPanel({
   settings,
@@ -71,6 +79,7 @@ export default function SettingsPanel({
 }: SettingsPanelProps) {
   const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
+  const [activeScope, setActiveScope] = useState<SettingsScope>("portfolio")
   const [activeSection, setActiveSection] = useState("invest")
   const [draft, setDraft] = useState(settings)
   const [saving, setSaving] = useState(false)
@@ -115,6 +124,7 @@ export default function SettingsPanel({
 
   const handleOpen = () => {
     setDraft(settings)
+    setActiveScope("portfolio")
     setActiveSection("invest")
     setIsOpen(true)
     if (userRole === "admin") {
@@ -287,7 +297,19 @@ export default function SettingsPanel({
 
   const presets = [3, 5, 7, 10, 15, 20]
 
-  const visibleSections = SECTIONS.filter((s) => !s.adminOnly || userRole === "admin")
+  const visibleSections =
+    activeScope === "portfolio"
+      ? PORTFOLIO_SECTIONS
+      : activeScope === "user"
+        ? USER_SECTIONS
+        : SYSTEM_SECTIONS
+
+  const handleScopeChange = (scope: SettingsScope) => {
+    setActiveScope(scope)
+    setActiveSection(
+      scope === "portfolio" ? "invest" : scope === "user" ? "sources" : "system-security"
+    )
+  }
 
   return (
     <>
@@ -317,6 +339,47 @@ export default function SettingsPanel({
               >
                 &times;
               </button>
+            </div>
+
+            <div className="flex gap-1 mx-6 mb-4 p-1 rounded-lg bg-[#F1F3F5]" role="tablist">
+              <button
+                role="tab"
+                aria-selected={activeScope === "portfolio"}
+                onClick={() => handleScopeChange("portfolio")}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  activeScope === "portfolio"
+                    ? "bg-white text-[#1A1A1A] shadow-sm"
+                    : "text-[#6C757D] hover:text-[#1A1A1A]"
+                }`}
+              >
+                组合设置
+              </button>
+              <button
+                role="tab"
+                aria-selected={activeScope === "user"}
+                onClick={() => handleScopeChange("user")}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  activeScope === "user"
+                    ? "bg-white text-[#1A1A1A] shadow-sm"
+                    : "text-[#6C757D] hover:text-[#1A1A1A]"
+                }`}
+              >
+                用户设置
+              </button>
+              {userRole === "admin" && (
+                <button
+                  role="tab"
+                  aria-selected={activeScope === "system"}
+                  onClick={() => handleScopeChange("system")}
+                  className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    activeScope === "system"
+                      ? "bg-white text-[#1A1A1A] shadow-sm"
+                      : "text-[#6C757D] hover:text-[#1A1A1A]"
+                  }`}
+                >
+                  系统设置
+                </button>
+              )}
             </div>
 
             {/* Body: sidebar + content */}
@@ -442,7 +505,12 @@ export default function SettingsPanel({
                         ))}
                       </div>
                     </div>
+                  </div>
+                )}
 
+                {/* Market sources */}
+                {activeSection === "sources" && (
+                  <div className="space-y-6">
                     {marketSources && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -718,7 +786,6 @@ export default function SettingsPanel({
                         </button>
                       </div>
                     </div>
-
                     <div>
                       <label className="block text-sm font-medium text-[#1A1A1A] mb-2">
                         显示币种
@@ -1109,8 +1176,15 @@ export default function SettingsPanel({
                   </div>
                 )}
 
-                {/* Security */}
+                {/* User security */}
                 {activeSection === "security" && (
+                  <div className="space-y-6">
+                    <PasskeyManager />
+                  </div>
+                )}
+
+                {/* System security */}
+                {activeSection === "system-security" && (
                   <div className="space-y-6">
                     {/* OIDC */}
                     {userRole === "admin" && (
@@ -1203,9 +1277,6 @@ export default function SettingsPanel({
                         )}
                       </div>
                     )}
-
-                    {/* Passkey */}
-                    <PasskeyManager />
 
                     {/* WebAuthn */}
                     {userRole === "admin" && (
