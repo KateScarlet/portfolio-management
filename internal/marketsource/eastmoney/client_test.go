@@ -68,10 +68,10 @@ func TestFetchExchangeRate_UnsupportedPair(t *testing.T) {
 
 func TestParseF43(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		wantN   int
-		wantOk  bool
+		name   string
+		input  string
+		wantN  int
+		wantOk bool
 	}{
 		{"numeric", `1234`, 1234, true},
 		{"zero", `0`, 0, true},

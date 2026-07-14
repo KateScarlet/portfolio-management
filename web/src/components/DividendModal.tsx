@@ -113,44 +113,99 @@ export default function DividendModal({
         <div className="space-y-4">
           <label className="flex flex-col gap-2 text-xs font-bold text-[#6C757D]">
             分红总额
-            <input type="number" min="0" step="any" value={grossAmount} onChange={(event) => setGrossAmount(event.target.value)} className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal" />
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={grossAmount}
+              onChange={(event) => setGrossAmount(event.target.value)}
+              className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal"
+            />
           </label>
           <label className="flex flex-col gap-2 text-xs font-bold text-[#6C757D]">
             预扣税
-            <input type="number" min="0" step="any" value={taxAmount} onChange={(event) => setTaxAmount(event.target.value)} className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal" />
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={taxAmount}
+              onChange={(event) => setTaxAmount(event.target.value)}
+              className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal"
+            />
           </label>
           <label className="flex flex-col gap-2 text-xs font-bold text-[#6C757D]">
             支付日期
-            <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-normal" />
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(event) => setPaymentDate(event.target.value)}
+              className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-normal"
+            />
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setType("cash")} className={`px-3 py-2 rounded-lg text-sm border ${type === "cash" ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-[#DEE2E6] text-[#6C757D]"}`}>现金分红</button>
-            <button type="button" onClick={() => setType("reinvest")} className={`px-3 py-2 rounded-lg text-sm border ${type === "reinvest" ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-[#DEE2E6] text-[#6C757D]"}`}>红利再投资</button>
+            <button
+              type="button"
+              onClick={() => setType("cash")}
+              className={`px-3 py-2 rounded-lg text-sm border ${type === "cash" ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-[#DEE2E6] text-[#6C757D]"}`}
+            >
+              现金分红
+            </button>
+            <button
+              type="button"
+              onClick={() => setType("reinvest")}
+              className={`px-3 py-2 rounded-lg text-sm border ${type === "reinvest" ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-[#DEE2E6] text-[#6C757D]"}`}
+            >
+              红利再投资
+            </button>
           </div>
           {type === "reinvest" && (
             <label className="flex flex-col gap-2 text-xs font-bold text-[#6C757D]">
               再投资价格
-              <input type="number" min="0" step="any" value={reinvestmentPrice} onChange={(event) => setReinvestmentPrice(event.target.value)} className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal" />
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={reinvestmentPrice}
+                onChange={(event) => setReinvestmentPrice(event.target.value)}
+                className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-mono font-normal"
+              />
             </label>
           )}
           <label className="flex flex-col gap-2 text-xs font-bold text-[#6C757D]">
             备注
-            <input type="text" maxLength={500} value={note} onChange={(event) => setNote(event.target.value)} className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-normal" />
+            <input
+              type="text"
+              maxLength={500}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm font-normal"
+            />
           </label>
           {netAmount?.isPositive() && (
             <div className="bg-[#F8F9FA] rounded-lg p-3 text-sm">
               <span className="text-[#6C757D]">净分红：</span>
-              <span className="font-medium">{netAmount.toString()} {holding.currency || "CNY"}</span>
+              <span className="font-medium">
+                {netAmount.toString()} {holding.currency || "CNY"}
+              </span>
               {type === "reinvest" && parseDecimal(reinvestmentPrice)?.isPositive() && (
-                <div className="text-xs text-[#6C757D] mt-1">预计新增 {netAmount.div(reinvestmentPrice).toString()} 份</div>
+                <div className="text-xs text-[#6C757D] mt-1">
+                  预计新增 {netAmount.div(reinvestmentPrice).toString()} 份
+                </div>
               )}
             </div>
           )}
         </div>
 
         <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F3F5]">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#6C757D]">取消</button>
-          <button type="button" onClick={submit} disabled={submitting} className="px-4 py-2 text-sm text-white bg-[#1A1A1A] rounded-xl disabled:opacity-50">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#6C757D]">
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="px-4 py-2 text-sm text-white bg-[#1A1A1A] rounded-xl disabled:opacity-50"
+          >
             {submitting ? "提交中..." : "确认"}
           </button>
         </div>

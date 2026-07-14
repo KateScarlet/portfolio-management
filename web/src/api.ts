@@ -598,7 +598,7 @@ export async function fetchDividends(pid: string, holdingId?: string): Promise<D
 }
 
 export async function deleteDividend(pid: string, id: string): Promise<void> {
-	await request<void>(`/api/portfolios/${pid}/dividends/${id}`, {
+  await request<void>(`/api/portfolios/${pid}/dividends/${id}`, {
     method: "DELETE",
   })
 }

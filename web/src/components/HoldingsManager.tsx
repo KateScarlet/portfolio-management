@@ -749,11 +749,12 @@ export default function HoldingsManager({
                                               div.currency || "CNY"
                                             )}
                                           </span>
-                                          {div.type === "reinvest" && toDecimal(div.reinvestedShares).isPositive() && (
-                                            <span className="w-20 text-right text-[#6C757D]">
-                                              ×{div.reinvestedShares}
-                                            </span>
-                                          )}
+                                          {div.type === "reinvest" &&
+                                            toDecimal(div.reinvestedShares).isPositive() && (
+                                              <span className="w-20 text-right text-[#6C757D]">
+                                                ×{div.reinvestedShares}
+                                              </span>
+                                            )}
                                           <button
                                             onClick={() => setEditingDividend(div)}
                                             className="text-[10px] text-[#ADB5BD] hover:text-[#495057] transition-colors"
