@@ -146,6 +146,9 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
 	}
+	if err := migrateHoldingCostToNetInvestment(db); err != nil {
+		return nil, err
+	}
 
 	// 迁移：将 account_id 为 NULL 的持仓转移到默认账户
 	var holdingsWithNull []models.Holding
@@ -180,6 +183,41 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
 
 	return db, nil
+}
+
+// migrateHoldingCostToNetInvestment makes Holding.Cost a derived net-cash-flow
+// value. It is intentionally idempotent so data created by older releases is
+// corrected on the first startup and remains consistent on later startups.
+func migrateHoldingCostToNetInvestment(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+			UPDATE holding_lots
+			SET source = 'dividend_reinvest'
+			FROM dividend_events
+			WHERE dividend_events.holding_lot_id = holding_lots.id
+		`).Error; err != nil {
+			return err
+		}
+
+		var holdings []models.Holding
+		if err := tx.Find(&holdings).Error; err != nil {
+			return err
+		}
+		for i := range holdings {
+			lots, err := models.LoadLots(tx, holdings[i].ID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holdings[i], lots)
+			if err := tx.Model(&holdings[i]).Updates(map[string]any{
+				"shares": holdings[i].Shares, "value": holdings[i].Value,
+				"cost": holdings[i].Cost, "cost_price": holdings[i].CostPrice,
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // removeLegacyDividendLedger is a one-time destructive migration. The old

@@ -94,6 +94,7 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
+			costBasis := models.CostBasis(lots)
 			switch {
 			case input.Shares.IsPositive():
 				if input.Shares.GreaterThan(holding.Shares) {
@@ -105,9 +106,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				realizedValue = input.Shares.Mul(input.Price).Sub(input.Fee)
 				if holding.Shares.IsPositive() {
 					if input.Shares.GreaterThanOrEqual(holding.Shares) {
-						costReduction = holding.Cost
+						costReduction = costBasis
 					} else {
-						costReduction = holding.Cost.Div(holding.Shares).Mul(input.Shares)
+						costReduction = costBasis.Div(holding.Shares).Mul(input.Shares)
 					}
 				}
 			case input.Value.IsPositive():
@@ -120,12 +121,12 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 				realizedValue = input.Value.Sub(input.Fee)
 				if holding.Value.IsPositive() {
 					if input.Value.GreaterThanOrEqual(holding.Value) {
-						costReduction = holding.Cost
+						costReduction = costBasis
 					} else {
-						costReduction = holding.Cost.Div(holding.Value).Mul(input.Value)
+						costReduction = costBasis.Div(holding.Value).Mul(input.Value)
 					}
-				} else if holding.Cost.IsPositive() {
-					costReduction = holding.Cost
+				} else if costBasis.IsPositive() {
+					costReduction = costBasis
 				}
 			default:
 				return &httpError{status: consts.StatusBadRequest, msg: "需要提供股数或金额"}

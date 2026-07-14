@@ -85,6 +85,29 @@ func TestListHoldings_ReturnsUserHoldings(t *testing.T) {
 	}
 }
 
+func TestListHoldings_MergePreservesTotalDividends(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	holdingID := createTestHolding(t, db, 10, 100, 900)
+	if err := db.Model(&models.Holding{}).Where("id = ?", holdingID).
+		Update("total_dividends", decimal.NewFromInt(85)).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("GET", "/api/holdings?merge=true", nil)
+	ListHoldings(db, testRouter())(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var holdings []MergedHolding
+	if err := json.Unmarshal(c.Response.Body(), &holdings); err != nil {
+		t.Fatal(err)
+	}
+	if len(holdings) != 1 || !holdings[0].TotalDividends.Equal(decimal.NewFromInt(85)) {
+		t.Fatalf("expected merged dividends=85, got %+v", holdings)
+	}
+}
+
 func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	createTestHolding(t, db, 10, 100, 900)
@@ -657,7 +680,7 @@ func TestDeleteLot_OtherUserCannotDelete(t *testing.T) {
 
 func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
-		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80)},
+		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80), TotalDividends: decimal.NewFromInt(85)},
 	}
 	lotsMap := make(map[uuid.UUID][]models.HoldingLot)
 	if err := convertHoldingsCurrency(holdings, lotsMap, "CNY", testRouter(), testUserID); err != nil {
@@ -668,6 +691,9 @@ func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	}
 	if holdings[0].Currency != "CNY" {
 		t.Errorf("expected currency unchanged at CNY, got %s", holdings[0].Currency)
+	}
+	if !holdings[0].TotalDividends.Equal(decimal.NewFromInt(85)) {
+		t.Errorf("expected dividends unchanged at 85, got %s", holdings[0].TotalDividends)
 	}
 }
 

@@ -116,7 +116,7 @@ export default function AccountView({
     const value = toDecimal(h.value)
     const cost = toDecimal(h.cost)
     const profit = value.minus(cost)
-    const returnRate = cost.isZero() ? new Decimal(0) : profit.div(cost)
+    const returnRate = cost.isPositive() ? profit.div(cost) : new Decimal(0)
     const profitColor = getProfitColor(profit.isPositive(), colorScheme)
 
     return (
@@ -185,12 +185,12 @@ export default function AccountView({
             )}
           </td>
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
-            {h.cost && toDecimal(h.cost).isPositive() ? (
+            {h.cost && !toDecimal(h.cost).isZero() ? (
               <div>
                 <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
                 {toDecimal(h.totalDividends || "0").isPositive() && (
                   <p className="text-[10px] text-yellow-600">
-                    含分红 {formatCurrencyByCode(h.totalDividends || "0", h.currency || "CNY")}
+                    累计分红 {formatCurrencyByCode(h.totalDividends || "0", h.currency || "CNY")}
                   </p>
                 )}
               </div>
@@ -199,14 +199,25 @@ export default function AccountView({
             )}
           </td>
           <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
-            {h.cost && toDecimal(h.cost).isPositive() ? (
+            <div>
               <p className={profitColor}>
                 {profit.isPositive() ? "+" : ""}
-                {formatPercent(returnRate.toNumber())}
+                {formatCurrencyByCode(profit.toString(), h.currency || "CNY")}
               </p>
-            ) : (
-              <span className="text-[#ADB5BD] text-xs">-</span>
-            )}
+              {cost.isPositive() ? (
+                <p className="text-[10px] text-[#6C757D]">
+                  {profit.isPositive() ? "+" : ""}
+                  {formatPercent(returnRate.toNumber())}
+                </p>
+              ) : (
+                <p className="text-[10px] text-emerald-600">
+                  已回本
+                  {cost.isNegative()
+                    ? ` · 净回收 ${formatCurrencyByCode(cost.abs().toString(), h.currency || "CNY")}`
+                    : ""}
+                </p>
+              )}
+            </div>
           </td>
           <td className="px-6 py-5 text-right font-medium text-sm font-mono">
             {formatCurrencyByCode(h.value, h.currency || "CNY")}
@@ -335,7 +346,7 @@ export default function AccountView({
                   <th className="px-6 py-4 font-bold">代码/名称</th>
                   {!selectedAccount && <th className="px-6 py-4 font-bold">账户</th>}
                   <th className="px-6 py-4 font-bold text-right">净值 & 份额</th>
-                  <th className="px-6 py-4 font-bold text-right">总成本</th>
+                  <th className="px-6 py-4 font-bold text-right">净投入</th>
                   <th className="px-6 py-4 font-bold text-right">盈亏</th>
                   <th className="px-6 py-4 font-bold text-right">当前总市值</th>
                   <th className="px-6 py-4 font-bold text-right">操作</th>

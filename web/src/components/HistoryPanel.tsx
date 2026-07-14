@@ -42,7 +42,7 @@ export default function HistoryPanel({
             <tr>
               <th className="px-6 py-4 font-bold">日期</th>
               <th className="px-6 py-4 font-bold">总价值</th>
-              <th className="px-6 py-4 font-bold">总成本</th>
+              <th className="px-6 py-4 font-bold">净投入</th>
               <th className="px-6 py-4 font-bold">累计盈亏</th>
               <th className="px-6 py-4 font-bold">股票</th>
               <th className="px-6 py-4 font-bold">债券</th>

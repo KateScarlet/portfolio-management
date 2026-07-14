@@ -80,6 +80,13 @@ func TestDividendCashLifecycle(t *testing.T) {
 	if !fund.Amount.Equal(decimal.NewFromInt(85)) {
 		t.Fatalf("expected available fund 85, got %s", fund.Amount)
 	}
+	var holding models.Holding
+	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !holding.Cost.Equal(decimal.NewFromInt(815)) {
+		t.Fatalf("expected cash dividend to reduce net investment to 815, got %s", holding.Cost)
+	}
 
 	deleteCtx := newDividendCtx("DELETE", dividend.ID.String(), nil)
 	DeleteDividend(db)(context.Background(), deleteCtx)
@@ -91,6 +98,12 @@ func TestDividendCashLifecycle(t *testing.T) {
 	}
 	if !fund.Amount.IsZero() {
 		t.Fatalf("expected available fund 0 after delete, got %s", fund.Amount)
+	}
+	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !holding.Cost.Equal(decimal.NewFromInt(900)) {
+		t.Fatalf("expected deleting cash dividend to restore net investment to 900, got %s", holding.Cost)
 	}
 }
 
@@ -117,8 +130,8 @@ func TestDividendReinvestmentPersistsShares(t *testing.T) {
 	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !holding.Shares.Equal(decimal.NewFromInt(15)) || !holding.TotalDividends.Equal(decimal.NewFromInt(100)) {
-		t.Fatalf("unexpected holding after reinvestment: shares=%s dividends=%s", holding.Shares, holding.TotalDividends)
+	if !holding.Shares.Equal(decimal.NewFromInt(15)) || !holding.TotalDividends.Equal(decimal.NewFromInt(100)) || !holding.Cost.Equal(decimal.NewFromInt(900)) {
+		t.Fatalf("unexpected holding after reinvestment: shares=%s dividends=%s netInvestment=%s", holding.Shares, holding.TotalDividends, holding.Cost)
 	}
 }
 
@@ -258,8 +271,8 @@ func TestUpdateDividend_CashReinvestCashLifecycle(t *testing.T) {
 	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !holding.Shares.Equal(decimal.NewFromInt(15)) || !holding.TotalDividends.Equal(decimal.NewFromInt(100)) {
-		t.Fatalf("unexpected holding after reinvestment: shares=%s dividends=%s", holding.Shares, holding.TotalDividends)
+	if !holding.Shares.Equal(decimal.NewFromInt(15)) || !holding.TotalDividends.Equal(decimal.NewFromInt(100)) || !holding.Cost.Equal(decimal.NewFromInt(900)) {
+		t.Fatalf("unexpected holding after reinvestment: shares=%s dividends=%s netInvestment=%s", holding.Shares, holding.TotalDividends, holding.Cost)
 	}
 	var fund models.AvailableFund
 	if err := db.Where("portfolio_id = ? AND currency = ?", testPortfolioID, "USD").First(&fund).Error; err != nil {
@@ -294,8 +307,8 @@ func TestUpdateDividend_CashReinvestCashLifecycle(t *testing.T) {
 	if err := db.First(&holding, "id = ?", holdingID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !holding.Shares.Equal(decimal.NewFromInt(10)) || !holding.TotalDividends.Equal(decimal.NewFromInt(80)) {
-		t.Fatalf("unexpected holding after cash update: shares=%s dividends=%s", holding.Shares, holding.TotalDividends)
+	if !holding.Shares.Equal(decimal.NewFromInt(10)) || !holding.TotalDividends.Equal(decimal.NewFromInt(80)) || !holding.Cost.Equal(decimal.NewFromInt(820)) {
+		t.Fatalf("unexpected holding after cash update: shares=%s dividends=%s netInvestment=%s", holding.Shares, holding.TotalDividends, holding.Cost)
 	}
 	if err := db.First(&fund, "id = ?", fund.ID).Error; err != nil {
 		t.Fatal(err)

@@ -172,15 +172,24 @@ export default function HoldingsManager({
     onRefreshAvailableFunds()
   }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
 
-  const handleDividendConfirm = useCallback(async () => {
-    try {
-      const freshHoldings = await api.fetchHoldings(portfolioId)
-      setHoldings(freshHoldings)
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "刷新持仓失败", "error")
-    }
-    onRefreshAvailableFunds()
-  }, [portfolioId, setHoldings, onRefreshAvailableFunds, showToast])
+  const handleDividendConfirm = useCallback(
+    async (savedDividend: Dividend) => {
+      if (expandedId === savedDividend.holdingId) {
+        setExpandedDividends((current) => [
+          savedDividend,
+          ...current.filter((item) => item.id !== savedDividend.id),
+        ])
+      }
+      try {
+        const freshHoldings = await api.fetchHoldings(portfolioId)
+        setHoldings(freshHoldings)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "刷新持仓失败", "error")
+      }
+      await onRefreshAvailableFunds()
+    },
+    [expandedId, portfolioId, setHoldings, onRefreshAvailableFunds, showToast]
+  )
 
   // Pre-compute lot groups for each holding (for merged view)
   const lotGroupsByHolding = new Map<
@@ -460,7 +469,7 @@ export default function HoldingsManager({
               <th className="px-6 py-4 font-bold">资产大类</th>
               <th className="px-6 py-4 font-bold">代码/名称</th>
               <th className="px-6 py-4 font-bold text-right">净值 & 份额</th>
-              <th className="px-6 py-4 font-bold text-right">总成本</th>
+              <th className="px-6 py-4 font-bold text-right">净投入</th>
               <th className="px-6 py-4 font-bold text-right">盈亏</th>
               <th className="px-6 py-4 font-bold text-right">当前总市值</th>
               <th className="px-6 py-4 font-bold text-right">操作</th>
@@ -548,12 +557,12 @@ export default function HoldingsManager({
                         )}
                       </td>
                       <td className="px-6 py-5 text-right font-mono text-sm text-[#495057]">
-                        {h.cost && toDecimal(h.cost).isPositive() ? (
+                        {h.cost && !toDecimal(h.cost).isZero() ? (
                           <div>
                             <p>{formatCurrencyByCode(h.cost, h.currency || "CNY")}</p>
                             {toDecimal(h.totalDividends || "0").isPositive() && (
                               <p className="text-[10px] text-yellow-600">
-                                含分红{" "}
+                                累计分红{" "}
                                 {formatCurrencyByCode(h.totalDividends || "0", h.currency || "CNY")}
                               </p>
                             )}
@@ -566,26 +575,34 @@ export default function HoldingsManager({
                         {(() => {
                           const value = toDecimal(h.value)
                           const cost = toDecimal(h.cost)
-                          const totalDividends = toDecimal(h.totalDividends || "0")
                           if (
-                            cost.isZero() ||
                             !Number.isFinite(value.toNumber()) ||
                             !Number.isFinite(cost.toNumber())
                           ) {
                             return <span className="text-[#ADB5BD] text-xs">-</span>
                           }
-                          const profit = value.minus(cost).plus(totalDividends)
-                          const returnRate = profit.div(cost)
-                          const rateNum = returnRate.toNumber()
-                          if (!Number.isFinite(rateNum)) {
-                            return <span className="text-[#ADB5BD] text-xs">-</span>
-                          }
+                          const profit = value.minus(cost)
                           const isPositive = profit.isPositive()
                           return (
-                            <p className={getProfitColor(isPositive, colorScheme)}>
-                              {isPositive ? "+" : ""}
-                              {formatPercent(rateNum)}
-                            </p>
+                            <div>
+                              <p className={getProfitColor(isPositive, colorScheme)}>
+                                {isPositive ? "+" : ""}
+                                {formatCurrencyByCode(profit.toString(), h.currency || "CNY")}
+                              </p>
+                              {cost.isPositive() ? (
+                                <p className="text-[10px] text-[#6C757D]">
+                                  {isPositive ? "+" : ""}
+                                  {formatPercent(profit.div(cost).toNumber())}
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-emerald-600">
+                                  已回本
+                                  {cost.isNegative()
+                                    ? ` · 净回收 ${formatCurrencyByCode(cost.abs().toString(), h.currency || "CNY")}`
+                                    : ""}
+                                </p>
+                              )}
+                            </div>
                           )
                         })()}
                       </td>

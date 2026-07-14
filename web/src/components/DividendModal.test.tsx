@@ -51,11 +51,12 @@ describe("DividendModal", () => {
 
   it("submits a reinvestment using the holding currency", async () => {
     vi.mocked(api.recordDividend).mockResolvedValue(dividendResult())
+    const onConfirm = vi.fn()
     render(
       <DividendModal
         portfolioId="portfolio-1"
         holding={holding}
-        onConfirm={vi.fn()}
+        onConfirm={onConfirm}
         onClose={vi.fn()}
       />
     )
@@ -81,6 +82,7 @@ describe("DividendModal", () => {
       expect.anything(),
       expect.objectContaining({ currency: expect.anything() })
     )
+    expect(onConfirm).toHaveBeenCalledWith(dividendResult())
   })
 
   it("rejects an empty amount without throwing", () => {

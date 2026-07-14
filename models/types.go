@@ -20,6 +20,7 @@ type HoldingLot struct {
 	Cost       decimal.Decimal `gorm:"type:decimal;default:0;comment:交易成本(买入为成本增加,卖出为成本减少)" json:"cost"`
 	ValueAdded decimal.Decimal `gorm:"type:decimal;default:0;comment:市值变动(买入为购买时市值,卖出为卖出时市值)" json:"valueAdded"`
 	Fee        decimal.Decimal `gorm:"type:decimal;default:0;comment:交易手续费" json:"fee"`
+	Source     string          `gorm:"size:30;default:'trade';comment:批次来源(trade/dividend_reinvest)" json:"source,omitempty"`
 }
 
 type AssetMapColumn map[string]decimal.Decimal
@@ -81,7 +82,7 @@ type Holding struct {
 	Price          decimal.Decimal `gorm:"type:decimal;default:0;comment:当前价格" json:"price"`
 	CostPrice      decimal.Decimal `gorm:"type:decimal;default:0;comment:成本单价" json:"costPrice"`
 	Value          decimal.Decimal `gorm:"type:decimal;default:0;comment:当前市值(shares*price)" json:"value"`
-	Cost           decimal.Decimal `gorm:"type:decimal;default:0;comment:总成本(买入成本-卖出成本,不含手续费)" json:"cost"`
+	Cost           decimal.Decimal `gorm:"type:decimal;default:0;comment:净投入(买入支出-卖出净回款-现金分红)" json:"cost"`
 	TotalDividends decimal.Decimal `gorm:"type:decimal;default:0;comment:累计已收分红" json:"totalDividends"`
 	Date           time.Time       `gorm:"comment:建仓日期" json:"date"`
 	Fee            decimal.Decimal `gorm:"-" json:"fee"`
@@ -202,36 +203,39 @@ type WebAuthnSession struct {
 // Convention:
 //   - Buy lot: Cost = raw cost (shares * costPrice, NO fee); ValueAdded = market value at purchase; Fee = transaction fee
 //   - Sell lot: Cost = proportional cost reduction; ValueAdded = value removed from holding; Fee = transaction fee
-//   - Holding: Cost = total buy costs - total sell costs (NO fees); Value = current market value
-//   - Total investment (principal) = Cost + BuyFees()
+//   - Holding: Cost is net investment: trade buys including fees, minus net
+//     sale proceeds and cash dividends. Dividend reinvestment is an internal
+//     transfer and therefore contributes zero net investment.
+//   - Lot Cost remains the acquisition-cost basis used to calculate realized
+//     gains when selling; it is deliberately separate from Holding.Cost.
 func RecalcFromLots(h *Holding, lots []HoldingLot) {
-	if len(lots) == 0 {
-		h.Shares = decimal.Zero
-		h.Value = decimal.Zero
-		h.Cost = decimal.Zero
-		h.CostPrice = decimal.Zero
-		return
-	}
-
 	var totalBuyShares, totalSellShares decimal.Decimal
-	var totalBuyCost, totalSellCost decimal.Decimal
+	var netInvestment, reinvestedDividends decimal.Decimal
 	var totalBuyValue, totalSellValue decimal.Decimal
 
 	for i := range lots {
 		if lots[i].Type == "sell" {
 			totalSellShares = totalSellShares.Add(lots[i].Shares)
-			totalSellCost = totalSellCost.Add(lots[i].Cost)
 			totalSellValue = totalSellValue.Add(lots[i].ValueAdded)
+			netInvestment = netInvestment.Sub(lots[i].ValueAdded.Sub(lots[i].Fee))
 		} else {
 			totalBuyShares = totalBuyShares.Add(lots[i].Shares)
-			totalBuyCost = totalBuyCost.Add(lots[i].Cost)
 			totalBuyValue = totalBuyValue.Add(lots[i].ValueAdded)
+			if lots[i].Source == "dividend_reinvest" {
+				reinvestedDividends = reinvestedDividends.Add(lots[i].Cost)
+			} else {
+				netInvestment = netInvestment.Add(lots[i].Cost).Add(lots[i].Fee)
+			}
 		}
+	}
+	cashDividends := h.TotalDividends.Sub(reinvestedDividends)
+	if cashDividends.IsPositive() {
+		netInvestment = netInvestment.Sub(cashDividends)
 	}
 
 	if h.Symbol != "" {
 		h.Shares = totalBuyShares.Sub(totalSellShares)
-		h.Cost = totalBuyCost.Sub(totalSellCost)
+		h.Cost = netInvestment
 		if h.Shares.IsPositive() {
 			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {
@@ -241,13 +245,28 @@ func RecalcFromLots(h *Holding, lots []HoldingLot) {
 	} else {
 		h.Shares = totalBuyShares.Sub(totalSellShares)
 		h.Value = totalBuyValue.Sub(totalSellValue)
-		h.Cost = totalBuyCost.Sub(totalSellCost)
+		h.Cost = netInvestment
 		if h.Shares.IsPositive() {
 			h.CostPrice = h.Cost.Div(h.Shares)
 		} else {
 			h.CostPrice = decimal.Zero
 		}
 	}
+}
+
+// CostBasis returns the remaining acquisition-cost basis represented by lots.
+// Unlike Holding.Cost (net investment), it includes dividend-reinvestment lots
+// and is reduced by the basis allocated to prior sales.
+func CostBasis(lots []HoldingLot) decimal.Decimal {
+	total := decimal.Zero
+	for i := range lots {
+		if lots[i].Type == "sell" {
+			total = total.Sub(lots[i].Cost)
+		} else {
+			total = total.Add(lots[i].Cost)
+		}
+	}
+	return total
 }
 
 // TotalFees returns the sum of all lot fees for this holding.

@@ -8,7 +8,7 @@ interface DividendModalProps {
   portfolioId: string
   holding: Holding
   dividend?: Dividend
-  onConfirm: (updatedHolding: Holding) => void | Promise<void>
+  onConfirm: (savedDividend: Dividend) => void | Promise<void>
   onClose: () => void
 }
 
@@ -85,12 +85,16 @@ export default function DividendModal({
 
     setSubmitting(true)
     try {
+      let savedDividend: Dividend
       if (dividend) {
-        await api.updateDividend(portfolioId, dividend.id, payload)
+        savedDividend = await api.updateDividend(portfolioId, dividend.id, payload)
       } else {
-        await api.recordDividend(portfolioId, { holdingId: holding.id, ...payload })
+        savedDividend = await api.recordDividend(portfolioId, {
+          holdingId: holding.id,
+          ...payload,
+        })
       }
-      await onConfirm(holding)
+      await onConfirm(savedDividend)
       onClose()
       showToast(dividend ? "分红记录已更新" : "分红记录成功", "success")
     } catch (error) {

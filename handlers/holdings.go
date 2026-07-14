@@ -41,6 +41,7 @@ func convertHoldingsCurrency(holdings []models.Holding, lotsMap map[uuid.UUID][]
 		h.Value = h.Value.Mul(rate)
 		h.Cost = h.Cost.Mul(rate)
 		h.CostPrice = h.CostPrice.Mul(rate)
+		h.TotalDividends = h.TotalDividends.Mul(rate)
 		lots := lotsMap[h.ID]
 		for j := range lots {
 			lots[j].Fee = lots[j].Fee.Mul(rate)
@@ -183,6 +184,7 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				mh.Shares = mh.Shares.Add(h.Shares)
 				mh.Cost = mh.Cost.Add(h.Cost)
 				mh.Value = mh.Value.Add(h.Value)
+				mh.TotalDividends = mh.TotalDividends.Add(h.TotalDividends)
 			}
 
 			// Compute merged CostPrice and append all lots
@@ -676,19 +678,10 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 
-			lots, err := models.LoadLots(tx, holding.ID)
-			if err != nil {
-				return err
-			}
-
-			var realizedValue decimal.Decimal
-			for i := range lots {
-				lot := &lots[i]
-				if lot.Type == "sell" {
-					realizedValue = realizedValue.Add(lot.ValueAdded).Sub(lot.Fee)
-				}
-			}
-			refundAmount := holding.Cost.Add(models.BuyFees(lots)).Sub(realizedValue)
+			// Holding.Cost is the remaining net cash invested. Reversing a
+			// holding therefore returns a positive balance or reclaims a
+			// negative balance already recovered through sales/dividends.
+			refundAmount := holding.Cost
 			if refundAmount.IsPositive() {
 				currency := holding.Currency
 				if currency == "" {
@@ -705,6 +698,20 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 					Amount:      refundAmount,
 					Currency:    currency,
 					HoldingID:   &holding.ID,
+				}).Error; err != nil {
+					return err
+				}
+			} else if refundAmount.IsNegative() {
+				currency := holding.Currency
+				if currency == "" {
+					currency = "CNY"
+				}
+				if err := deductAvailableFund(tx, user.UserID, portfolioID, currency, refundAmount.Abs()); err != nil {
+					return err
+				}
+				if err := tx.Create(&models.FundTransaction{
+					ID: uuid.New(), UserID: user.UserID, PortfolioID: portfolioID,
+					Type: "delete", Amount: refundAmount.Abs(), Currency: currency, HoldingID: &holding.ID,
 				}).Error; err != nil {
 					return err
 				}

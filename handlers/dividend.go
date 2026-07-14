@@ -167,7 +167,7 @@ func createDividendLot(holding models.Holding, paymentDate time.Time, netAmount,
 	return models.HoldingLot{
 		ID: uuid.New(), HoldingID: holding.ID, Type: "buy", Date: paymentDate,
 		Shares: netAmount.Div(price), CostPrice: price, Cost: netAmount,
-		ValueAdded: netAmount, Fee: decimal.Zero,
+		ValueAdded: netAmount, Fee: decimal.Zero, Source: "dividend_reinvest",
 	}
 }
 
@@ -227,15 +227,16 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 				}
 				dividend.HoldingLotID = &lot.ID
 				dividend.ReinvestedShares = lot.Shares
-				lots, err := models.LoadLots(tx, holding.ID)
-				if err != nil {
-					return err
-				}
-				models.RecalcFromLots(&holding, lots)
 			}
+			holding.TotalDividends = holding.TotalDividends.Add(netAmount)
+			lots, err := models.LoadLots(tx, holding.ID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, lots)
 			if err := tx.Model(&holding).Updates(map[string]any{
 				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost,
-				"cost_price": holding.CostPrice, "total_dividends": gorm.Expr("total_dividends + ?", netAmount),
+				"cost_price": holding.CostPrice, "total_dividends": holding.TotalDividends,
 			}).Error; err != nil {
 				return err
 			}
@@ -353,10 +354,11 @@ func UpdateDividend(db *gorm.DB) app.HandlerFunc {
 			if err != nil {
 				return err
 			}
+			holding.TotalDividends = holding.TotalDividends.Add(newNetAmount.Sub(dividend.NetAmount))
 			models.RecalcFromLots(&holding, lots)
 			if err := tx.Model(&holding).Updates(map[string]any{
 				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost, "cost_price": holding.CostPrice,
-				"total_dividends": gorm.Expr("total_dividends + ?", newNetAmount.Sub(dividend.NetAmount)),
+				"total_dividends": holding.TotalDividends,
 			}).Error; err != nil {
 				return err
 			}
@@ -436,15 +438,16 @@ func DeleteDividend(db *gorm.DB) app.HandlerFunc {
 				if err := models.DeleteLotByID(tx, *dividend.HoldingLotID); err != nil {
 					return err
 				}
-				lots, err := models.LoadLots(tx, holding.ID)
-				if err != nil {
-					return err
-				}
-				models.RecalcFromLots(&holding, lots)
 			}
+			holding.TotalDividends = holding.TotalDividends.Sub(dividend.NetAmount)
+			lots, err := models.LoadLots(tx, holding.ID)
+			if err != nil {
+				return err
+			}
+			models.RecalcFromLots(&holding, lots)
 			if err := tx.Model(&holding).Updates(map[string]any{
 				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost, "cost_price": holding.CostPrice,
-				"total_dividends": gorm.Expr("total_dividends - ?", dividend.NetAmount),
+				"total_dividends": holding.TotalDividends,
 			}).Error; err != nil {
 				return err
 			}

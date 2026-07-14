@@ -108,6 +108,7 @@ export interface HoldingLot {
   cost?: string
   valueAdded?: string
   fee?: string // 手续费
+  source?: "trade" | "dividend_reinvest"
 }
 
 export interface Holding {
@@ -122,7 +123,7 @@ export interface Holding {
   price: string
   costPrice?: string // Avg cost per share for calculated holdings
   value: string // Current total value
-  cost?: string // Total cost basis
+  cost?: string // Net investment
   totalDividends?: string // 累计分红金额
   date?: string // Original purchase date for the lot being added
   fee?: string // 手续费（仅用于创建时传递）

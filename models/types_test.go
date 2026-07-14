@@ -22,17 +22,21 @@ func TestHolding_RecalcFromLots_SymbolBased(t *testing.T) {
 	if !h.Shares.Equal(decimal.NewFromInt(12)) {
 		t.Errorf("expected shares=12, got %s", h.Shares)
 	}
-	if !h.Cost.Equal(decimal.NewFromInt(1155)) {
-		t.Errorf("expected cost=1155, got %s", h.Cost)
+	if !h.Cost.Equal(decimal.NewFromInt(1150)) {
+		t.Errorf("expected net investment=1150, got %s", h.Cost)
 	}
-	if !h.CostPrice.Equal(decimal.RequireFromString("96.25")) {
-		t.Errorf("expected costPrice=96.25, got %s", h.CostPrice)
+	expectedCostPrice := decimal.NewFromInt(1150).Div(decimal.NewFromInt(12))
+	if !h.CostPrice.Equal(expectedCostPrice) {
+		t.Errorf("expected costPrice=%s, got %s", expectedCostPrice, h.CostPrice)
 	}
 	if !h.Value.Equal(decimal.NewFromInt(1200)) {
 		t.Errorf("expected value=1200, got %s", h.Value)
 	}
 	if !TotalFees(lots).Equal(decimal.NewFromInt(10)) {
 		t.Errorf("expected totalFees=10, got %s", TotalFees(lots))
+	}
+	if !CostBasis(lots).Equal(decimal.NewFromInt(1155)) {
+		t.Errorf("expected remaining cost basis=1155, got %s", CostBasis(lots))
 	}
 }
 
@@ -76,8 +80,8 @@ func TestHolding_RecalcFromLots_FullySold(t *testing.T) {
 	if !h.Shares.IsZero() {
 		t.Errorf("expected shares=0, got %s", h.Shares)
 	}
-	if !h.Cost.IsZero() {
-		t.Errorf("expected cost=0, got %s", h.Cost)
+	if !h.Cost.Equal(decimal.NewFromInt(-90)) {
+		t.Errorf("expected net investment=-90, got %s", h.Cost)
 	}
 	if !h.Value.IsZero() {
 		t.Errorf("expected value=0, got %s", h.Value)
@@ -101,8 +105,8 @@ func TestHolding_RecalcFromLots_ManualHolding(t *testing.T) {
 	if !h.Value.Equal(decimal.NewFromInt(5500)) {
 		t.Errorf("expected value=5500, got %s", h.Value)
 	}
-	if !h.Cost.Equal(decimal.NewFromInt(6000)) {
-		t.Errorf("expected cost=6000, got %s", h.Cost)
+	if !h.Cost.Equal(decimal.NewFromInt(5500)) {
+		t.Errorf("expected net investment=5500, got %s", h.Cost)
 	}
 }
 
@@ -132,6 +136,29 @@ func TestHolding_RecalcFromLots_Empty(t *testing.T) {
 	RecalcFromLots(h, nil)
 	if !h.Shares.IsZero() || !h.Value.IsZero() || !h.Cost.IsZero() || !h.CostPrice.IsZero() {
 		t.Fatalf("empty lots should reset calculated fields: %+v", h)
+	}
+}
+
+func TestHolding_RecalcFromLots_DividendCashAndReinvestment(t *testing.T) {
+	h := &Holding{
+		Symbol:         "VTI",
+		Price:          decimal.NewFromInt(100),
+		TotalDividends: decimal.NewFromInt(150),
+	}
+	lots := []HoldingLot{
+		{Type: "buy", Shares: decimal.NewFromInt(10), Cost: decimal.NewFromInt(1000), Fee: decimal.NewFromInt(5)},
+		{Type: "buy", Source: "dividend_reinvest", Shares: decimal.NewFromInt(1), Cost: decimal.NewFromInt(100)},
+	}
+
+	RecalcFromLots(h, lots)
+
+	// The 100 reinvested dividend is an internal transfer. Only the remaining
+	// 50 cash dividend reduces the original 1005 cash outlay.
+	if !h.Cost.Equal(decimal.NewFromInt(955)) {
+		t.Fatalf("expected net investment=955, got %s", h.Cost)
+	}
+	if !CostBasis(lots).Equal(decimal.NewFromInt(1100)) {
+		t.Fatalf("expected cost basis=1100, got %s", CostBasis(lots))
 	}
 }
 
