@@ -1,6 +1,6 @@
 # ---- Build frontend ----
 FROM node:26.5 AS frontend
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install -g pnpm@latest
 WORKDIR /app
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
