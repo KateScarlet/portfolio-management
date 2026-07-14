@@ -611,7 +611,7 @@ export default function App() {
             userRole={user.role}
             portfolioId={currentPortfolio.id}
           />
-          {user.role === "admin" && <UserManager />}
+          {user.role === "admin" && <UserManager currentUser={user} />}
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#6C757D]">{user.username}</span>
             <button
