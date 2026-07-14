@@ -36,6 +36,15 @@ export function formatPrice(value: string | number | undefined | null, currency:
   return `${symbol}${formatDecimal(value, 4)}`
 }
 
+export function formatShares(value: string | number | undefined | null): string {
+  const d = toDecimal(value)
+  if (d.isNaN() || !d.isFinite()) return "0"
+  return d
+    .toDecimalPlaces(4)
+    .toFixed()
+    .replace(/\.0+$|(\.\d*?)0+$/, "$1")
+}
+
 export function formatCurrency(value: string | number | undefined | null): string {
   return `${CURRENCY_SYMBOLS["CNY"]}${formatDecimal(value)}`
 }

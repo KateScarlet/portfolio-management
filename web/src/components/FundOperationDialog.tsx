@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { Portfolio } from "../types"
+import { AvailableFund, Portfolio } from "../types"
 import * as api from "../api"
 import { toDecimal } from "../utils"
 import { useToast } from "./toast-context"
@@ -10,6 +10,7 @@ type OperationType = "transfer_in" | "transfer_out" | "transfer" | "convert"
 interface FundOperationDialogProps {
   type: OperationType
   portfolios: Portfolio[]
+  availableFunds: AvailableFund[]
   currentPortfolioId: string
   currentCurrency?: string
   onClose: () => void
@@ -37,21 +38,29 @@ function parseDecimalInput(value: string) {
 export default function FundOperationDialog({
   type,
   portfolios,
+  availableFunds,
   currentPortfolioId,
   currentCurrency,
   onClose,
   onSuccess,
 }: FundOperationDialogProps) {
   const otherPortfolios = portfolios.filter((p) => p.id !== currentPortfolioId)
+  const availableCurrencies = [...new Set(availableFunds.map((fund) => fund.currency))]
+  const usesAvailableCurrencies = type !== "transfer_in"
+  const currencyOptions = usesAvailableCurrencies ? availableCurrencies : CURRENCIES
+  const initialCurrency =
+    currentCurrency && currencyOptions.includes(currentCurrency)
+      ? currentCurrency
+      : currencyOptions[0] || ""
 
-  const [currency, setCurrency] = useState(currentCurrency || "CNY")
+  const [currency, setCurrency] = useState(initialCurrency)
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
   const [targetPortfolioId, setTargetPortfolioId] = useState(
     type === "transfer" && otherPortfolios.length > 0 ? otherPortfolios[0].id : ""
   )
   const [toCurrency, setToCurrency] = useState(
-    type === "convert" ? CURRENCIES.find((c) => c !== (currentCurrency || "CNY")) || "USD" : ""
+    type === "convert" ? CURRENCIES.find((c) => c !== initialCurrency) || "" : ""
   )
   const [toAmount, setToAmount] = useState("")
   const [exchangeRate, setExchangeRate] = useState("")
@@ -109,6 +118,7 @@ export default function FundOperationDialog({
   }
 
   const handleSwap = () => {
+    if (!availableCurrencies.includes(toCurrency)) return
     setCurrency(toCurrency)
     setToCurrency(currency)
     setAmount(toAmount)
@@ -215,18 +225,31 @@ export default function FundOperationDialog({
                     onChange={(e) => setCurrency(e.target.value)}
                     className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                   >
-                    {CURRENCIES.filter((c) => c !== toCurrency).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    {currencyOptions.length === 0 ? (
+                      <option value="" disabled>
+                        暂无可用币种
                       </option>
-                    ))}
+                    ) : (
+                      currencyOptions
+                        .filter((c) => c !== toCurrency)
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))
+                    )}
                   </select>
                 </div>
                 <button
                   type="button"
                   onClick={handleSwap}
-                  className="mb-0.5 p-1.5 rounded-lg text-[#ADB5BD] hover:text-[#1A1A1A] hover:bg-[#F8F9FA] transition-colors"
-                  title="互换币种"
+                  disabled={!availableCurrencies.includes(toCurrency)}
+                  className="mb-0.5 p-1.5 rounded-lg text-[#ADB5BD] hover:text-[#1A1A1A] hover:bg-[#F8F9FA] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={
+                    availableCurrencies.includes(toCurrency)
+                      ? "互换币种"
+                      : "目标币种没有可用资金，无法互换"
+                  }
                 >
                   <ArrowLeftRight size={16} />
                 </button>
@@ -307,11 +330,17 @@ export default function FundOperationDialog({
                   onChange={(e) => setCurrency(e.target.value)}
                   className="px-3 py-2 border border-[#E9ECEF] rounded-lg text-sm bg-white focus:outline-none focus:border-[#1A1A1A]"
                 >
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {currencyOptions.length === 0 ? (
+                    <option value="" disabled>
+                      暂无可用币种
                     </option>
-                  ))}
+                  ) : (
+                    currencyOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
@@ -370,7 +399,7 @@ export default function FundOperationDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || (usesAvailableCurrencies && currencyOptions.length === 0)}
             className="px-4 py-2 text-sm text-white bg-[#1A1A1A] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {submitting ? "提交中..." : "确认"}

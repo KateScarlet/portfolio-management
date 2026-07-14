@@ -12,6 +12,7 @@ import AssetIcon from "./AssetIcon"
 import {
   formatCurrencyByCode,
   formatPrice,
+  formatShares,
   formatPercent,
   getProfitColor,
   toDecimal,
@@ -376,14 +377,14 @@ export default function HoldingsManager({
               </span>
               <span className="w-20 text-right">
                 <span className="text-[#ADB5BD]">× </span>
-                {lot.shares}
+                {formatShares(lot.shares)}
               </span>
             </>
           ) : (
             <>
               <span className="w-20 text-right">
                 <span className="text-[#ADB5BD]">数量 </span>
-                {lot.shares}份
+                {formatShares(lot.shares)}份
               </span>
               <span className="w-28 text-right">
                 <span className="text-[#ADB5BD]">成本 </span>
@@ -540,7 +541,7 @@ export default function HoldingsManager({
                         {h.symbol ? (
                           <div>
                             <p>{formatPrice(h.price, h.currency || "CNY")}</p>
-                            <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
+                            <p className="text-[10px] text-[#ADB5BD]">× {formatShares(h.shares)}</p>
                           </div>
                         ) : toDecimal(h.shares).isPositive() ? (
                           <div>
@@ -550,7 +551,7 @@ export default function HoldingsManager({
                                 h.currency || "CNY"
                               )}
                             </p>
-                            <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
+                            <p className="text-[10px] text-[#ADB5BD]">× {formatShares(h.shares)}</p>
                           </div>
                         ) : (
                           <span className="text-[#ADB5BD] text-xs">-</span>
@@ -590,7 +591,9 @@ export default function HoldingsManager({
                                 {formatCurrencyByCode(profit.toString(), h.currency || "CNY")}
                               </p>
                               {cost.isPositive() ? (
-                                <p className="text-[10px] text-[#6C757D]">
+                                <p
+                                  className={`text-[10px] ${getProfitColor(isPositive, colorScheme)}`}
+                                >
                                   {isPositive ? "+" : ""}
                                   {formatPercent(profit.div(cost).toNumber())}
                                 </p>

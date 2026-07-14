@@ -5,6 +5,7 @@ import {
   formatPercent,
   toDecimal,
   formatPrice,
+  formatShares,
   formatCurrencyByCode,
   getProfitColor,
 } from "./utils"
@@ -89,6 +90,20 @@ describe("formatPrice", () => {
   it("handles negative values", () => {
     const result = formatPrice(-50, "CNY")
     expect(result).toBe("¥-50.0000")
+  })
+})
+
+describe("formatShares", () => {
+  it("keeps at most 4 decimal places", () => {
+    expect(formatShares("12.345678")).toBe("12.3457")
+  })
+
+  it("removes trailing decimal zeroes", () => {
+    expect(formatShares("12.340000")).toBe("12.34")
+  })
+
+  it("does not add decimal places to integers", () => {
+    expect(formatShares("12")).toBe("12")
   })
 })
 

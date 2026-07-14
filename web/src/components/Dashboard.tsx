@@ -257,6 +257,7 @@ export default function Dashboard({
         <FundOperationDialog
           type={fundOperation.type}
           portfolios={portfolios}
+          availableFunds={availableFunds}
           currentPortfolioId={currentPortfolioId}
           currentCurrency={fundOperation.currency}
           onClose={() => setFundOperation(null)}

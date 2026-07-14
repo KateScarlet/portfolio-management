@@ -12,6 +12,7 @@ import {
 import {
   formatCurrencyByCode,
   formatPrice,
+  formatShares,
   formatPercent,
   getProfitColor,
   toDecimal,
@@ -178,7 +179,7 @@ export default function AccountView({
                 <p>
                   {formatPrice(toDecimal(h.value).div(h.shares).toString(), h.currency || "CNY")}
                 </p>
-                <p className="text-[10px] text-[#ADB5BD]">× {h.shares}</p>
+                <p className="text-[10px] text-[#ADB5BD]">× {formatShares(h.shares)}</p>
               </div>
             ) : (
               <span className="text-[#ADB5BD] text-xs">-</span>
@@ -205,7 +206,7 @@ export default function AccountView({
                 {formatCurrencyByCode(profit.toString(), h.currency || "CNY")}
               </p>
               {cost.isPositive() ? (
-                <p className="text-[10px] text-[#6C757D]">
+                <p className={`text-[10px] ${profitColor}`}>
                   {profit.isPositive() ? "+" : ""}
                   {formatPercent(returnRate.toNumber())}
                 </p>
@@ -274,7 +275,7 @@ export default function AccountView({
                             {lot.type === "sell" ? "卖出" : "买入"}
                           </span>
                         </td>
-                        <td className="py-1.5 text-right font-mono">{lot.shares}</td>
+                        <td className="py-1.5 text-right font-mono">{formatShares(lot.shares)}</td>
                         <td className="py-1.5 text-right font-mono">
                           {lot.costPrice ? formatPrice(lot.costPrice, h.currency || "CNY") : "-"}
                         </td>
