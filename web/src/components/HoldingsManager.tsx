@@ -772,7 +772,7 @@ export default function HoldingsManager({
                                           {div.type === "reinvest" &&
                                             toDecimal(div.reinvestedShares).isPositive() && (
                                               <span className="w-20 text-right text-[#6C757D]">
-                                                ×{div.reinvestedShares}
+                                                ×{formatShares(div.reinvestedShares)}
                                               </span>
                                             )}
                                           <button
