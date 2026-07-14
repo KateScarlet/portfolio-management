@@ -43,11 +43,21 @@ var (
 type eastmoneyResponse struct {
 	RC   int `json:"rc"`
 	Data *struct {
-		F43 int    `json:"f43"`
-		F57 string `json:"f57"`
-		F58 string `json:"f58"`
-		F59 int    `json:"f59"`
+		F43Raw json.RawMessage `json:"f43"`
+		F57    string          `json:"f57"`
+		F58    string          `json:"f58"`
+		F59    int             `json:"f59"`
 	} `json:"data"`
+}
+
+// parseF43 extracts an int from the raw f43 JSON value.
+// Returns (value, true) when f43 is a number; (0, false) when f43 is "-" or non-numeric.
+func parseF43(raw json.RawMessage) (int, bool) {
+	var n int
+	if err := json.Unmarshal(raw, &n); err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 func Init() {
@@ -185,7 +195,11 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("eastmoney no data for forex pair %s", pair)
 	}
 
-	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	f43, ok := parseF43(resp.Data.F43Raw)
+	if !ok {
+		return decimal.Zero, fmt.Errorf("non-numeric f43 for forex %s", pair)
+	}
+	price := decimal.NewFromInt(int64(f43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 	if price.IsZero() {
 		return decimal.Zero, fmt.Errorf("zero exchange rate for %s", pair)
 	}
@@ -228,7 +242,11 @@ func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for symbol %s", symbol)
 	}
 
-	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	f43, ok := parseF43(resp.Data.F43Raw)
+	if !ok {
+		return nil, fmt.Errorf("non-numeric f43 for commodity %s", symbol)
+	}
+	price := decimal.NewFromInt(int64(f43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 	unit := symbolUnit[lower]
 
 	slog.Info("eastmoney price fetched from API", "symbol", symbol, "price", price)
@@ -267,7 +285,11 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for A-share %s", symbol)
 	}
 
-	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	f43, ok := parseF43(resp.Data.F43Raw)
+	if !ok {
+		return nil, fmt.Errorf("non-numeric f43 for A-share %s", symbol)
+	}
+	price := decimal.NewFromInt(int64(f43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney A-share price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
@@ -308,7 +330,11 @@ func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for US stock %s", symbol)
 	}
 
-	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	f43, ok := parseF43(resp.Data.F43Raw)
+	if !ok {
+		return nil, fmt.Errorf("non-numeric f43 for US stock %s", symbol)
+	}
+	price := decimal.NewFromInt(int64(f43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney US stock price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
@@ -345,7 +371,11 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("eastmoney no data for HK stock %s", symbol)
 	}
 
-	price := decimal.NewFromInt(int64(resp.Data.F43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
+	f43, ok := parseF43(resp.Data.F43Raw)
+	if !ok {
+		return nil, fmt.Errorf("non-numeric f43 for HK stock %s", symbol)
+	}
+	price := decimal.NewFromInt(int64(f43)).Div(decimal.NewFromInt(int64(math.Pow(10, float64(resp.Data.F59)))))
 
 	slog.Info("eastmoney HK stock price fetched from API", "symbol", symbol, "price", price)
 	return &marketsource.Quote{
