@@ -158,4 +158,56 @@ describe("SettingsPanel", () => {
       expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ displayCurrency: "USD" }))
     )
   })
+
+  it.each([
+    ["股票", 0, -25, "targetStocks", "targetBonds"],
+    ["长期债券", 0, 25, "targetBonds", "targetStocks"],
+    ["现金", 2, -25, "targetCash", "targetCommodities"],
+    ["商品", 2, 25, "targetCommodities", "targetCash"],
+  ] as const)(
+    "allows %s target allocation to be dragged to zero and saved",
+    async (assetName, handleIndex, deltaX, zeroKey, adjacentKey) => {
+      const { container, onSave } = renderPanel()
+      fireEvent.click(screen.getByTitle("设置"))
+
+      const handles = container.querySelectorAll<HTMLElement>(".cursor-col-resize")
+      const handle = handles[handleIndex]
+      const bar = handle.parentElement?.parentElement
+      expect(handle).toBeDefined()
+      expect(bar).not.toBeNull()
+
+      Object.defineProperty(handle, "setPointerCapture", { value: vi.fn() })
+      vi.spyOn(bar as HTMLElement, "getBoundingClientRect").mockReturnValue({
+        width: 100,
+        height: 40,
+        top: 0,
+        right: 100,
+        bottom: 40,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
+
+      fireEvent.pointerDown(handle, { clientX: 50, pointerId: 1 })
+      fireEvent.pointerMove(window, { clientX: 50 + deltaX, pointerId: 1 })
+      fireEvent.pointerUp(window, { pointerId: 1 })
+
+      expect(screen.getByText(`${assetName} 0%`)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole("button", { name: "保存" }))
+
+      await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+      const saved = vi.mocked(onSave).mock.calls[0][0]
+      expect(saved[zeroKey]).toBe(0)
+      expect(saved[adjacentKey]).toBe(50)
+      expect(
+        saved.targetStocks + saved.targetBonds + saved.targetCash + saved.targetCommodities
+      ).toBe(100)
+      expect(
+        [saved.targetStocks, saved.targetBonds, saved.targetCash, saved.targetCommodities].every(
+          (value) => value >= 0 && value <= 100
+        )
+      ).toBe(true)
+    }
+  )
 })
