@@ -399,36 +399,8 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 						holdingCurrency = "CNY"
 					}
 
-					var af models.AvailableFund
-					err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, holdingCurrency).First(&af).Error
-					fundsAmount := decimal.Zero
-					if err == nil {
-						fundsAmount = af.Amount
-					} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+					if err := deductAvailableFund(tx, user.UserID, portfolioID, holdingCurrency, addedCost); err != nil {
 						return err
-					}
-
-					if fundsAmount.LessThan(addedCost) {
-						return &httpError{status: consts.StatusBadRequest, msg: fmt.Sprintf("可用资金不足: %s 可用 %s, 需要 %s", holdingCurrency, fundsAmount.StringFixed(2), addedCost.StringFixed(2))}
-					}
-
-					newAmount := fundsAmount.Sub(addedCost)
-					if err == nil {
-						if err := tx.Model(&af).Update("amount", newAmount).Error; err != nil {
-							return err
-						}
-					} else {
-						if newAmount.IsPositive() {
-							if err := tx.Create(&models.AvailableFund{
-								ID:          uuid.New(),
-								UserID:      user.UserID,
-								PortfolioID: portfolioID,
-								Currency:    holdingCurrency,
-								Amount:      newAmount,
-							}).Error; err != nil {
-								return err
-							}
-						}
 					}
 
 					if err := tx.Create(&models.FundTransaction{

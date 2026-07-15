@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"sync"
 	"testing"
 	"time"
 
@@ -381,6 +383,93 @@ func TestTransferOut_Success(t *testing.T) {
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
 	if !af.Amount.Equal(decimal.NewFromInt(50)) {
 		t.Errorf("expected 50, got %s", af.Amount)
+	}
+}
+
+func TestAddAvailableFund_ConcurrentCreditsDoNotLoseUpdates(t *testing.T) {
+	db := setupTestDB(t)
+	const workers = 24
+
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- db.Transaction(func(tx *gorm.DB) error {
+				return addAvailableFund(tx, testUserID, testPortfolioID, "USD", decimal.NewFromInt(1))
+			})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent credit failed: %v", err)
+		}
+	}
+
+	var fund models.AvailableFund
+	if err := db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&fund).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !fund.Amount.Equal(decimal.NewFromInt(workers)) {
+		t.Fatalf("expected all %d credits to be retained, got %s", workers, fund.Amount)
+	}
+}
+
+func TestDeductAvailableFund_ConcurrentDebitsCannotOverspend(t *testing.T) {
+	db := setupTestDB(t)
+	if err := db.Create(&models.AvailableFund{
+		ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID,
+		Currency: "USD", Amount: decimal.NewFromInt(100),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	const workers = 10
+	start := make(chan struct{})
+	results := make(chan error, workers)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			results <- db.Transaction(func(tx *gorm.DB) error {
+				return deductAvailableFund(tx, testUserID, testPortfolioID, "USD", decimal.NewFromInt(15))
+			})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	succeeded := 0
+	for err := range results {
+		if err == nil {
+			succeeded++
+			continue
+		}
+		var httpErr *httpError
+		if !errors.As(err, &httpErr) || httpErr.status != 400 {
+			t.Fatalf("unexpected concurrent debit error: %v", err)
+		}
+	}
+	if succeeded != 6 {
+		t.Fatalf("expected exactly 6 successful debits, got %d", succeeded)
+	}
+
+	var fund models.AvailableFund
+	if err := db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&fund).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !fund.Amount.Equal(decimal.NewFromInt(10)) {
+		t.Fatalf("expected 10 USD remaining, got %s", fund.Amount)
 	}
 }
 

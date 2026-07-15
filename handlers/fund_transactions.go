@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var currencyConversionTolerance = decimal.RequireFromString("0.01")
@@ -447,36 +448,49 @@ func ConvertCurrency(db *gorm.DB) app.HandlerFunc {
 }
 
 func addAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, amount decimal.Decimal) error {
-	var af models.AvailableFund
-	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return tx.Create(&models.AvailableFund{
-			ID:          uuid.New(),
-			UserID:      userID,
-			PortfolioID: portfolioID,
-			Currency:    currency,
-			Amount:      amount,
-		}).Error
+	_, err := addAvailableFundReturningBalance(tx, userID, portfolioID, currency, amount)
+	return err
+}
+
+func addAvailableFundReturningBalance(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, amount decimal.Decimal) (decimal.Decimal, error) {
+	fund := models.AvailableFund{
+		ID:          uuid.New(),
+		UserID:      userID,
+		PortfolioID: portfolioID,
+		Currency:    currency,
+		Amount:      amount,
 	}
-	if err != nil {
-		return err
-	}
-	newAmount := af.Amount.Add(amount)
-	return tx.Model(&af).Update("amount", newAmount).Error
+	err := tx.Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}, {Name: "portfolio_id"}, {Name: "currency"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"amount": gorm.Expr("available_funds.amount + EXCLUDED.amount"),
+			}),
+		},
+		clause.Returning{Columns: []clause.Column{{Name: "amount"}}},
+	).Create(&fund).Error
+	return fund.Amount, err
 }
 
 func deductAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency string, amount decimal.Decimal) error {
-	var af models.AvailableFund
-	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&af).Error
+	result := tx.Model(&models.AvailableFund{}).
+		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
+		Where("amount >= ?", amount).
+		UpdateColumn("amount", gorm.Expr("amount - ?", amount))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		return nil
+	}
+
+	var fund models.AvailableFund
+	err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).First(&fund).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 余额为 0"}
 	}
 	if err != nil {
 		return err
 	}
-	if af.Amount.LessThan(amount) {
-		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + af.Amount.StringFixed(2) + ", 需要 " + amount.StringFixed(2)}
-	}
-	newAmount := af.Amount.Sub(amount)
-	return tx.Model(&af).Update("amount", newAmount).Error
+	return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足: " + currency + " 可用 " + fund.Amount.StringFixed(2) + ", 需要 " + amount.StringFixed(2)}
 }

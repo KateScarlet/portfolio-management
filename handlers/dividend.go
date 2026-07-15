@@ -111,27 +111,16 @@ func changeAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency st
 		return nil
 	}
 	if delta.IsPositive() {
-		fund := models.AvailableFund{ID: uuid.New(), UserID: userID, PortfolioID: portfolioID, Currency: currency, Amount: delta}
-		return tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "user_id"}, {Name: "portfolio_id"}, {Name: "currency"}},
-			DoUpdates: clause.Assignments(map[string]any{"amount": gorm.Expr("available_funds.amount + EXCLUDED.amount")}),
-		}).Create(&fund).Error
+		return addAvailableFund(tx, userID, portfolioID, currency, delta)
 	}
-	var fund models.AvailableFund
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("user_id = ? AND portfolio_id = ? AND currency = ?", userID, portfolioID, currency).
-		First(&fund).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
-	}
-	if err != nil {
+	if err := deductAvailableFund(tx, userID, portfolioID, currency, delta.Abs()); err != nil {
+		var httpErr *httpError
+		if errors.As(err, &httpErr) {
+			return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
+		}
 		return err
 	}
-	newAmount := fund.Amount.Add(delta)
-	if newAmount.IsNegative() {
-		return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
-	}
-	return tx.Model(&fund).Update("amount", newAmount).Error
+	return nil
 }
 
 func ensureReinvestmentReversible(tx *gorm.DB, dividend models.Dividend) error {

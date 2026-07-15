@@ -78,7 +78,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec("CREATE UNIQUE INDEX idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)").Error; err != nil {
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)").Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&models.Portfolio{

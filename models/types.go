@@ -146,9 +146,9 @@ type Setting struct {
 
 type AvailableFund struct {
 	ID          uuid.UUID       `gorm:"type:uuid;primaryKey;comment:记录唯一ID" json:"id"`
-	UserID      uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属用户ID" json:"userId"`
-	PortfolioID uuid.UUID       `gorm:"type:uuid;index;not null;comment:所属组合ID" json:"portfolioId"`
-	Currency    string          `gorm:"size:10;not null;comment:货币代码(如CNY/USD)" json:"currency"`
+	UserID      uuid.UUID       `gorm:"type:uuid;index;uniqueIndex:idx_available_funds_unique;not null;comment:所属用户ID" json:"userId"`
+	PortfolioID uuid.UUID       `gorm:"type:uuid;index;uniqueIndex:idx_available_funds_unique;not null;comment:所属组合ID" json:"portfolioId"`
+	Currency    string          `gorm:"size:10;uniqueIndex:idx_available_funds_unique;not null;comment:货币代码(如CNY/USD)" json:"currency"`
 	Amount      decimal.Decimal `gorm:"type:decimal;default:0;comment:可用金额" json:"amount"`
 }
 

@@ -192,20 +192,8 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 					currency = "CNY"
 				}
 
-				var af models.AvailableFund
-				err := tx.Where("user_id = ? AND portfolio_id = ? AND currency = ?", user.UserID, portfolioID, currency).First(&af).Error
-				switch {
-				case err == nil:
-					newFundsAmount = af.Amount.Add(realizedValue)
-					if err := tx.Model(&af).Update("amount", newFundsAmount).Error; err != nil {
-						return err
-					}
-				case errors.Is(err, gorm.ErrRecordNotFound):
-					newFundsAmount = realizedValue
-					if err := tx.Create(&models.AvailableFund{ID: uuid.New(), UserID: user.UserID, PortfolioID: portfolioID, Currency: currency, Amount: newFundsAmount}).Error; err != nil {
-						return err
-					}
-				default:
+				newFundsAmount, err = addAvailableFundReturningBalance(tx, user.UserID, portfolioID, currency, realizedValue)
+				if err != nil {
 					return err
 				}
 
