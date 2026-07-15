@@ -126,11 +126,11 @@ export default function UserManager({ currentUser }: Props) {
       <button
         type="button"
         onClick={handleOpen}
-        className="p-2 rounded-lg hover:bg-[#F1F3F5] transition-colors text-[#6C757D] hover:text-[#1A1A1A]"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6C757D] transition-colors hover:bg-[#F1F3F5] hover:text-[#1A1A1A]"
         title="用户管理"
         aria-label="用户管理"
       >
-        <Users className="w-5 h-5" />
+        <Users className="h-4 w-4" />
       </button>
 
       {isOpen && (

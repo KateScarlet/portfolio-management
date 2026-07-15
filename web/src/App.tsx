@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Decimal from "decimal.js"
+import { ChartPie } from "lucide-react"
 import { usePortfolio } from "./usePortfolio"
 import { useExchangeRates } from "./useExchangeRates"
 import { useSSE } from "./hooks/useSSE"
@@ -607,11 +608,13 @@ export default function App() {
             </button>
           )}
           <button
+            type="button"
             onClick={handleShowSummary}
-            className="text-xs text-[#6C757D] hover:text-[#1A1A1A] transition-colors"
-            title="查看汇总"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6C757D] transition-colors hover:bg-[#F1F3F5] hover:text-[#1A1A1A]"
+            title="查看投资组合汇总"
+            aria-label="查看投资组合汇总"
           >
-            汇总
+            <ChartPie className="h-4 w-4" />
           </button>
           <SettingsPanel
             settings={settings}

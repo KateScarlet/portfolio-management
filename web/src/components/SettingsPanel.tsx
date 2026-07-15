@@ -314,11 +314,13 @@ export default function SettingsPanel({
   return (
     <>
       <button
+        type="button"
         onClick={handleOpen}
-        className="p-2 rounded-lg hover:bg-[#F1F3F5] transition-colors text-[#6C757D] hover:text-[#1A1A1A]"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6C757D] transition-colors hover:bg-[#F1F3F5] hover:text-[#1A1A1A]"
         title="设置"
+        aria-label="设置"
       >
-        <SettingsIcon className="w-5 h-5" />
+        <SettingsIcon className="h-4 w-4" />
       </button>
 
       {isOpen && (
