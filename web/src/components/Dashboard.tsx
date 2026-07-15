@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import Decimal from "decimal.js"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
+import { ArrowLeftRight, ArrowUpRight, Plus, Repeat2 } from "lucide-react"
 import { AssetId, ASSET_DEFINITIONS, AvailableFund, ColorScheme, Portfolio } from "../types"
 import { formatCurrencyByCode, formatPercent, getProfitColor, toDecimal } from "../utils"
 import FundOperationDialog from "./FundOperationDialog"
@@ -223,32 +224,38 @@ export default function Dashboard({
           </div>
         )}
 
-        <div className="flex gap-2 mt-2 justify-end">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <button
             onClick={() => setFundOperation({ type: "transfer_in" })}
-            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
-            title="转入"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E9ECEF] bg-white px-2 py-2 text-xs font-medium text-[#495057] transition-colors hover:border-[#CED4DA] hover:bg-[#F8F9FA] hover:text-[#1A1A1A]"
+            title="从外部转入资金"
           >
+            <Plus className="h-3.5 w-3.5" />
             转入
           </button>
           <button
             onClick={() => setFundOperation({ type: "transfer_out" })}
-            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
-            title="转出"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E9ECEF] bg-white px-2 py-2 text-xs font-medium text-[#495057] transition-colors hover:border-[#CED4DA] hover:bg-[#F8F9FA] hover:text-[#1A1A1A]"
+            title="转出可用资金"
           >
+            <ArrowUpRight className="h-3.5 w-3.5" />
             转出
           </button>
           <button
             onClick={() => setFundOperation({ type: "transfer" })}
-            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E9ECEF] bg-white px-2 py-2 text-xs font-medium text-[#495057] transition-colors hover:border-[#CED4DA] hover:bg-[#F8F9FA] hover:text-[#1A1A1A]"
+            title="在投资组合之间划转"
           >
+            <Repeat2 className="h-3.5 w-3.5" />
             划转
           </button>
           <button
             onClick={() => setFundOperation({ type: "convert" })}
-            className="text-[10px] px-2 py-1 border border-[#E9ECEF] rounded text-[#495057] hover:bg-[#F8F9FA] transition-colors"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E9ECEF] bg-white px-2 py-2 text-xs font-medium text-[#495057] transition-colors hover:border-[#CED4DA] hover:bg-[#F8F9FA] hover:text-[#1A1A1A]"
+            title="兑换持有货币"
           >
-            货币转换
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            换汇
           </button>
         </div>
       </div>

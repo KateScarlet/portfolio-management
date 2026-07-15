@@ -9,6 +9,7 @@ vi.mock("../api", async () => {
     ...actual,
     convertCurrency: vi.fn(),
     fetchExchangeRate: vi.fn(),
+    transferOutFunds: vi.fn(),
   }
 })
 
@@ -73,6 +74,46 @@ describe("FundOperationDialog", () => {
     expect(screen.getByRole("option", { name: "HKD" })).toBeInTheDocument()
     expect(screen.queryByRole("option", { name: "CNY" })).not.toBeInTheDocument()
     expect(screen.queryByRole("option", { name: "EUR" })).not.toBeInTheDocument()
+  })
+
+  it("shows the available balance and supports filling the full amount", () => {
+    render(
+      <FundOperationDialog
+        type="transfer_out"
+        portfolios={[]}
+        availableFunds={[{ currency: "USD", amount: "123.45" }]}
+        currentPortfolioId="portfolio-1"
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole("dialog", { name: "转出资金" })).toBeInTheDocument()
+    expect(screen.getByText(/可用余额/)).toHaveTextContent("$123.45")
+
+    fireEvent.click(screen.getByRole("button", { name: "全部" }))
+    expect(screen.getByRole("spinbutton", { name: "操作金额" })).toHaveValue(123.45)
+  })
+
+  it("prevents an amount greater than the available balance", async () => {
+    render(
+      <FundOperationDialog
+        type="transfer_out"
+        portfolios={[]}
+        availableFunds={[{ currency: "USD", amount: "100" }]}
+        currentPortfolioId="portfolio-1"
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "操作金额" }), {
+      target: { value: "100.01" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "确认" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("金额不能超过可用余额")
+    expect(api.transferOutFunds).not.toHaveBeenCalled()
   })
 
   it("disables transfers out when there are no available fund currencies", () => {

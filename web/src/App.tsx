@@ -123,6 +123,8 @@ export default function App() {
   )
   const [showSummary, setShowSummary] = useState(false)
   const [summary, setSummary] = useState<PortfolioSummary | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryError, setSummaryError] = useState("")
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [availableFunds, setAvailableFunds] = useState<AvailableFund[]>([])
@@ -457,12 +459,18 @@ export default function App() {
   }, [])
 
   const handleShowSummary = useCallback(async () => {
+    setShowSummary(true)
+    setSummary(null)
+    setSummaryError("")
+    setSummaryLoading(true)
     try {
       const s = await api.fetchSummary()
       setSummary(s)
-      setShowSummary(true)
     } catch (e) {
       console.error("Failed to fetch summary", e)
+      setSummaryError(e instanceof Error ? e.message : "汇总数据加载失败")
+    } finally {
+      setSummaryLoading(false)
     }
   }, [])
 
@@ -717,6 +725,9 @@ export default function App() {
           summary={summary}
           colorScheme={settings.colorScheme}
           displayCurrency={settings.displayCurrency}
+          loading={summaryLoading}
+          error={summaryError}
+          onRetry={handleShowSummary}
           onClose={() => setShowSummary(false)}
         />
       )}
