@@ -211,13 +211,13 @@ export default function SummaryDashboard({
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.45fr)]">
-            <section className="rounded-xl border border-[#E9ECEF] bg-white p-5 sm:p-6">
+            <section className="flex flex-col rounded-xl border border-[#E9ECEF] bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <PieChart size={17} className="text-[#6C757D]" />
                 <h3 className="text-sm font-semibold text-[#1A1A1A]">资产配置</h3>
               </div>
 
-              <div className="mt-6 flex flex-col items-center gap-7 sm:flex-row sm:items-center">
+              <div className="mt-6 flex flex-1 flex-col items-center gap-7 sm:flex-row sm:items-center">
                 <div
                   className="relative size-42 shrink-0 rounded-full"
                   style={{ background: allocationGradient }}

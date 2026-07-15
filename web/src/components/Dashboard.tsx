@@ -140,6 +140,8 @@ export default function Dashboard({
               </Pie>
               <Tooltip
                 formatter={(value) => formatCurrencyByCode(String(value), displayCurrency)}
+                itemStyle={{ color: "#495057" }}
+                wrapperStyle={{ zIndex: 10 }}
                 contentStyle={{
                   borderRadius: "0.5rem",
                   border: "1px solid #E9ECEF",

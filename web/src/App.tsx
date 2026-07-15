@@ -555,23 +555,37 @@ export default function App() {
         <div className="flex items-center gap-3">
           <img src="/logo.svg" alt="投资组合管理" className="w-8 h-8 shrink-0" />
           <h1 className="text-xl font-semibold tracking-tight">投资组合管理</h1>
-          <div className="flex items-center bg-[#F8F9FA] rounded-md p-0.5 ml-2">
+          <div
+            role="tablist"
+            aria-label="资产视图"
+            className="relative grid grid-cols-2 items-center bg-[#F8F9FA] rounded-md p-0.5 ml-2"
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded bg-white shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none ${
+                viewMode === "account" ? "translate-x-full" : "translate-x-0"
+              }`}
+            />
             <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "portfolio"}
+              aria-controls="view-panel"
               onClick={() => setViewMode("portfolio")}
-              className={`text-xs px-3 py-1 rounded transition-colors ${
-                viewMode === "portfolio"
-                  ? "bg-white text-[#1A1A1A] shadow-sm"
-                  : "text-[#6C757D] hover:text-[#1A1A1A]"
+              className={`relative z-1 text-xs px-3 py-1 rounded transition-colors duration-200 ${
+                viewMode === "portfolio" ? "text-[#1A1A1A]" : "text-[#6C757D] hover:text-[#1A1A1A]"
               }`}
             >
               组合视图
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "account"}
+              aria-controls="view-panel"
               onClick={() => setViewMode("account")}
-              className={`text-xs px-3 py-1 rounded transition-colors ${
-                viewMode === "account"
-                  ? "bg-white text-[#1A1A1A] shadow-sm"
-                  : "text-[#6C757D] hover:text-[#1A1A1A]"
+              className={`relative z-1 text-xs px-3 py-1 rounded transition-colors duration-200 ${
+                viewMode === "account" ? "text-[#1A1A1A]" : "text-[#6C757D] hover:text-[#1A1A1A]"
               }`}
             >
               账户视图
@@ -635,19 +649,28 @@ export default function App() {
         </div>
       </header>
 
-      <main className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full">
+      <main
+        id="view-panel"
+        role="tabpanel"
+        className="grow p-4 sm:p-8 flex flex-col gap-8 max-w-350 mx-auto w-full"
+      >
         {viewMode === "account" ? (
-          <AccountView
-            selectedAccount={currentAccount}
-            colorScheme={settings.colorScheme}
-            portfolios={portfolios}
-            currentPortfolio={currentPortfolio}
-            accounts={accounts}
-            onAddHolding={handleAddHolding}
-            onRefreshAvailableFunds={handleRefreshAvailableFunds}
-          />
+          <div key="account" className="view-content-enter view-content-enter-from-right">
+            <AccountView
+              selectedAccount={currentAccount}
+              colorScheme={settings.colorScheme}
+              portfolios={portfolios}
+              currentPortfolio={currentPortfolio}
+              accounts={accounts}
+              onAddHolding={handleAddHolding}
+              onRefreshAvailableFunds={handleRefreshAvailableFunds}
+            />
+          </div>
         ) : (
-          <>
+          <div
+            key="portfolio"
+            className="view-content-enter view-content-enter-from-left flex flex-col gap-8"
+          >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-5 flex flex-col gap-6 h-full">
                 <Dashboard
@@ -705,7 +728,7 @@ export default function App() {
                 displayCurrency={settings.displayCurrency}
               />
             </div>
-          </>
+          </div>
         )}
       </main>
 

@@ -27,6 +27,41 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+@keyframes view-content-enter-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes view-content-enter-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.view-content-enter {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Do not retain transform after entering: fixed dialogs inside this view must stay viewport-bound. */
+  animation-fill-mode: none;
+}
+
+.view-content-enter-from-left {
+  animation-name: view-content-enter-from-left;
+}
+
+.view-content-enter-from-right {
+  animation-name: view-content-enter-from-right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-content-enter {
+    animation: none;
+  }
+}
+
 /* Thin scrollbar for settings panel */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
