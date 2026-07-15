@@ -8,6 +8,7 @@ import (
 	"os"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
+	"sync"
 	"testing"
 	"time"
 
@@ -108,6 +109,10 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		Price:       dPrice,
 		Value:       dShares.Mul(dPrice),
 		Cost:        dCost,
+	}
+	var defaultAccount models.Account
+	if err := db.Where("user_id = ? AND is_default = ?", testUserID, true).Find(&defaultAccount).Error; err == nil && defaultAccount.ID != uuid.Nil {
+		h.AccountID = defaultAccount.ID
 	}
 	if shares > 0 {
 		h.CostPrice = dCost.Div(dShares)
@@ -286,6 +291,71 @@ func TestSell_NewCurrencyFundCreatedOnSell(t *testing.T) {
 	db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "HKD").First(&af)
 	if !af.Amount.Equal(decimal.NewFromInt(1000)) {
 		t.Errorf("expected HKD funds 1000, got %s", af.Amount)
+	}
+}
+
+func TestSell_ConcurrentRequestsCannotOversell(t *testing.T) {
+	db := setupTestDB(t)
+	id := createTestHoldingWithCurrency(t, db, "USD", 10, 100, 900)
+
+	start := make(chan struct{})
+	statuses := make(chan int, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			c := newCtx(id, SellRequest{
+				Shares: decimal.NewFromInt(8),
+				Price:  decimal.NewFromInt(100),
+			})
+			SellHolding(db)(context.Background(), c)
+			statuses <- c.Response.StatusCode()
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(statuses)
+
+	successes := 0
+	rejections := 0
+	for status := range statuses {
+		switch status {
+		case 200:
+			successes++
+		case 400:
+			rejections++
+		default:
+			t.Fatalf("unexpected response status: %d", status)
+		}
+	}
+	if successes != 1 || rejections != 1 {
+		t.Fatalf("expected one successful sale and one rejection, got successes=%d rejections=%d", successes, rejections)
+	}
+
+	var holding models.Holding
+	if err := db.First(&holding, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !holding.Shares.Equal(decimal.NewFromInt(2)) {
+		t.Errorf("expected 2 remaining shares, got %s", holding.Shares)
+	}
+
+	var lots []models.HoldingLot
+	if err := db.Where("holding_id = ?", id).Find(&lots).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(lots) != 2 {
+		t.Errorf("expected one buy lot and one sell lot, got %d lots", len(lots))
+	}
+
+	var fund models.AvailableFund
+	if err := db.Where("user_id = ? AND portfolio_id = ? AND currency = ?", testUserID, testPortfolioID, "USD").First(&fund).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !fund.Amount.Equal(decimal.NewFromInt(800)) {
+		t.Errorf("expected sale proceeds of 800, got %s", fund.Amount)
 	}
 }
 

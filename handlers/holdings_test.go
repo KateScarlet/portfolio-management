@@ -18,7 +18,13 @@ import (
 
 func setupHoldingsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	return setupTestDB(t)
+	db := setupTestDB(t)
+	if err := db.Create(&models.Account{
+		ID: uuid.New(), UserID: testUserID, Name: "默认账户", IsDefault: true,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	return db
 }
 
 func testRouter() *marketsource.Router {
@@ -184,6 +190,34 @@ func TestCreateHolding_NewStockHolding(t *testing.T) {
 	}
 	if !holding.Shares.Equal(decimal.NewFromInt(10)) {
 		t.Errorf("expected shares 10, got %s", holding.Shares)
+	}
+}
+
+func TestCreateHolding_RejectsAccountOwnedByAnotherUser(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	otherUserID := uuid.New()
+	otherAccount := models.Account{ID: uuid.New(), UserID: otherUserID, Name: "其他用户账户"}
+	if err := db.Create(&otherAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	body := map[string]any{
+		"assetId":   "stocks",
+		"symbol":    "AAPL",
+		"accountId": otherAccount.ID,
+	}
+	c := newUserCtx("POST", "/api/holdings", body)
+	CreateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 403 {
+		t.Fatalf("expected 403, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var count int64
+	if err := db.Model(&models.Holding{}).Where("user_id = ?", testUserID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no holding to be created, got %d", count)
 	}
 }
 
@@ -453,14 +487,79 @@ func TestUpdateHolding_BlockAssetIdChange(t *testing.T) {
 	}
 }
 
-func TestUpdateHolding_LotsRecalculation(t *testing.T) {
+func TestUpdateHolding_RejectsAccountOwnedByAnotherUser(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	id := createTestHolding(t, db, 10, 100, 900)
+
+	var original models.Holding
+	if err := db.First(&original, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	otherAccount := models.Account{ID: uuid.New(), UserID: uuid.New(), Name: "其他用户账户"}
+	if err := db.Create(&otherAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := app.NewContext(1)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id)
+	c.Request.Header.SetMethod("PATCH")
+	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
+	c.Request.SetBodyRaw([]byte(`{"accountId":"` + otherAccount.ID.String() + `"}`))
+	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{UserID: testUserID, Username: "testuser", Role: "user"})
+
+	UpdateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 403 {
+		t.Fatalf("expected 403, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var persisted models.Holding
+	if err := db.First(&persisted, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if persisted.AccountID != original.AccountID {
+		t.Fatalf("expected account to remain %s, got %s", original.AccountID, persisted.AccountID)
+	}
+}
+
+func TestUpdateHolding_MovesToOwnedAccount(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	id := createTestHolding(t, db, 10, 100, 900)
+	targetAccount := models.Account{ID: uuid.New(), UserID: testUserID, Name: "证券账户"}
+	if err := db.Create(&targetAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := app.NewContext(1)
+	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
+	c.Request.SetRequestURI("/api/portfolios/" + testPortfolioID.String() + "/holdings/" + id)
+	c.Request.Header.SetMethod("PATCH")
+	c.Request.Header.SetContentTypeBytes([]byte("application/json"))
+	c.Request.SetBodyRaw([]byte(`{"accountId":"` + targetAccount.ID.String() + `"}`))
+	c.Set(string(middleware.UserContextKey), &middleware.JWTClaims{UserID: testUserID, Username: "testuser", Role: "user"})
+
+	UpdateHolding(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var persisted models.Holding
+	if err := db.First(&persisted, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if persisted.AccountID != targetAccount.ID {
+		t.Fatalf("expected account %s, got %s", targetAccount.ID, persisted.AccountID)
+	}
+}
+
+func TestUpdateHolding_RejectsBulkLotReplacement(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	id := createTestHolding(t, db, 10, 100, 900)
 
 	newLots := []map[string]any{
 		{"id": uuid.New(), "date": "1970-01-01T00:00:01Z", "shares": 20, "costPrice": 50, "cost": 1000, "valueAdded": 2000},
 	}
-	body := map[string]any{"lots": newLots}
+	body := map[string]any{"name": "被篡改的名称", "lots": newLots}
 
 	c := app.NewContext(1)
 	c.Params = param.Params{{Key: "pid", Value: testPortfolioID.String()}, {Key: "id", Value: id}}
@@ -477,19 +576,26 @@ func TestUpdateHolding_LotsRecalculation(t *testing.T) {
 
 	UpdateHolding(db)(context.Background(), c)
 
-	if c.Response.StatusCode() != 200 {
-		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
+	if c.Response.StatusCode() != 400 {
+		t.Fatalf("expected 400, got %d: %s", c.Response.StatusCode(), string(c.Response.Body()))
 	}
 
-	var updated HoldingResponse
-	if err := json.Unmarshal(c.Response.Body(), &updated); err != nil {
+	var persisted models.Holding
+	if err := db.First(&persisted, "id = ?", id).Error; err != nil {
 		t.Fatal(err)
 	}
-	if !updated.Shares.Equal(decimal.NewFromInt(20)) {
-		t.Errorf("expected shares 20, got %s", updated.Shares)
+	if !persisted.Shares.Equal(decimal.NewFromInt(10)) || !persisted.Cost.Equal(decimal.NewFromInt(900)) {
+		t.Fatalf("holding changed after rejected replacement: shares=%s cost=%s", persisted.Shares, persisted.Cost)
 	}
-	if !updated.Cost.Equal(decimal.NewFromInt(1000)) {
-		t.Errorf("expected cost 1000, got %s", updated.Cost)
+	if persisted.Name != "Test Stock" {
+		t.Fatalf("other fields must not update when lots is rejected, got name %q", persisted.Name)
+	}
+	var lotCount int64
+	if err := db.Model(&models.HoldingLot{}).Where("holding_id = ?", id).Count(&lotCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if lotCount != 1 {
+		t.Fatalf("expected original lot to remain, got %d lots", lotCount)
 	}
 }
 

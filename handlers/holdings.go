@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type httpError struct {
@@ -286,20 +287,26 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		// 如果没有指定账户，使用默认账户
-		if input.AccountID == uuid.Nil {
-			var defaultAccount models.Account
-			if err := db.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&defaultAccount).Error; err == nil {
-				input.AccountID = defaultAccount.ID
-			}
-		}
-
 		isRegisterOnly := input.Shares.IsZero() && input.Cost.IsZero()
 
 		var created bool
 		var result models.Holding
 		var resultLots []models.HoldingLot
 		err = db.Transaction(func(tx *gorm.DB) error {
+			if input.AccountID == uuid.Nil {
+				var defaultAccount models.Account
+				if err := tx.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&defaultAccount).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						return &httpError{status: consts.StatusBadRequest, msg: "默认账户不存在"}
+					}
+					return err
+				}
+				input.AccountID = defaultAccount.ID
+			}
+			if err := validateAccountOwnership(tx, user.UserID, input.AccountID); err != nil {
+				return err
+			}
+
 			var existing models.Holding
 			var res *gorm.DB
 			if input.Symbol != "" {
@@ -494,10 +501,14 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
+		if _, ok := updates["lots"]; ok {
+			c.JSON(consts.StatusBadRequest, map[string]string{"error": "不能批量替换交易记录，请使用交易记录专用接口"})
+			return
+		}
 
 		allowedFields := map[string]bool{
 			"name": true, "symbol": true, "market": true, "price": true,
-			"date": true, "lots": true, "value": true, "accountId": true,
+			"date": true, "value": true, "accountId": true,
 		}
 		safeUpdates := make(map[string]any)
 		for k, v := range updates {
@@ -516,51 +527,15 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			return
 		}
 
-		if lotsRaw, ok := safeUpdates["lots"]; ok {
-			if lotsBytes, err := json.Marshal(lotsRaw); err == nil {
-				var lots []models.HoldingLot
-				if json.Unmarshal(lotsBytes, &lots) == nil {
-					for i := range lots {
-						if lots[i].ID == uuid.Nil {
-							lots[i].ID = uuid.New()
-						}
-						lots[i].HoldingID = holding.ID
-						if lots[i].Shares.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录股数不能为负数"})
-							return
-						}
-						if lots[i].Cost.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录成本不能为负数"})
-							return
-						}
-						if lots[i].Fee.IsNegative() {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录手续费不能为负数"})
-							return
-						}
-						if lots[i].Type != "" && lots[i].Type != "buy" && lots[i].Type != "sell" {
-							c.JSON(consts.StatusBadRequest, map[string]string{"error": "交易记录类型必须为 'buy' 或 'sell'"})
-							return
-						}
-					}
-					priceBefore := holding.Price
-					models.RecalcFromLots(&holding, lots)
-					if holding.Symbol != "" && priceBefore.IsPositive() {
-						holding.Price = priceBefore
-						holding.Value = holding.Shares.Mul(holding.Price)
-					}
-					if err := db.Transaction(func(tx *gorm.DB) error {
-						if err := tx.Save(&holding).Error; err != nil {
-							return err
-						}
-						return models.ReplaceLots(tx, holding.ID, lots)
-					}); err != nil {
-						c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
-						return
-					}
-					c.JSON(consts.StatusOK, HoldingResponse{Holding: holding, Lots: lots})
-					return
-				}
+		var targetAccountID uuid.UUID
+		if accountRaw, ok := safeUpdates["accountId"]; ok {
+			accountID, err := uuid.Parse(fmt.Sprint(accountRaw))
+			if err != nil || accountID == uuid.Nil {
+				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的账户ID"})
+				return
 			}
+			targetAccountID = accountID
+			safeUpdates["accountId"] = accountID
 		}
 
 		if newValue, ok := safeUpdates["value"]; ok && holding.Symbol == "" {
@@ -616,15 +591,24 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			}
 		}
 
-		// Remove "lots" from safeUpdates since it's handled separately
-		delete(safeUpdates, "lots")
-
 		if len(safeUpdates) == 0 {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "没有可更新的字段"})
 			return
 		}
 
-		if err := db.Model(&holding).Updates(safeUpdates).Error; err != nil {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if targetAccountID != uuid.Nil {
+				if err := validateAccountOwnership(tx, user.UserID, targetAccountID); err != nil {
+					return err
+				}
+			}
+			return tx.Model(&holding).Updates(safeUpdates).Error
+		})
+		if err != nil {
+			if he, ok := errors.AsType[*httpError](err); ok {
+				c.JSON(he.status, map[string]string{"error": he.msg})
+				return
+			}
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
@@ -1092,4 +1076,23 @@ func userOwnsPortfolio(db *gorm.DB, userID, portfolioID uuid.UUID) (bool, error)
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func validateAccountOwnership(tx *gorm.DB, userID, accountID uuid.UUID) error {
+	if accountID == uuid.Nil {
+		return &httpError{status: consts.StatusBadRequest, msg: "账户ID不能为空"}
+	}
+
+	var account models.Account
+	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).First(&account, "id = ?", accountID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &httpError{status: consts.StatusBadRequest, msg: "账户不存在"}
+	}
+	if err != nil {
+		return err
+	}
+	if account.UserID != userID {
+		return &httpError{status: consts.StatusForbidden, msg: "无权使用此账户"}
+	}
+	return nil
 }

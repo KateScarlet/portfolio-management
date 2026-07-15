@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SellRequest struct {
@@ -82,7 +83,9 @@ func SellHolding(db *gorm.DB) app.HandlerFunc {
 		var newFundsAmount decimal.Decimal
 
 		err = db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("portfolio_id = ?", portfolioID).First(&holding, "id = ?", id).Error; err != nil {
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("portfolio_id = ? AND user_id = ?", portfolioID, user.UserID).
+				First(&holding, "id = ?", id).Error; err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return &httpError{status: consts.StatusNotFound, msg: "持仓不存在"}
 				}
