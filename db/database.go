@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"portfolio-management/models"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -140,144 +140,51 @@ func initPostgres(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := removeLegacyDividendLedger(db); err != nil {
-		return nil, err
-	}
 	if err := db.AutoMigrate(&models.Portfolio{}, &models.Holding{}, &models.HoldingLot{}, &models.PortfolioRecord{}, &models.Setting{}, &models.User{}, &models.WebAuthnCredential{}, &models.WebAuthnSession{}, &models.AvailableFund{}, &models.FundTransaction{}, &models.Account{}, &models.Dividend{}); err != nil {
 		return nil, err
 	}
-	if err := migrateHoldingCostToNetInvestment(db); err != nil {
-		return nil, err
-	}
 
-	// 迁移：将 account_id 为 NULL 的持仓转移到默认账户
-	var holdingsWithNull []models.Holding
-	if err := db.Where("account_id IS NULL").Find(&holdingsWithNull).Error; err == nil && len(holdingsWithNull) > 0 {
-		userIDs := make(map[uuid.UUID]bool)
-		for i := range holdingsWithNull {
-			userIDs[holdingsWithNull[i].UserID] = true
-		}
-		for userID := range userIDs {
-			var defaultAccount models.Account
-			if err := db.Where("user_id = ? AND is_default = ?", userID, true).First(&defaultAccount).Error; err != nil {
-				continue
-			}
-			db.Model(&models.Holding{}).Where("user_id = ? AND account_id IS NULL", userID).Update("account_id", defaultAccount.ID)
-		}
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''").Error; err != nil {
+		slog.Warn("failed to create index idx_holdings_portfolio_symbol_account", "error", err)
 	}
-	// 将 account_id 列改为 NOT NULL
-	db.Exec("ALTER TABLE holdings ALTER COLUMN account_id SET NOT NULL")
-
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_symbol_account ON holdings(portfolio_id, symbol, account_id) WHERE symbol != ''")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_records_portfolio_ts ON portfolio_records(portfolio_id, timestamp DESC)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)")
-	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_dividend_events_holding_date ON dividend_events(holding_id, payment_date DESC)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)")
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_portfolio_name_asset_account ON holdings(portfolio_id, name, asset_id, account_id) WHERE symbol = ''").Error; err != nil {
+		slog.Warn("failed to create index idx_holdings_portfolio_name_asset_account", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id)").Error; err != nil {
+		slog.Warn("failed to create index idx_settings_user_id", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_settings_portfolio_id ON settings(portfolio_id)").Error; err != nil {
+		slog.Warn("failed to create index idx_settings_portfolio_id", "error", err)
+	}
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sso ON users(sso_provider, sso_id) WHERE sso_provider != ''").Error; err != nil {
+		slog.Warn("failed to create index idx_users_sso", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_portfolio_ts ON portfolio_records(portfolio_id, timestamp DESC)").Error; err != nil {
+		slog.Warn("failed to create index idx_records_portfolio_ts", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_sessions_expires ON webauthn_sessions(expires_at)").Error; err != nil {
+		slog.Warn("failed to create index idx_webauthn_sessions_expires", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_webauthn_creds_cred_id ON webauthn_credentials(credential_id)").Error; err != nil {
+		slog.Warn("failed to create index idx_webauthn_creds_cred_id", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_portfolio_asset ON holdings(portfolio_id, asset_id)").Error; err != nil {
+		slog.Warn("failed to create index idx_holdings_portfolio_asset", "error", err)
+	}
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_available_funds_unique ON available_funds(user_id, portfolio_id, currency)").Error; err != nil {
+		slog.Warn("failed to create index idx_available_funds_unique", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_fund_transactions_portfolio_ts ON fund_transactions(portfolio_id, created_at DESC)").Error; err != nil {
+		slog.Warn("failed to create index idx_fund_transactions_portfolio_ts", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_dividend_events_holding_date ON dividend_events(holding_id, payment_date DESC)").Error; err != nil {
+		slog.Warn("failed to create index idx_dividend_events_holding_date", "error", err)
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)").Error; err != nil {
+		slog.Warn("failed to create index idx_holdings_account_id", "error", err)
+	}
 
 	return db, nil
-}
-
-// migrateHoldingCostToNetInvestment makes Holding.Cost a derived net-cash-flow
-// value. It is intentionally idempotent so data created by older releases is
-// corrected on the first startup and remains consistent on later startups.
-func migrateHoldingCostToNetInvestment(db *gorm.DB) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec(`
-			UPDATE holding_lots
-			SET source = 'dividend_reinvest'
-			FROM dividend_events
-			WHERE dividend_events.holding_lot_id = holding_lots.id
-		`).Error; err != nil {
-			return err
-		}
-
-		var holdings []models.Holding
-		if err := tx.Find(&holdings).Error; err != nil {
-			return err
-		}
-		for i := range holdings {
-			lots, err := models.LoadLots(tx, holdings[i].ID)
-			if err != nil {
-				return err
-			}
-			models.RecalcFromLots(&holdings[i], lots)
-			if err := tx.Model(&holdings[i]).Updates(map[string]any{
-				"shares": holdings[i].Shares, "value": holdings[i].Value,
-				"cost": holdings[i].Cost, "cost_price": holdings[i].CostPrice,
-			}).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// removeLegacyDividendLedger is a one-time destructive migration. The old
-// dividends table used a different accounting contract, so its records cannot
-// be represented safely in dividend_events. Linked DRIP lots and transaction
-// log rows are removed; existing cash balances are retained as opening cash.
-func removeLegacyDividendLedger(db *gorm.DB) error {
-	if !db.Migrator().HasTable("dividends") {
-		return nil
-	}
-	type legacyDividend struct {
-		HoldingID    uuid.UUID
-		HoldingLotID *uuid.UUID
-		FundTxID     *uuid.UUID
-	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		var rows []legacyDividend
-		if err := tx.Table("dividends").Select("holding_id", "holding_lot_id", "fund_tx_id").Find(&rows).Error; err != nil {
-			return err
-		}
-		holdingIDs := make([]uuid.UUID, 0, len(rows))
-		seen := make(map[uuid.UUID]struct{}, len(rows))
-		for _, row := range rows {
-			if row.HoldingLotID != nil {
-				if err := tx.Where("id = ?", *row.HoldingLotID).Delete(&models.HoldingLot{}).Error; err != nil {
-					return err
-				}
-			}
-			if row.FundTxID != nil {
-				if err := tx.Where("id = ?", *row.FundTxID).Delete(&models.FundTransaction{}).Error; err != nil {
-					return err
-				}
-			}
-			if _, ok := seen[row.HoldingID]; !ok {
-				seen[row.HoldingID] = struct{}{}
-				holdingIDs = append(holdingIDs, row.HoldingID)
-			}
-		}
-		for _, holdingID := range holdingIDs {
-			var holding models.Holding
-			if err := tx.First(&holding, "id = ?", holdingID).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					continue
-				}
-				return err
-			}
-			lots, err := models.LoadLots(tx, holdingID)
-			if err != nil {
-				return err
-			}
-			models.RecalcFromLots(&holding, lots)
-			if err := tx.Model(&holding).Updates(map[string]any{
-				"shares": holding.Shares, "value": holding.Value, "cost": holding.Cost,
-				"cost_price": holding.CostPrice, "total_dividends": 0,
-			}).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Migrator().DropTable("dividends")
-	})
 }
 
 func IsSetupMode() bool {

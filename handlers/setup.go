@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -122,7 +123,9 @@ func SetupComplete(h *server.Hertz) app.HandlerFunc {
 
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			h.Shutdown(context.Background())
+			if err := h.Shutdown(context.Background()); err != nil {
+				slog.Error("failed to shutdown server", "error", err)
+			}
 		}()
 	}
 }

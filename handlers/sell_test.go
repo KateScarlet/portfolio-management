@@ -302,9 +302,7 @@ func TestSell_ConcurrentRequestsCannotOversell(t *testing.T) {
 	statuses := make(chan int, 2)
 	var wg sync.WaitGroup
 	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			c := newCtx(id, SellRequest{
 				Shares: decimal.NewFromInt(8),
@@ -312,7 +310,7 @@ func TestSell_ConcurrentRequestsCannotOversell(t *testing.T) {
 			})
 			SellHolding(db)(context.Background(), c)
 			statuses <- c.Response.StatusCode()
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()

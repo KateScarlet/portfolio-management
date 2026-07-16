@@ -394,14 +394,12 @@ func TestAddAvailableFund_ConcurrentCreditsDoNotLoseUpdates(t *testing.T) {
 	errs := make(chan error, workers)
 	var wg sync.WaitGroup
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			errs <- db.Transaction(func(tx *gorm.DB) error {
 				return addAvailableFund(tx, testUserID, testPortfolioID, "USD", decimal.NewFromInt(1))
 			})
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -436,14 +434,12 @@ func TestDeductAvailableFund_ConcurrentDebitsCannotOverspend(t *testing.T) {
 	results := make(chan error, workers)
 	var wg sync.WaitGroup
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			results <- db.Transaction(func(tx *gorm.DB) error {
 				return deductAvailableFund(tx, testUserID, testPortfolioID, "USD", decimal.NewFromInt(15))
 			})
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()

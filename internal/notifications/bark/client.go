@@ -67,7 +67,11 @@ func (c *Client) SendNotification(title, body, group string) error {
 		slog.Error("failed to send bark notification", "error", err)
 		return fmt.Errorf("failed to send bark notification: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Error("failed to close response body", "error", err)
+		}
+	}()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

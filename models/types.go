@@ -323,6 +323,4 @@ type Dividend struct {
 	UpdatedAt         time.Time       `gorm:"autoUpdateTime;timestamptz" json:"updatedAt"`
 }
 
-// TableName deliberately uses a new table. The old dividends table represented
-// a different accounting contract and is not migrated.
 func (Dividend) TableName() string { return "dividend_events" }

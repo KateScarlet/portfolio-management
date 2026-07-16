@@ -357,7 +357,8 @@ func (n *Notifier) checkSummary(userID, portfolioID uuid.UUID, portfolioName str
 		}
 
 		var summaryHoldings []notifications.SummaryHolding
-		for _, h := range holdingsByAsset[id] {
+		for i := range holdingsByAsset[id] {
+			h := &holdingsByAsset[id][i]
 			hPct := decimal.Zero
 			if total.IsPositive() {
 				hPct = h.Value.Div(total).Mul(decimal.NewFromInt(100))

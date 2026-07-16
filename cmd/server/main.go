@@ -60,7 +60,11 @@ func main() {
 		slog.Error("failed to get sqlDB", "error", err)
 		panic("Failed to get sqlDB: " + err.Error())
 	}
-	defer sqlDB.Close()
+	defer func() {
+		if err := sqlDB.Close(); err != nil {
+			slog.Error("failed to close database", "error", err)
+		}
+	}()
 
 	yahoo.Init()
 	eastmoney.Init()

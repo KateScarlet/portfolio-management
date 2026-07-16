@@ -61,7 +61,10 @@ func Login(db *gorm.DB, cfg *db.Config) app.HandlerFunc {
 			return
 		}
 
-		_ = ensureDefaultAccount(db, user.ID)
+		if err := ensureDefaultAccount(db, user.ID); err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认账户失败"})
+			return
+		}
 
 		setAuthCookie(c, "auth_token", token, cookieMaxAge, cfg)
 		c.JSON(consts.StatusOK, map[string]any{
