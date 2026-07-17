@@ -1,12 +1,11 @@
 # ---- Build frontend ----
-FROM node:26.5 AS frontend
-RUN npm install -g pnpm@11
+FROM ghcr.io/voidzero-dev/vite-plus:latest AS frontend
 WORKDIR /app
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    vp install --frozen-lockfile
 COPY web/ ./
-RUN pnpm build
+RUN vp build
 
 # ---- Build backend ----
 FROM golang:1.26.5 AS backend

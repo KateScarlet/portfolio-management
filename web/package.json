@@ -1,19 +1,19 @@
 {
   "name": "permanent-portfolio-web",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "oxlint .",
-    "lint:fix": "oxlint . --fix",
-    "format": "oxfmt --ignore-path .oxfmtignore .",
-    "format:check": "oxfmt --check --ignore-path .oxfmtignore .",
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "lint": "vp lint .",
+    "lint:fix": "vp lint . --fix",
+    "format": "vp fmt --ignore-path .oxfmtignore .",
+    "format:check": "vp fmt --check --ignore-path .oxfmtignore .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vp test run",
+    "test:watch": "vp test"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
@@ -34,14 +34,19 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.3",
     "esbuild": "^0.28.1",
     "jsdom": "^29.1.1",
-    "oxfmt": "^0.58.0",
-    "oxlint": "^1.73.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~7.0.2",
-    "vite": "^8.1.4",
-    "vitest": "^4.1.10"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.13.1",
+      "onFail": "download"
+    }
   }
 }

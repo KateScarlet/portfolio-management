@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react"
-import { describe, it, expect } from "vitest"
+import { describe, it, expect } from "vite-plus/test"
 import AssetIcon from "./AssetIcon"
 import type { AssetId } from "../types"
 
