@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"portfolio-management/db"
 	"portfolio-management/models"
 
@@ -152,13 +153,25 @@ func OIDCCallback(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 				c.JSON(consts.StatusConflict, map[string]string{"error": "创建用户失败，用户名 '" + username + "' 可能已被占用: " + err.Error()})
 				return
 			}
-			_ = ensureDefaultPortfolio(gormDB, user.ID)
-			_ = ensureDefaultAccount(gormDB, user.ID)
+			if err := ensureDefaultPortfolio(gormDB, user.ID); err != nil {
+				slog.Error("failed to create default portfolio for OIDC user", "error", err, "userId", user.ID)
+				gormDB.Delete(&user)
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认组合失败"})
+				return
+			}
+			if err := ensureDefaultAccount(gormDB, user.ID); err != nil {
+				slog.Error("failed to create default account for OIDC user", "error", err, "userId", user.ID)
+				gormDB.Delete(&user)
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "创建默认账户失败"})
+				return
+			}
 		case err != nil:
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "查询用户失败"})
 			return
 		case user.Username != username:
-			gormDB.Model(&user).Update("username", username)
+			if err := gormDB.Model(&user).Update("username", username).Error; err != nil {
+				slog.Error("failed to update OIDC username", "error", err, "userId", user.ID)
+			}
 			user.Username = username
 		}
 

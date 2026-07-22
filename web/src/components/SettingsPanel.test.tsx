@@ -210,4 +210,49 @@ describe("SettingsPanel", () => {
       ).toBe(true)
     }
   )
+
+  it("allows recovering from 100% allocation by dragging back", async () => {
+    const { container, onSave } = renderPanel({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        targetStocks: 100,
+        targetBonds: 0,
+        targetCash: 0,
+        targetCommodities: 0,
+      },
+    })
+    fireEvent.click(screen.getByTitle("设置"))
+
+    const handles = container.querySelectorAll<HTMLElement>(".cursor-col-resize")
+    const handle0 = handles[0]
+    const bar = handle0.parentElement?.parentElement
+    expect(handle0).toBeDefined()
+    expect(bar).not.toBeNull()
+
+    Object.defineProperty(handle0, "setPointerCapture", { value: vi.fn() })
+    vi.spyOn(bar as HTMLElement, "getBoundingClientRect").mockReturnValue({
+      width: 200,
+      height: 40,
+      top: 0,
+      right: 200,
+      bottom: 40,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    // Drag handle0 left by 100px to reduce stocks from 100% by 50%
+    fireEvent.pointerDown(handle0, { clientX: 150, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 50, pointerId: 1 })
+    fireEvent.pointerUp(window, { pointerId: 1 })
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const saved = vi.mocked(onSave).mock.calls[0][0]
+    expect(saved.targetStocks).toBeLessThan(100)
+    expect(saved.targetStocks).toBeGreaterThan(0)
+    expect(saved.targetBonds).toBeGreaterThan(0)
+    expect(saved.targetStocks + saved.targetBonds).toBe(100)
+  })
 })

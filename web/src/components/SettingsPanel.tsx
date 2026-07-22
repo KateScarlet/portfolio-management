@@ -1589,18 +1589,26 @@ function TargetAllocationBar({
                   {def.name} {pct}%
                 </span>
               )}
-              {i < 3 && (
-                <div
-                  className="absolute right-0 top-0 bottom-0 w-1.5 z-10 flex items-center justify-center cursor-col-resize touch-none"
-                  onPointerDown={(e) => handlePointerDown(i, e)}
-                >
-                  <div
-                    className={`w-0.5 h-5 rounded-full transition-colors ${
-                      dragIdx === i ? "bg-white" : "bg-white/50"
-                    }`}
-                  />
-                </div>
-              )}
+              {i < 3 &&
+                (() => {
+                  const belowSum = currentPcts.slice(0, i).reduce((s, v) => s + v, 0)
+                  const aboveSum = currentPcts.slice(i + 2).reduce((s, v) => s + v, 0)
+                  const isConstrained = belowSum + aboveSum >= 100
+                  return (
+                    <div
+                      className={`absolute right-0 top-0 bottom-0 w-1.5 z-10 flex items-center justify-center cursor-col-resize touch-none ${
+                        isConstrained ? "pointer-events-none opacity-0" : ""
+                      }`}
+                      onPointerDown={(e) => handlePointerDown(i, e)}
+                    >
+                      <div
+                        className={`w-0.5 h-5 rounded-full transition-colors ${
+                          dragIdx === i ? "bg-white" : "bg-white/50"
+                        }`}
+                      />
+                    </div>
+                  )
+                })()}
             </div>
           )
         })}
