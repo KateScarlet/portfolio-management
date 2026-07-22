@@ -22,10 +22,10 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.25.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "recharts": "^3.9.2",
+    "recharts": "^3.10.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
@@ -45,7 +45,7 @@
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "11.13.1",
+      "version": "11.15.1",
       "onFail": "download"
     }
   }
