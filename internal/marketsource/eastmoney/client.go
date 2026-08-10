@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -388,18 +387,6 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 	}, nil
 }
 
-type fundGZResponse struct {
-	FundCode string `json:"fundcode"`
-	Name     string `json:"name"`
-	JZRQ     string `json:"jzrq"`
-	DWJZ     string `json:"dwjz"`
-	GSZ      string `json:"gsz"`
-	GSZSZL   string `json:"gszzl"`
-	GZTime   string `json:"gztime"`
-}
-
-var jsonpRe = regexp.MustCompile(`^jsonpgz\((.*)\);$`)
-
 type fundLSJZItem struct {
 	FSRQ  string `json:"FSRQ"`  // 净值日期
 	DWJZ  string `json:"DWJZ"`  // 单位净值
@@ -448,7 +435,7 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 		return nil, fmt.Errorf("no NAV for fund %s", code)
 	}
 
-	// Get fund name from fundgz API
+	// Get fund name from FundValuationLast API
 	name := fetchFundName(queryCode)
 
 	slog.Info("eastmoney fund NAV fetched", "code", code, "price", price, "date", item.FSRQ)
@@ -462,27 +449,33 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 	}, nil
 }
 
+type fundValuationItem struct {
+	FCODE     string  `json:"FCODE"`
+	SHORTNAME string  `json:"SHORTNAME"`
+	NAV       float64 `json:"NAV"`
+}
+
+type fundValuationResponse struct {
+	Data      []fundValuationItem `json:"data"`
+	ErrorCode int                 `json:"errorCode"`
+	Success   bool                `json:"success"`
+}
+
 func fetchFundName(queryCode string) string {
 	r, err := httpClient.R().
-		SetHeader("Accept", "*/*").
-		Get(fmt.Sprintf("https://fundgz.1234567.com.cn/js/%s.js", queryCode))
+		Get(fmt.Sprintf("https://fundcomapi.eastmoney.com/mm/newCore/FundValuationLast?FCODES=%s&FIELDS=FCODE,SHORTNAME", queryCode))
 	if err != nil {
 		slog.Debug("eastmoney: failed to fetch fund name", "code", queryCode, "error", err)
 		return queryCode
 	}
-	body := strings.TrimSpace(r.String())
-	m := jsonpRe.FindStringSubmatch(body)
-	if len(m) < 2 {
-		slog.Debug("eastmoney: fund name not found in response", "code", queryCode)
-		return queryCode
-	}
-	var resp fundGZResponse
-	if err := json.Unmarshal([]byte(m[1]), &resp); err != nil {
+	var resp fundValuationResponse
+	if err := json.Unmarshal(r.Body(), &resp); err != nil {
 		slog.Debug("eastmoney: failed to parse fund name response", "code", queryCode, "error", err)
 		return queryCode
 	}
-	if resp.Name == "" {
+	if !resp.Success || len(resp.Data) == 0 || resp.Data[0].SHORTNAME == "" {
+		slog.Debug("eastmoney: fund name not found in response", "code", queryCode)
 		return queryCode
 	}
-	return resp.Name
+	return resp.Data[0].SHORTNAME
 }
