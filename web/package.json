@@ -22,7 +22,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",
-    "lucide-react": "^1.28.0",
+    "lucide-react": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
@@ -31,11 +31,11 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "autoprefixer": "^10.5.4",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
@@ -45,7 +45,7 @@
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "11.15.1",
+      "version": "11.21.0",
       "onFail": "download"
     }
   }
