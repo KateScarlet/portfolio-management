@@ -22,7 +22,7 @@ interface Props {
   onRefresh: () => void | Promise<void>
 }
 
-type PendingAction = "create" | "delete" | string | null
+type PendingAction = string | null
 
 export default function AccountManager({ accounts, onClose, onRefresh }: Props) {
   const [showCreate, setShowCreate] = useState(false)
