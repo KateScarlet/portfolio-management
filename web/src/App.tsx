@@ -130,7 +130,12 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [availableFunds, setAvailableFunds] = useState<AvailableFund[]>([])
   const [fundTransactions, setFundTransactions] = useState<FundTransaction[]>([])
-  const exchangeRates = useExchangeRates(availableFunds, settings.displayCurrency)
+  const [holdingCurrencies, setHoldingCurrencies] = useState<string[]>([])
+  const exchangeRates = useExchangeRates(
+    availableFunds,
+    holdingCurrencies,
+    settings.displayCurrency
+  )
 
   const {
     holdings,
@@ -144,6 +149,10 @@ export default function App() {
     saveRecord,
     deleteRecord,
   } = usePortfolio(currentPortfolio?.id || null, settings.displayCurrency, exchangeRates)
+
+  useEffect(() => {
+    setHoldingCurrencies([...new Set(holdings.map((h) => h.currency))])
+  }, [holdings])
 
   const totalFundsDisplay = availableFunds.reduce((sum, f) => {
     const rate = exchangeRates[f.currency]

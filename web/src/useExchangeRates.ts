@@ -3,7 +3,11 @@ import { AvailableFund } from "./types"
 import * as api from "./api"
 import { useToast } from "./components/toast-context"
 
-export function useExchangeRates(availableFunds: AvailableFund[], displayCurrency: string = "CNY") {
+export function useExchangeRates(
+  availableFunds: AvailableFund[],
+  holdingCurrencies: string[],
+  displayCurrency: string = "CNY"
+) {
   const [exchangeRates, setExchangeRates] = useState<Record<string, string>>({
     [displayCurrency]: "1",
   })
@@ -13,11 +17,12 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
   useEffect(() => {
     if (prevDisplayCurrency.current !== displayCurrency) {
       prevDisplayCurrency.current = displayCurrency
-      setExchangeRates({ [displayCurrency]: "1" })
     }
 
-    const currencies = availableFunds.map((f) => f.currency).filter((c) => c !== displayCurrency)
-    const unique = [...new Set(currencies)]
+    const allCurrencies = [...availableFunds.map((f) => f.currency), ...holdingCurrencies].filter(
+      (c) => c !== displayCurrency
+    )
+    const unique = [...new Set(allCurrencies)]
     if (unique.length === 0) return
 
     let cancelled = false
@@ -49,7 +54,7 @@ export function useExchangeRates(availableFunds: AvailableFund[], displayCurrenc
     return () => {
       cancelled = true
     }
-  }, [availableFunds, displayCurrency, showToast])
+  }, [availableFunds, holdingCurrencies, displayCurrency, showToast])
 
   return exchangeRates
 }
