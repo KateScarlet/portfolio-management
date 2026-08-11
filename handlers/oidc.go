@@ -235,6 +235,7 @@ func UpdateOIDCConfig(cfg *db.Config) app.HandlerFunc {
 		}
 
 		if err := db.SaveConfig(cfg); err != nil {
+			slog.Error("failed to save OIDC config", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存配置失败"})
 			return
 		}
@@ -290,6 +291,7 @@ func UpdateWebAuthnConfig(cfg *db.Config) app.HandlerFunc {
 		}
 
 		if err := db.SaveConfig(cfg); err != nil {
+			slog.Error("failed to save WebAuthn config", "error", err)
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "保存配置失败"})
 			return
 		}
