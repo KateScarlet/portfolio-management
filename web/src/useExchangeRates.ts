@@ -17,6 +17,7 @@ export function useExchangeRates(
   useEffect(() => {
     if (prevDisplayCurrency.current !== displayCurrency) {
       prevDisplayCurrency.current = displayCurrency
+      setExchangeRates({ [displayCurrency]: "1" })
     }
 
     const allCurrencies = [...availableFunds.map((f) => f.currency), ...holdingCurrencies].filter(
