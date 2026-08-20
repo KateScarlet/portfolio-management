@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"portfolio-management/models"
 	"time"
+
+	"portfolio-management/models"
 
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"

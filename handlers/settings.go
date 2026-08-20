@@ -2,21 +2,22 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"log/slog"
+	"strconv"
+	"sync"
+	"time"
+	"uuid"
+
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/internal/scheduler"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"strconv"
-	"sync"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

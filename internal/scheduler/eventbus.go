@@ -3,8 +3,7 @@ package scheduler
 import (
 	"log/slog"
 	"sync"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 const subscriberBufferSize = 64

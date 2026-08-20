@@ -2,15 +2,16 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"portfolio-management/middleware"
-	"portfolio-management/models"
+	"encoding/json/v2"
 	"testing"
 	"time"
+	"uuid"
+
+	"portfolio-management/middleware"
+	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -55,7 +56,7 @@ func TestValidateDividendInput(t *testing.T) {
 
 func TestDividendCashLifecycle(t *testing.T) {
 	db := setupTestDB(t)
-	currency := "D" + uuid.NewString()[:8]
+	currency := "D" + uuid.New().String()[:8]
 	holdingID := createTestHoldingWithCurrency(t, db, currency, 10, 100, 900)
 	date := time.Now().Add(-24 * time.Hour).Truncate(time.Second)
 	c := newDividendCtx("POST", "", CreateDividendRequest{
@@ -337,7 +338,7 @@ func TestUpdateDividend_RejectsInvalidOrMissingRecord(t *testing.T) {
 		t.Fatalf("invalid id: expected 400, got %d", invalidCtx.Response.StatusCode())
 	}
 
-	missingCtx := newDividendCtx("PUT", uuid.NewString(), validBody)
+	missingCtx := newDividendCtx("PUT", uuid.New().String(), validBody)
 	UpdateDividend(db)(context.Background(), missingCtx)
 	if missingCtx.Response.StatusCode() != 404 {
 		t.Fatalf("missing record: expected 404, got %d: %s", missingCtx.Response.StatusCode(), missingCtx.Response.Body())

@@ -3,13 +3,14 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
-	"portfolio-management/internal/marketsource"
-	"portfolio-management/models"
 	"strconv"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
+	"portfolio-management/internal/marketsource"
+	"portfolio-management/models"
+
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

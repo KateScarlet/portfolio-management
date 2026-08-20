@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 func init() {

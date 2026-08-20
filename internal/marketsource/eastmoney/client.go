@@ -3,7 +3,8 @@ package eastmoney
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
 	"math"
@@ -42,7 +43,7 @@ var (
 type eastmoneyResponse struct {
 	RC   int `json:"rc"`
 	Data *struct {
-		F43Raw json.RawMessage `json:"f43"`
+		F43Raw jsontext.Value `json:"f43"`
 		F57    string          `json:"f57"`
 		F58    string          `json:"f58"`
 		F59    int             `json:"f59"`
@@ -51,7 +52,7 @@ type eastmoneyResponse struct {
 
 // parseF43 extracts an int from the raw f43 JSON value.
 // Returns (value, true) when f43 is a number; (0, false) when f43 is "-" or non-numeric.
-func parseF43(raw json.RawMessage) (int, bool) {
+func parseF43(raw jsontext.Value) (int, bool) {
 	var n int
 	if err := json.Unmarshal(raw, &n); err != nil {
 		return 0, false

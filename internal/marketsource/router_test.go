@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -23,6 +23,7 @@ func (m *mockSource) FetchQuote(symbol, market string) (*Quote, error) {
 	m.quoteCalls.Add(1)
 	return &Quote{Symbol: symbol, Price: decimal.NewFromInt(100), Currency: "USD"}, nil
 }
+
 func (m *mockSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	m.exchangeCalls.Add(1)
 	return decimal.NewFromFloat(7.2), nil
@@ -260,6 +261,7 @@ func (f *failingSource) SupportedMarkets() []string { return f.markets }
 func (f *failingSource) FetchQuote(symbol, market string) (*Quote, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (f *failingSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	f.exchangeCalls.Add(1)
 	return decimal.Zero, fmt.Errorf("source unavailable")
@@ -276,6 +278,7 @@ func (n *notSupportedSource) SupportedMarkets() []string { return n.markets }
 func (n *notSupportedSource) FetchQuote(symbol, market string) (*Quote, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
 func (n *notSupportedSource) FetchExchangeRate(pair string) (decimal.Decimal, error) {
 	n.exchangeCalls.Add(1)
 	return decimal.Zero, ErrNotSupported

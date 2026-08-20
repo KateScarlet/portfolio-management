@@ -2,14 +2,14 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
+	"uuid"
+
 	"portfolio-management/internal/scheduler"
 	"portfolio-management/middleware"
 
-	"log/slog"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

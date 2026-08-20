@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time"
+	"uuid"
+
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/internal/notifications/telegram"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"strings"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

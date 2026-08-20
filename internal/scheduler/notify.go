@@ -3,16 +3,17 @@ package scheduler
 import (
 	"log/slog"
 	"maps"
+	"strings"
+	"sync"
+	"time"
+	"uuid"
+
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/internal/notifications"
 	"portfolio-management/internal/notifications/bark"
 	"portfolio-management/internal/notifications/telegram"
 	"portfolio-management/models"
-	"strings"
-	"sync"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

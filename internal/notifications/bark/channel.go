@@ -3,12 +3,13 @@ package bark
 import (
 	"fmt"
 	"log/slog"
-	"portfolio-management/internal/notifications"
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
+	"portfolio-management/internal/notifications"
+
 	"gorm.io/gorm"
 )
 

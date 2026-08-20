@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"context"
+	"uuid"
+
 	"portfolio-management/middleware"
 	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

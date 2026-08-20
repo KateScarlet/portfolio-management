@@ -1,7 +1,8 @@
 package eastmoney
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 )
 
@@ -88,7 +89,7 @@ func TestParseF43(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			raw := json.RawMessage(tt.input)
+			raw := jsontext.Value(tt.input)
 			gotN, gotOk := parseF43(raw)
 			if gotN != tt.wantN || gotOk != tt.wantOk {
 				t.Errorf("parseF43(%s) = (%v, %v), want (%v, %v)", tt.input, gotN, gotOk, tt.wantN, tt.wantOk)

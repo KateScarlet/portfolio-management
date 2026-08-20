@@ -3,15 +3,16 @@ package handlers
 import (
 	"context"
 	"errors"
+	"time"
+	"uuid"
+
 	"portfolio-management/db"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

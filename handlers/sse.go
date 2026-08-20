@@ -2,18 +2,19 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"log/slog"
 	"net/http"
-	"portfolio-management/internal/scheduler"
-	"portfolio-management/middleware"
 	"sync"
 	"time"
+	"uuid"
+
+	"portfolio-management/internal/scheduler"
+	"portfolio-management/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
-	"github.com/google/uuid"
 )
 
 const (

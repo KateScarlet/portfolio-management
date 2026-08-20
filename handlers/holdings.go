@@ -2,20 +2,19 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sort"
+	"time"
+	"uuid"
+
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"sort"
-	"time"
-
-	"log/slog"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -293,7 +292,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 		var result models.Holding
 		var resultLots []models.HoldingLot
 		err = db.Transaction(func(tx *gorm.DB) error {
-			if input.AccountID == uuid.Nil {
+			if input.AccountID == uuid.Nil() {
 				var defaultAccount models.Account
 				if err := tx.Where("user_id = ? AND is_default = ?", user.UserID, true).First(&defaultAccount).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -502,7 +501,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		var targetAccountID uuid.UUID
 		if accountRaw, ok := safeUpdates["accountId"]; ok {
 			accountID, err := uuid.Parse(fmt.Sprint(accountRaw))
-			if err != nil || accountID == uuid.Nil {
+			if err != nil || accountID == uuid.Nil() {
 				c.JSON(consts.StatusBadRequest, map[string]string{"error": "无效的账户ID"})
 				return
 			}
@@ -518,8 +517,6 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 				newVal, parseErr = decimal.NewFromString(v)
 			case float64:
 				newVal = decimal.NewFromFloat(v)
-			case json.Number:
-				newVal, parseErr = decimal.NewFromString(v.String())
 			default:
 				newVal, parseErr = decimal.NewFromString(fmt.Sprint(newValue))
 			}
@@ -569,7 +566,7 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 		}
 
 		err = db.Transaction(func(tx *gorm.DB) error {
-			if targetAccountID != uuid.Nil {
+			if targetAccountID != uuid.Nil() {
 				if err := validateAccountOwnership(tx, user.UserID, targetAccountID); err != nil {
 					return err
 				}
@@ -1051,7 +1048,7 @@ func userOwnsPortfolio(db *gorm.DB, userID, portfolioID uuid.UUID) (bool, error)
 }
 
 func validateAccountOwnership(tx *gorm.DB, userID, accountID uuid.UUID) error {
-	if accountID == uuid.Nil {
+	if accountID == uuid.Nil() {
 		return &httpError{status: consts.StatusBadRequest, msg: "账户ID不能为空"}
 	}
 

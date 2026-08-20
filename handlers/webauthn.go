@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
+	"fmt"
 	"log/slog"
 	"math"
+	"time"
+	"uuid"
+
 	"portfolio-management/db"
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -82,6 +84,16 @@ func generateSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+func uuidFromBytes(value []byte) (uuid.UUID, error) {
+	if len(value) != 16 {
+		return uuid.Nil(), fmt.Errorf("invalid UUID length: %d", len(value))
+	}
+
+	var result uuid.UUID
+	copy(result[:], value)
+	return result, nil
+}
+
 type webauthnUser struct {
 	id          []byte
 	name        string
@@ -119,7 +131,7 @@ func loadUserByID(gormDB *gorm.DB, id uuid.UUID) (*models.User, error) {
 }
 
 func loadWebAuthnUser(gormDB *gorm.DB, userHandle []byte) (*webauthnUser, error) {
-	userID, err := uuid.FromBytes(userHandle)
+	userID, err := uuidFromBytes(userHandle)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +442,7 @@ func WebAuthnLoginFinish(gormDB *gorm.DB, cfg *db.Config) app.HandlerFunc {
 		}
 
 		var dbUser models.User
-		webAuthnID, err := uuid.FromBytes(user.WebAuthnID())
+		webAuthnID, err := uuidFromBytes(user.WebAuthnID())
 		if err != nil {
 			c.JSON(consts.StatusNotFound, map[string]string{"error": "用户不存在"})
 			return

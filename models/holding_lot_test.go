@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -27,7 +27,7 @@ func setupModelTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := "test_models_" + uuid.NewString()
+	schema := "test_models_" + uuid.New().String()
 	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA %q`, schema)).Error; err != nil {
 		adminSQLDB.Close() //nolint:errcheck // best effort after setup failure
 		t.Fatal(err)

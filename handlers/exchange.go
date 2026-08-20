@@ -3,12 +3,13 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"uuid"
+
 	"portfolio-management/internal/marketsource"
 	"portfolio-management/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 )
 
 func GetExchange(router *marketsource.Router) app.HandlerFunc {

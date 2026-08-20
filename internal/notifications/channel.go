@@ -1,10 +1,11 @@
 package notifications
 
 import (
-	"portfolio-management/models"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
+	"portfolio-management/models"
+
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

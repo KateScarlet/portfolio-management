@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
-	"portfolio-management/middleware"
-	"portfolio-management/models"
 	"sync"
 	"testing"
 	"time"
+	"uuid"
+
+	"portfolio-management/middleware"
+	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

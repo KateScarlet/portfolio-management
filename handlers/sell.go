@@ -3,15 +3,15 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"time"
+	"uuid"
+
 	"portfolio-management/middleware"
 	"portfolio-management/models"
-	"time"
-
-	"log/slog"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

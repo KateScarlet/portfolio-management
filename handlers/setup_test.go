@@ -3,9 +3,10 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"portfolio-management/db"
+	"encoding/json/v2"
 	"testing"
+
+	"portfolio-management/db"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"

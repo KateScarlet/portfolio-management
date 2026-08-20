@@ -3,11 +3,11 @@ package middleware
 import (
 	"context"
 	"strings"
+	"uuid"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type contextKey string

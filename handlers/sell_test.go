@@ -2,26 +2,29 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"net/url"
 	"os"
-	"portfolio-management/middleware"
-	"portfolio-management/models"
 	"sync"
 	"testing"
 	"time"
+	"uuid"
+
+	"portfolio-management/middleware"
+	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route/param"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-var testUserID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
-var testPortfolioID = uuid.MustParse("00000000-0000-0000-0000-000000000002")
+var (
+	testUserID      = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	testPortfolioID = uuid.MustParse("00000000-0000-0000-0000-000000000002")
+)
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -38,7 +41,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatal(err)
 	}
 
-	schema := "test_" + uuid.NewString()
+	schema := "test_" + uuid.New().String()
 	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA %q`, schema)).Error; err != nil {
 		adminSQLDB.Close() //nolint:errcheck // best effort after setup failure
 		t.Fatal(err)
@@ -111,7 +114,7 @@ func createTestHolding(t *testing.T, db *gorm.DB, shares, price, cost float64) s
 		Cost:        dCost,
 	}
 	var defaultAccount models.Account
-	if err := db.Where("user_id = ? AND is_default = ?", testUserID, true).Find(&defaultAccount).Error; err == nil && defaultAccount.ID != uuid.Nil {
+	if err := db.Where("user_id = ? AND is_default = ?", testUserID, true).Find(&defaultAccount).Error; err == nil && defaultAccount.ID != uuid.Nil() {
 		h.AccountID = defaultAccount.ID
 	}
 	if shares > 0 {

@@ -6,13 +6,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"uuid"
+
 	"portfolio-management/db"
 	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )

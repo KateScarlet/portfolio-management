@@ -1,7 +1,7 @@
 package models
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -197,7 +197,7 @@ func TestAssetMapColumn_ScanAndValue(t *testing.T) {
 	if !decoded["bonds"].Equal(decimal.NewFromInt(3)) {
 		t.Fatalf("unexpected serialized assets: %s", value)
 	}
-	nilValue, err := (AssetMapColumn(nil)).Value()
+	nilValue, err := AssetMapColumn(nil).Value()
 	if err != nil || nilValue != "{}" {
 		t.Fatalf("nil assets should serialize as {}, got %v, err=%v", nilValue, err)
 	}
@@ -236,7 +236,7 @@ func TestHoldingSnapshotColumn_ScanAndValue(t *testing.T) {
 	if len(decoded) != 1 || decoded[0].Symbol != "AAPL" {
 		t.Fatalf("unexpected serialized snapshots: %s", value)
 	}
-	nilValue, err := (HoldingSnapshotColumn(nil)).Value()
+	nilValue, err := HoldingSnapshotColumn(nil).Value()
 	if err != nil || nilValue != "[]" {
 		t.Fatalf("nil snapshots should serialize as [], got %v, err=%v", nilValue, err)
 	}

@@ -3,13 +3,14 @@ package scheduler
 import (
 	"fmt"
 	"os"
-	"portfolio-management/internal/marketsource"
-	"portfolio-management/models"
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
+	"portfolio-management/internal/marketsource"
+	"portfolio-management/models"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

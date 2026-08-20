@@ -1,14 +1,15 @@
 package marketsource
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
-	"portfolio-management/models"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
+	"portfolio-management/models"
+
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"

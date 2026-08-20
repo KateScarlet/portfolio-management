@@ -3,14 +3,15 @@ package handlers
 import (
 	"context"
 	"errors"
-	"portfolio-management/middleware"
-	"portfolio-management/models"
 	"strings"
 	"time"
+	"uuid"
+
+	"portfolio-management/middleware"
+	"portfolio-management/models"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -86,11 +87,11 @@ func writeDividendError(c *app.RequestContext, err error) {
 func parsePortfolioAndUser(c *app.RequestContext) (*middleware.JWTClaims, uuid.UUID, *httpError) {
 	user := middleware.GetUser(c)
 	if user == nil {
-		return nil, uuid.Nil, &httpError{status: consts.StatusUnauthorized, msg: "未登录"}
+		return nil, uuid.Nil(), &httpError{status: consts.StatusUnauthorized, msg: "未登录"}
 	}
 	portfolioID, err := uuid.Parse(c.Param("pid"))
 	if err != nil {
-		return nil, uuid.Nil, &httpError{status: consts.StatusBadRequest, msg: "无效的投资组合ID"}
+		return nil, uuid.Nil(), &httpError{status: consts.StatusBadRequest, msg: "无效的投资组合ID"}
 	}
 	return user, portfolioID, nil
 }
@@ -179,7 +180,7 @@ func RecordDividend(db *gorm.DB) app.HandlerFunc {
 			writeDividendError(c, he)
 			return
 		}
-		if req.HoldingID == uuid.Nil {
+		if req.HoldingID == uuid.Nil() {
 			c.JSON(consts.StatusBadRequest, map[string]string{"error": "持仓ID不能为空"})
 			return
 		}
