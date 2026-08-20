@@ -74,8 +74,7 @@ func LoadConfig() *Config {
 	v.SetDefault("database.dsn", "postgres://localhost:5432/portfolio?sslmode=disable")
 
 	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			if os.IsNotExist(err) {
 				return &Config{}
 			}

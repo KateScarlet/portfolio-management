@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"time"
 	"uuid"
@@ -153,19 +154,17 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 				mh, exists := merged[key]
 				if !exists {
 					mh = &MergedHolding{
-						Holding: models.Holding{
-							ID:          h.ID,
-							UserID:      h.UserID,
-							PortfolioID: h.PortfolioID,
-							AssetId:     h.AssetId,
-							Symbol:      h.Symbol,
-							Name:        h.Name,
-							Market:      h.Market,
-							Currency:    h.Currency,
-							Price:       h.Price,
-							Date:        h.Date,
-						},
-						Accounts: make([]MergedHoldingAccount, 0),
+						ID:          h.ID,
+						UserID:      h.UserID,
+						PortfolioID: h.PortfolioID,
+						AssetId:     h.AssetId,
+						Symbol:      h.Symbol,
+						Name:        h.Name,
+						Market:      h.Market,
+						Currency:    h.Currency,
+						Price:       h.Price,
+						Date:        h.Date,
+						Accounts:    make([]MergedHoldingAccount, 0),
 					}
 					merged[key] = mh
 				}
@@ -419,8 +418,7 @@ func CreateHolding(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			var he *httpError
-			if errors.As(err, &he) {
+			if he, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(he.status, map[string]string{"error": he.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -533,8 +531,8 @@ func UpdateHolding(db *gorm.DB) app.HandlerFunc {
 			if !newVal.Equal(oldVal) && len(lots) > 0 {
 				diff := newVal.Sub(oldVal)
 				lastBuyIdx := -1
-				for i := len(lots) - 1; i >= 0; i-- {
-					if lots[i].Type != "sell" {
+				for i, lot := range slices.Backward(lots) {
+					if lot.Type != "sell" {
 						lastBuyIdx = i
 						break
 					}
@@ -694,8 +692,7 @@ func DeleteHolding(db *gorm.DB) app.HandlerFunc {
 			return nil
 		})
 		if err != nil {
-			var he *httpError
-			if errors.As(err, &he) {
+			if he, ok := errors.AsType[*httpError](err); ok {
 				c.JSON(he.status, map[string]string{"error": he.msg})
 			} else {
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})

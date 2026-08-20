@@ -44,9 +44,9 @@ type eastmoneyResponse struct {
 	RC   int `json:"rc"`
 	Data *struct {
 		F43Raw jsontext.Value `json:"f43"`
-		F57    string          `json:"f57"`
-		F58    string          `json:"f58"`
-		F59    int             `json:"f59"`
+		F57    string         `json:"f57"`
+		F58    string         `json:"f58"`
+		F59    int            `json:"f59"`
 	} `json:"data"`
 }
 
@@ -99,7 +99,7 @@ type searchResponse struct {
 // isUSQuoteID checks whether a QuoteID belongs to a US exchange.
 // US exchange prefixes: 105=NASDAQ, 106=NYSE, 107=AMEX.
 func isUSQuoteID(quoteID string) bool {
-	prefix := strings.SplitN(quoteID, ".", 2)[0]
+	prefix, _, _ := strings.Cut(quoteID, ".")
 	return prefix == "105" || prefix == "106" || prefix == "107"
 }
 

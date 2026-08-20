@@ -332,13 +332,11 @@ func ensureDefaultPortfolio(db *gorm.DB, userID uuid.UUID) error {
 
 func generateToken(user *models.User) (string, error) {
 	claims := &middleware.JWTClaims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+		UserID:    user.ID,
+		Username:  user.Username,
+		Role:      user.Role,
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

@@ -115,8 +115,7 @@ func changeAvailableFund(tx *gorm.DB, userID, portfolioID uuid.UUID, currency st
 		return addAvailableFund(tx, userID, portfolioID, currency, delta)
 	}
 	if err := deductAvailableFund(tx, userID, portfolioID, currency, delta.Abs()); err != nil {
-		var httpErr *httpError
-		if errors.As(err, &httpErr) {
+		if _, ok := errors.AsType[*httpError](err); ok {
 			return &httpError{status: consts.StatusBadRequest, msg: "可用资金不足，无法撤销该分红"}
 		}
 		return err
