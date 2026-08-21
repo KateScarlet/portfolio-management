@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
+	"resty.dev/v3"
 
 	"portfolio-management/internal/marketsource"
 )
@@ -77,7 +77,7 @@ func Init() {
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
 		SetRetryMaxWaitTime(5 * time.Second).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
+		AddRetryConditions(func(r *resty.Response, err error) bool {
 			if err != nil {
 				return true
 			}
@@ -126,7 +126,7 @@ func resolveUSSecid(ticker string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("eastmoney search request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return "", fmt.Errorf("eastmoney search returned status %d", r.StatusCode())
 	}
 
@@ -187,7 +187,7 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("eastmoney forex request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return decimal.Zero, fmt.Errorf("eastmoney forex returned status %d", r.StatusCode())
 	}
 
@@ -234,7 +234,7 @@ func fetchCommodityQuote(symbol string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return nil, fmt.Errorf("eastmoney returned status %d", r.StatusCode())
 	}
 
@@ -277,7 +277,7 @@ func fetchAShareQuote(symbol string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney A-share request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return nil, fmt.Errorf("eastmoney A-share returned status %d", r.StatusCode())
 	}
 
@@ -322,7 +322,7 @@ func fetchUSStockQuote(symbol string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney US stock request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return nil, fmt.Errorf("eastmoney US stock returned status %d", r.StatusCode())
 	}
 
@@ -363,7 +363,7 @@ func fetchHKStockQuote(symbol string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney HK stock request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return nil, fmt.Errorf("eastmoney HK stock returned status %d", r.StatusCode())
 	}
 
@@ -418,12 +418,12 @@ func fetchFundQuote(code string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("eastmoney lsjz request failed: %w", err)
 	}
-	if r.IsError() {
+	if r.IsStatusFailure() {
 		return nil, fmt.Errorf("eastmoney lsjz returned status %d", r.StatusCode())
 	}
 
 	var resp fundLSJZResponse
-	if err := json.Unmarshal(r.Body(), &resp); err != nil {
+	if err := json.Unmarshal(r.Bytes(), &resp); err != nil {
 		return nil, fmt.Errorf("failed to parse lsjz response: %w", err)
 	}
 	if resp.ErrCode != 0 || len(resp.Data.LSJZList) == 0 {
@@ -470,7 +470,7 @@ func fetchFundName(queryCode string) string {
 		return queryCode
 	}
 	var resp fundValuationResponse
-	if err := json.Unmarshal(r.Body(), &resp); err != nil {
+	if err := json.Unmarshal(r.Bytes(), &resp); err != nil {
 		slog.Debug("eastmoney: failed to parse fund name response", "code", queryCode, "error", err)
 		return queryCode
 	}

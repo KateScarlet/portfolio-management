@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
+	"resty.dev/v3"
 
 	"portfolio-management/internal/marketsource"
 )
@@ -21,7 +21,7 @@ func Init() {
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
 		SetRetryMaxWaitTime(5 * time.Second).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
+		AddRetryConditions(func(r *resty.Response, err error) bool {
 			if err != nil {
 				return true
 			}
@@ -75,7 +75,7 @@ func fetchQuote(symbol, market string) (*marketsource.Quote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("yahoo finance request failed: %w", err)
 	}
-	if resp.IsError() {
+	if resp.IsStatusFailure() {
 		return nil, fmt.Errorf("yahoo finance returned status %d", resp.StatusCode())
 	}
 
@@ -123,7 +123,7 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("exchange rate request failed: %w", err)
 	}
-	if resp.IsError() {
+	if resp.IsStatusFailure() {
 		return decimal.Zero, fmt.Errorf("exchange rate returned status %d", resp.StatusCode())
 	}
 

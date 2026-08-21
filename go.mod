@@ -5,7 +5,6 @@ go 1.27.0
 require (
 	github.com/cloudwego/hertz v0.10.6
 	github.com/coreos/go-oidc/v3 v3.20.0
-	github.com/go-resty/resty/v2 v2.17.2
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -17,6 +16,7 @@ require (
 	golang.org/x/text v0.41.0
 	gorm.io/driver/postgres v1.6.2
 	gorm.io/gorm v1.31.2
+	resty.dev/v3 v3.0.0-rc.3
 )
 
 require (

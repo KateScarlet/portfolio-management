@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
+	"resty.dev/v3"
 
 	"portfolio-management/internal/marketsource"
 )
@@ -22,7 +22,7 @@ func Init() {
 		SetRetryCount(2).
 		SetRetryWaitTime(1 * time.Second).
 		SetRetryMaxWaitTime(3 * time.Second).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
+		AddRetryConditions(func(r *resty.Response, err error) bool {
 			if err != nil {
 				return true
 			}
@@ -51,12 +51,12 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	if err != nil {
 		return nil, fmt.Errorf("sina request failed: %w", err)
 	}
-	if resp.IsError() {
+	if resp.IsStatusFailure() {
 		return nil, fmt.Errorf("sina returned status %d", resp.StatusCode())
 	}
 
 	// Sina returns GBK-encoded data, convert to UTF-8
-	body := marketsource.GBKToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Bytes())
 	return parseQuote(body, symbol, market)
 }
 
@@ -77,11 +77,11 @@ func fetchExchangeRate(pair string) (decimal.Decimal, error) {
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("sina forex request failed: %w", err)
 	}
-	if resp.IsError() {
+	if resp.IsStatusFailure() {
 		return decimal.Zero, fmt.Errorf("sina forex returned status %d", resp.StatusCode())
 	}
 
-	body := marketsource.GBKToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Bytes())
 	body = strings.TrimSpace(body)
 	if body == "" || body == "var hq_str_=\"\"" {
 		return decimal.Zero, fmt.Errorf("sina no data for forex pair %s", pair)

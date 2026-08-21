@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/shopspring/decimal"
+	"resty.dev/v3"
 
 	"portfolio-management/internal/marketsource"
 )
@@ -21,7 +21,7 @@ func Init() {
 		SetRetryCount(2).
 		SetRetryWaitTime(1 * time.Second).
 		SetRetryMaxWaitTime(3 * time.Second).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
+		AddRetryConditions(func(r *resty.Response, err error) bool {
 			if err != nil {
 				return true
 			}
@@ -50,11 +50,11 @@ func (c *Client) FetchQuote(symbol, market string) (*marketsource.Quote, error) 
 	if err != nil {
 		return nil, fmt.Errorf("tencent request failed: %w", err)
 	}
-	if resp.IsError() {
+	if resp.IsStatusFailure() {
 		return nil, fmt.Errorf("tencent returned status %d", resp.StatusCode())
 	}
 
-	body := marketsource.GBKToUTF8(resp.Body())
+	body := marketsource.GBKToUTF8(resp.Bytes())
 	if market == "FUND" {
 		return parseFundQuote(body, symbol)
 	}
