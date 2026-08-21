@@ -20,14 +20,7 @@ func Init() {
 		SetTimeout(10 * time.Second).
 		SetRetryCount(2).
 		SetRetryWaitTime(1 * time.Second).
-		SetRetryMaxWaitTime(3 * time.Second).
-		AddRetryConditions(func(r *resty.Response, err error) bool {
-			if err != nil {
-				return true
-			}
-			status := r.StatusCode()
-			return status == 429 || status >= 500
-		})
+		SetRetryMaxWaitTime(3 * time.Second)
 }
 
 type Client struct{}

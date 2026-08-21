@@ -76,14 +76,7 @@ func Init() {
 		SetTimeout(30 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(1 * time.Second).
-		SetRetryMaxWaitTime(5 * time.Second).
-		AddRetryConditions(func(r *resty.Response, err error) bool {
-			if err != nil {
-				return true
-			}
-			status := r.StatusCode()
-			return status == 429 || status >= 500
-		})
+		SetRetryMaxWaitTime(5 * time.Second)
 }
 
 // Search API response for resolving US stock secid
