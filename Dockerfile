@@ -8,7 +8,7 @@ COPY web/ ./
 RUN vp build
 
 # ---- Build backend ----
-FROM golang:1.27.0 AS backend
+FROM chainguard/go:latest AS backend
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
