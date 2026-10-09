@@ -9,7 +9,7 @@ require (
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jellydator/ttlcache/v3 v3.4.1
-	github.com/shopspring/decimal v1.4.0
+	github.com/shopspring/decimal v1.5.0
 	github.com/spf13/viper v1.21.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/oauth2 v0.37.0
