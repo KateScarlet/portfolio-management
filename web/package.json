@@ -41,7 +41,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2",
     "vite": "catalog:",
-    "vite-plus": "^1.1.0"
+    "vite-plus": "catalog:"
   },
   "devEngines": {
     "packageManager": {
