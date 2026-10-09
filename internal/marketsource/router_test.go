@@ -122,6 +122,25 @@ func TestFetchQuote_DifferentKeysCachedSeparately(t *testing.T) {
 	}
 }
 
+func TestFetchQuote_RejectsZeroPriceWithoutCaching(t *testing.T) {
+	src := &zeroQuoteSource{name: "yahoo", markets: []string{"COMMODITY_INTL"}}
+	r := NewRouter(nil, map[string]MarketSource{"yahoo": src})
+
+	for range 2 {
+		quote, err := r.FetchQuote(uuid.UUID{}, "GC.INTL", "COMMODITY_INTL")
+		if err == nil {
+			t.Fatal("expected zero-priced gold quote to be rejected")
+		}
+		if quote != nil {
+			t.Fatalf("expected no quote, got %#v", quote)
+		}
+	}
+
+	if src.quoteCalls.Load() != 2 {
+		t.Errorf("expected zero-priced quote not to be cached, got %d source calls", src.quoteCalls.Load())
+	}
+}
+
 // Ensure Router still satisfies its usage (compile-time check).
 var _ interface {
 	FetchQuote(userID uuid.UUID, symbol, market string) (*Quote, error)
@@ -254,6 +273,22 @@ type failingSource struct {
 	name          string
 	markets       []string
 	exchangeCalls atomic.Int32
+}
+
+type zeroQuoteSource struct {
+	name       string
+	markets    []string
+	quoteCalls atomic.Int32
+}
+
+func (z *zeroQuoteSource) Name() string               { return z.name }
+func (z *zeroQuoteSource) SupportedMarkets() []string { return z.markets }
+func (z *zeroQuoteSource) FetchQuote(symbol, market string) (*Quote, error) {
+	z.quoteCalls.Add(1)
+	return &Quote{Symbol: symbol, Price: decimal.Zero}, nil
+}
+func (z *zeroQuoteSource) FetchExchangeRate(string) (decimal.Decimal, error) {
+	return decimal.Zero, ErrNotSupported
 }
 
 func (f *failingSource) Name() string               { return f.name }

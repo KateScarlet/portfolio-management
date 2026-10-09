@@ -79,6 +79,13 @@ func (r *Router) FetchQuote(userID uuid.UUID, symbol, market string) (*Quote, er
 			lastErr = err
 			continue
 		}
+		if q == nil || !q.Price.IsPositive() {
+			err := fmt.Errorf("invalid non-positive price for %s", symbol)
+			slog.Warn("source returned invalid quote, trying next",
+				"source", name, "symbol", symbol, "market", market, "error", err)
+			lastErr = err
+			continue
+		}
 		slog.Info("price fetched", "source", name, "symbol", symbol, "market", market)
 		r.quoteCache.Set(cacheKey, q, r.cacheTTL)
 		return q, nil
