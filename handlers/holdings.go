@@ -894,6 +894,9 @@ func UpdateLot(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			models.RecalcFromLots(&holding, remainingLots)
+			if holding.Shares.IsNegative() {
+				return &httpError{status: consts.StatusBadRequest, msg: "修改交易记录会导致持仓份额为负数"}
+			}
 			return tx.Save(&holding).Error
 		})
 		if err != nil {
@@ -1021,6 +1024,9 @@ func DeleteLot(db *gorm.DB) app.HandlerFunc {
 				return err
 			}
 			models.RecalcFromLots(&holding, remainingLots)
+			if holding.Shares.IsNegative() {
+				return &httpError{status: consts.StatusBadRequest, msg: "删除交易记录会导致持仓份额为负数"}
+			}
 			return tx.Save(&holding).Error
 		})
 		if err != nil {

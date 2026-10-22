@@ -785,6 +785,74 @@ func TestDeleteLot_OtherUserCannotDelete(t *testing.T) {
 	}
 }
 
+func TestUpdateLot_RejectsChangeThatWouldOversell(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	holdingID := uuid.MustParse(createTestHolding(t, db, 10, 100, 900))
+	var buyLot models.HoldingLot
+	if err := db.Where("holding_id = ?", holdingID).First(&buyLot).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.HoldingLot{
+		ID: uuid.New(), HoldingID: holdingID, Type: "sell", Date: time.Now(),
+		Shares: decimal.NewFromInt(8), Cost: decimal.NewFromInt(720), ValueAdded: decimal.NewFromInt(800),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("PATCH", "/api/portfolios/"+testPortfolioID.String()+"/holdings/"+holdingID.String()+"/lots/"+buyLot.ID.String(), map[string]any{
+		"shares": "5",
+	})
+	c.Params = append(c.Params,
+		param.Param{Key: "hid", Value: holdingID.String()},
+		param.Param{Key: "lid", Value: buyLot.ID.String()},
+	)
+	UpdateLot(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 400 {
+		t.Fatalf("expected 400, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var persistedLot models.HoldingLot
+	if err := db.First(&persistedLot, "id = ?", buyLot.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !persistedLot.Shares.Equal(decimal.NewFromInt(10)) {
+		t.Fatalf("buy lot must remain unchanged after rollback, got %s shares", persistedLot.Shares)
+	}
+}
+
+func TestDeleteLot_RejectsDeleteThatWouldOversell(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	holdingID := uuid.MustParse(createTestHolding(t, db, 10, 100, 900))
+	var buyLot models.HoldingLot
+	if err := db.Where("holding_id = ?", holdingID).First(&buyLot).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.HoldingLot{
+		ID: uuid.New(), HoldingID: holdingID, Type: "sell", Date: time.Now(),
+		Shares: decimal.NewFromInt(8), Cost: decimal.NewFromInt(720), ValueAdded: decimal.NewFromInt(800),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := newUserCtx("DELETE", "/api/portfolios/"+testPortfolioID.String()+"/holdings/"+holdingID.String()+"/lots/"+buyLot.ID.String(), nil)
+	c.Params = append(c.Params,
+		param.Param{Key: "hid", Value: holdingID.String()},
+		param.Param{Key: "lid", Value: buyLot.ID.String()},
+	)
+	DeleteLot(db)(context.Background(), c)
+
+	if c.Response.StatusCode() != 400 {
+		t.Fatalf("expected 400, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var count int64
+	if err := db.Model(&models.HoldingLot{}).Where("id = ?", buyLot.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatal("buy lot must remain after rejected delete")
+	}
+}
+
 func TestConvertHoldingsCurrency_SameCurrency_NoChange(t *testing.T) {
 	holdings := []models.Holding{
 		{Currency: "CNY", Value: decimal.NewFromInt(1000), Cost: decimal.NewFromInt(800), Price: decimal.NewFromInt(100), CostPrice: decimal.NewFromInt(80), TotalDividends: decimal.NewFromInt(85)},
