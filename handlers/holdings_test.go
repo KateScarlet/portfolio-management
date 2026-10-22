@@ -115,6 +115,53 @@ func TestListHoldings_MergePreservesTotalDividends(t *testing.T) {
 	}
 }
 
+func TestListHoldings_MergeDoesNotCombineDifferentMarketsOrCurrencies(t *testing.T) {
+	db := setupHoldingsTestDB(t)
+	firstAccount := models.Account{ID: uuid.New(), UserID: testUserID, Name: "US broker"}
+	secondAccount := models.Account{ID: uuid.New(), UserID: testUserID, Name: "HK broker"}
+	if err := db.Create(&firstAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&secondAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, holding := range []models.Holding{
+		{
+			ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID, AccountID: firstAccount.ID,
+			AssetId: "stocks", Symbol: "ACME", Name: "Acme", Market: "US", Currency: "USD",
+			Shares: decimal.NewFromInt(1), Price: decimal.NewFromInt(100), Value: decimal.NewFromInt(100), Cost: decimal.NewFromInt(90),
+		},
+		{
+			ID: uuid.New(), UserID: testUserID, PortfolioID: testPortfolioID, AccountID: secondAccount.ID,
+			AssetId: "stocks", Symbol: "ACME", Name: "Acme", Market: "HK", Currency: "HKD",
+			Shares: decimal.NewFromInt(1), Price: decimal.NewFromInt(100), Value: decimal.NewFromInt(100), Cost: decimal.NewFromInt(90),
+		},
+	} {
+		if err := db.Create(&holding).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	c := newUserCtx("GET", "/api/holdings?merge=true", nil)
+	ListHoldings(db, testRouter())(context.Background(), c)
+
+	if c.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d: %s", c.Response.StatusCode(), c.Response.Body())
+	}
+	var holdings []MergedHolding
+	if err := json.Unmarshal(c.Response.Body(), &holdings); err != nil {
+		t.Fatal(err)
+	}
+	if len(holdings) != 2 {
+		t.Fatalf("expected separate holdings for USD/US and HKD/HK, got %+v", holdings)
+	}
+	for _, holding := range holdings {
+		if !holding.Value.Equal(decimal.NewFromInt(100)) {
+			t.Fatalf("position values must not be combined across currencies, got %s", holding.Value)
+		}
+	}
+}
+
 func TestListHoldings_OtherUserNotReturned(t *testing.T) {
 	db := setupHoldingsTestDB(t)
 	createTestHolding(t, db, 10, 100, 900)

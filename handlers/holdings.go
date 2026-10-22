@@ -142,15 +142,24 @@ func ListHoldings(db *gorm.DB, router *marketsource.Router) app.HandlerFunc {
 			}
 
 			type mergeKey struct {
-				Symbol  string
-				Name    string
-				AssetId string
+				Symbol   string
+				Name     string
+				AssetId  string
+				Market   string
+				Currency string
 			}
 			merged := make(map[mergeKey]*MergedHolding)
 
 			for i := range holdings {
 				h := &holdings[i]
-				key := mergeKey{Symbol: h.Symbol, Name: h.Name, AssetId: h.AssetId}
+				// Values can only be added when they describe the same traded
+				// instrument in the same currency.  In particular, callers that
+				// do not request a display currency receive native values, so
+				// USD and HKD positions must remain separate.
+				key := mergeKey{
+					Symbol: h.Symbol, Name: h.Name, AssetId: h.AssetId,
+					Market: h.Market, Currency: h.Currency,
+				}
 				mh, exists := merged[key]
 				if !exists {
 					mh = &MergedHolding{
